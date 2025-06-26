@@ -173,9 +173,6 @@ def setup(
 # ===============================================================================
 
 
-<<<<<<< HEAD
-def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
-=======
 def eval_pass_k(rewards: torch.Tensor, num_tests_per_prompt: int, k: int) -> float:
     """Evaluate pass@k score using an unbiased estimator.
 
@@ -204,8 +201,7 @@ def eval_pass_k(rewards: torch.Tensor, num_tests_per_prompt: int, k: int) -> flo
     return pass_k_score
 
 
-def run_env_eval(vllm_generation, dataloader, env, master_config):
->>>>>>> 06220d7 (feat: Support pass@k (#536))
+def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
     """Main entry point for running evaluation using environment.
 
     Generates model responses and evaluates them by env.
