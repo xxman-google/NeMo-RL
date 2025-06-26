@@ -86,6 +86,11 @@ class LoggerInterface(ABC):
         """Log dictionary of hyperparameters."""
         pass
 
+    @abstractmethod
+    def log_html(self, html: str) -> None:
+        """Log HTML."""
+        pass
+
 
 class TensorboardLogger(LoggerInterface):
     """Tensorboard logger backend."""
@@ -131,6 +136,15 @@ class TensorboardLogger(LoggerInterface):
             step: Global step value
         """
         self.writer.add_figure(name, figure, step)
+
+    def log_html(self, name: str, html: str) -> None:
+        """Log HTML to Tensorboard.
+
+        Args:
+            name: Data identifier
+            html: HTML data
+        """
+        raise self.writer.add_text(name, html)
 
 
 class WandbLogger(LoggerInterface):
@@ -200,6 +214,15 @@ class WandbLogger(LoggerInterface):
             step: Global step value
         """
         self.run.log({name: figure}, step=step)
+
+    def log_html(self, name: str, html: str) -> None:
+        """Log HTML to wandb.
+
+        Args:
+            name: Data identifier
+            html: HTML data
+        """
+        self.run.log({name: wandb.Html(html)})
 
 
 class GpuMetricSnapshot(TypedDict):
@@ -702,6 +725,11 @@ class Logger(LoggerInterface):
             logger.log_plot(fig, step, name)
 
         plt.close(fig)
+
+    def log_html(self, name: str, html: str) -> None:
+        """Log HTML data."""
+        for logger in self.loggers:
+            logger.log_html(name, html)
 
     def __del__(self) -> None:
         """Clean up resources when the logger is destroyed."""

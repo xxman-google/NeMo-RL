@@ -26,8 +26,10 @@ from nemo_rl.data.llm_message_utils import get_keys_from_message_log
 from nemo_rl.distributed.batched_data_dict import BatchedDataDict
 from nemo_rl.distributed.virtual_cluster import ClusterConfig, RayVirtualCluster
 from nemo_rl.environments.math_environment import MathEnvConfig
+from nemo_rl.evals import visualization as vis_lib
 from nemo_rl.models.generation.interfaces import GenerationConfig
 from nemo_rl.models.generation.vllm import VllmGeneration
+from nemo_rl.utils.logger import Logger, LoggerConfig
 
 # ===============================================================================
 # Configuration
@@ -46,6 +48,7 @@ class MasterConfig(TypedDict):
     data: MathDataConfig
     env: MathEnvConfig
     cluster: ClusterConfig
+    logger: LoggerConfig
 
 
 # ===============================================================================
@@ -61,6 +64,7 @@ def setup(
     VllmGeneration,
     DataLoader,
     MasterConfig,
+    Logger,
 ]:
     """Set up components for model evaluation.
 
@@ -71,12 +75,13 @@ def setup(
         dataset: Dataset to evaluate on.
 
     Returns:
-        VLLM model, data loader, and config.
+        VLLM model, data loader, config, and logger.
     """
     # Extract individual configs for easier access
     eval_config = master_config["eval"]
     generation_config = master_config["generation"]
     cluster_config = master_config["cluster"]
+    logger_config = master_config["logger"]
 
     # Set seed for reproducibility
     set_seed(eval_config["seed"])
@@ -92,6 +97,11 @@ def setup(
         assert temperature > 0 and top_k != 1, (
             "temperature > 0 and top_k != 1 are required for multiple samples"
         )
+    # ==========================
+    #           Logger
+    # ==========================
+    logger = Logger(logger_config)
+    logger.log_hyperparams(master_config)
 
     # ==========================
     #           Data
@@ -142,6 +152,7 @@ def setup(
         vllm_generation,
         dataloader,
         master_config,
+        logger,
     )
 
 
@@ -150,7 +161,7 @@ def setup(
 # ===============================================================================
 
 
-def run_env_eval(vllm_generation, dataloader, env, master_config):
+def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
     """Main entry point for running evaluation using environment.
 
     Generates model responses and evaluates them by env.
@@ -160,6 +171,7 @@ def run_env_eval(vllm_generation, dataloader, env, master_config):
         dataloader: Data loader with evaluation samples.
         env: Environment that scores responses.
         master_config: Configuration settings.
+        logger: Logger for recording evaluation results.
     """
     # Extract for easier access
     generation_config = master_config["generation"]
@@ -169,6 +181,7 @@ def run_env_eval(vllm_generation, dataloader, env, master_config):
 
     # Run evaluation loop
     score, count = 0.0, 0
+    htmls = []
     for batch in dataloader:
         # update stats
         count += batch.size * num_tests_per_prompt
@@ -203,6 +216,15 @@ def run_env_eval(vllm_generation, dataloader, env, master_config):
             for i in range(len(batch["message_log"]))
         ]
         env_return = ray.get(env.step.remote(to_env, batch["extra_env_info"]))
+        for prompt, response, reward, metadata, observation in zip(prompts, outputs, env_return.rewards, env_return.metadata, env_return.observations):
+            html = vis_lib.jinja_env.from_string(vis_lib.HTML_JINJA).render(
+                prompt_messages=[{"content": prompt, "role": "user"}],
+                next_message=dict(content=response, role="assistant"),
+                score=reward.item(),
+                correct_answer=metadata["ground_truth"],
+                extracted_answer=observation["extracted_answer"],
+            )
+            htmls.append(html)
 
         # update stats
         if metric == "pass@1":
@@ -229,3 +251,6 @@ def run_env_eval(vllm_generation, dataloader, env, master_config):
     print(f"{metric=} {num_tests_per_prompt=}\n")
     print(f"score={average_score:.4f} ({score}/{count})")
     print("=" * 60 + "\n")
+    all_htmls = vis_lib.make_report_from_example_htmls(htmls)
+    logger.log_html("Decoding Results", all_htmls)
+

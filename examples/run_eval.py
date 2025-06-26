@@ -253,6 +253,7 @@ def main():
         vllm_generation,
         dataloader,
         master_config,
+        logger,
     ) = setup(config, tokenizer, dataset)
 
     # Run evaluation
@@ -261,6 +262,7 @@ def main():
         dataloader,
         env,
         master_config,
+        logger,
     )
 
 

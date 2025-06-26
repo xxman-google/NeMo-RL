@@ -69,7 +69,7 @@ class HFVerifyWorker:
 
     def verify(
         self, pred_responses: list[str], ground_truths: list[str]
-    ) -> list[float]:
+    ) -> list[tuple[float, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
         Args:
@@ -77,7 +77,7 @@ class HFVerifyWorker:
             ground_truths: list[str]. The ground truth responses.
 
         Returns:
-            list[float]. The rewards for each predicted response.
+            list[tuple[float, str]]. The rewards and the extracted answer for each predicted response.
         """
         results = []
         for response, ground_truth in zip(pred_responses, ground_truths):
@@ -85,27 +85,28 @@ class HFVerifyWorker:
                 ground_truth_parsable = "\\boxed{" + ground_truth + "}"
                 with _mute_output():
                     try:
-                        ret_score, _ = self.verify_func(
+                        ret_score, (_, extracted_answer) = self.verify_func(
                             [ground_truth_parsable], [response]
                         )
+                        extracted_answer = extracted_answer[-1]
                     # It's possible to emit a TimeoutException and that wouldn't be caught since
                     # it actually subclasses from BaseException and math-verify itself does not
                     # to catch it.
                     except (Exception, TimeoutException):
                         ret_score = 0.0
+                        extracted_answer = None
 
-                results.append(float(ret_score))
+                results.append((float(ret_score), extracted_answer))
             except Exception:
-                results.append(0.0)
+                results.append((0.0, extracted_answer))
         return results
-
 
 @ray.remote
 class MultichoiceVerifyWorker:
 
     def verify(
         self, pred_responses: list[str], ground_truths: list[str]
-    ) -> list[float]:
+    ) -> list[tuple[float, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
         Args:
@@ -113,22 +114,21 @@ class MultichoiceVerifyWorker:
             ground_truths: list[str]. The ground truth responses.
 
         Returns:
-            list[float]. The rewards for each predicted response.
+            list[tuple[float, str]]. The rewards and extracted answers for each predicted response.
         """
         results = []
         for response, ground_truth in zip(pred_responses, ground_truths):
-            response = answer_parsing.normalize_response(response)
+            response = normalize_response(response)
             extracted_answer = None
-            for answer_regex in answer_parsing.MULTILINGUAL_ANSWER_REGEXES:
-                regex = answer_parsing.MULTILINGUAL_ANSWER_PATTERN_TEMPLATE.format(answer_regex)
+            for answer_regex in MULTILINGUAL_ANSWER_REGEXES:
+                regex = MULTILINGUAL_ANSWER_PATTERN_TEMPLATE.format(answer_regex)
                 match = re.search(regex, response)
                 if match:
-                    extracted_answer = answer_parsing.normalize_extracted_answer(match.group(1))
+                    extracted_answer = normalize_extracted_answer(match.group(1))
                     break
             score = 1.0 if extracted_answer == ground_truth else 0.0
-            results.append(score)
-        return results
-
+            results.append((score, extracted_answer))
+        return results 
 
 class MathEnvironmentMetadata(TypedDict):
     ground_truth: str
@@ -200,19 +200,20 @@ class MathEnvironment(EnvironmentInterface):
         results = ray.get(futures)
 
         # flatten the results
-        results = [item for sublist in results for item in sublist]
+        results = [(score, extracted_answer) for sublist in results for (score, extracted_answer) in sublist]
         observations = [
             {
                 "role": "environment",
                 "content": "Environment: correct"
-                if result
+                if score
                 else "Environment: incorrect",
+                "extracted_answer": extracted_answer,
             }
-            for result in results
+            for score, extracted_answer in results
         ]
 
         # create a tensor of rewards and done flags
-        rewards = torch.tensor(results).cpu()
+        rewards = torch.tensor([score for score, _ in results]).cpu()
         done = torch.ones_like(rewards).cpu()
 
         next_stop_strings = [None] * len(message_log_batch)

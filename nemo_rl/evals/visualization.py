@@ -104,10 +104,8 @@ jinja_env = jinja2.Environment(
     autoescape=jinja2.select_autoescape(["html", "xml"]),
 )
 
-jinja_env.globals["message_to_html"] = message_to_html
 
-
-def make_report_from_example_htmls(htmls: list[str]):
+def make_report_from_example_htmls(htmls: list[str]) -> str:
     """
     Create a standalone HTML report from a list of example htmls
     """
@@ -125,3 +123,5 @@ def message_to_html(message: Message) -> str:
         content=message["content"],
         variant=message.get("variant", None),
     )
+
+jinja_env.globals["message_to_html"] = message_to_html
