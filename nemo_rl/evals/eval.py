@@ -115,13 +115,6 @@ def setup(
         "num_tests_per_prompt must be greater than or equal to pass_k_value for pass@k metric"
     )
 
-    assert pass_k_value >= 1, (
-        "pass_k_value must be greater than or equal to 1 for pass@k metric"
-    )
-    assert num_tests_per_prompt >= pass_k_value, (
-        "num_tests_per_prompt must be greater than or equal to pass_k_value for pass@k metric"
-    )
-
     # ==========================
     #           Data
     # ==========================
