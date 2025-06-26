@@ -176,6 +176,7 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
     # Extract for easier access
     generation_config = master_config["generation"]
     eval_config = master_config["eval"]
+    logger_config = master_config["logger"]
     metric = eval_config["metric"]
     num_tests_per_prompt = eval_config["num_tests_per_prompt"]
 
@@ -251,6 +252,8 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
     print(f"{metric=} {num_tests_per_prompt=}\n")
     print(f"score={average_score:.4f} ({score}/{count})")
     print("=" * 60 + "\n")
-    all_htmls = vis_lib.make_report_from_example_htmls(htmls)
+    logger.log_metrics({metric: average_score}, step=0)
+    max_samples_to_html = logger_config.get("max_samples_to_html", 30)
+    all_htmls = vis_lib.make_report_from_example_htmls(htmls[:max_samples_to_html])
     logger.log_html("Decoding Results", all_htmls)
 
