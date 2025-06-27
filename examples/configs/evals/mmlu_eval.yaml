@@ -28,9 +28,9 @@ tokenizer:
 
 data:
   max_input_seq_length: ${generation.vllm_cfg.max_model_len} # useless since we directly use prompts in evaluation
-  prompt_file: "examples/prompts/gpqa.txt"
+  prompt_file: "examples/prompts/mmlu.txt"
   system_prompt_file: null
-  dataset_name: "gpqa"
+  dataset_name: "mmlu"
 
 env:
   math:
