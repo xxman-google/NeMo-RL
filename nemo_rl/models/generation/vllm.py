@@ -819,10 +819,11 @@ class VllmGenerationWorker:
         )
         outputs = self.llm.generate(data["prompts"], sampling_params)
         texts = [output.outputs[0].text for output in outputs]
+        generation_lengths = [len(output.outputs[0].token_ids) for output in outputs]
 
         # Convert to BatchedDataDict
         return_data: BatchedDataDict[GenerationOutputSpec] = BatchedDataDict(
-            {"texts": texts}
+            {"texts": texts, "generation_lengths": generation_lengths}
         )
         return return_data
 

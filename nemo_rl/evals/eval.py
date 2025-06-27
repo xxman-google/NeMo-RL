@@ -183,6 +183,7 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
     # Run evaluation loop
     score, count = 0.0, 0
     htmls = []
+    generation_lengths = []
     for batch in dataloader:
         # update stats
         count += batch.size * num_tests_per_prompt
@@ -200,10 +201,12 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
 
         # generate by vllm
         inputs = BatchedDataDict({"prompts": prompts})
-        outputs = vllm_generation.generate_text(inputs)["texts"]
+        outputs = vllm_generation.generate_text(inputs)
+        output_texts = outputs["texts"]
+        generation_lengths.extend(outputs["generation_lengths"])
 
         # append to message_log
-        for idx, output in enumerate(outputs):
+        for idx, output in enumerate(output_texts):
             batch["message_log"][idx].append(
                 {
                     "role": "assistant",
@@ -217,7 +220,7 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
             for i in range(len(batch["message_log"]))
         ]
         env_return = ray.get(env.step.remote(to_env, batch["extra_env_info"]))
-        for prompt, response, reward, metadata, observation in zip(prompts, outputs, env_return.rewards, env_return.metadata, env_return.observations):
+        for prompt, response, reward, metadata, observation in zip(prompts, output_texts, env_return.rewards, env_return.metadata, env_return.observations):
             html = vis_lib.jinja_env.from_string(vis_lib.HTML_JINJA).render(
                 prompt_messages=[{"content": prompt, "role": "user"}],
                 next_message=dict(content=response, role="assistant"),
@@ -252,6 +255,7 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
     print(f"{metric=} {num_tests_per_prompt=}\n")
     print(f"score={average_score:.4f} ({score}/{count})")
     print("=" * 60 + "\n")
+    logger.log_histogram("generation length", generation_lengths, num_bins=10)
     logger.log_metrics({metric: average_score}, step=0)
     max_samples_to_html = logger_config.get("max_samples_to_html", 30)
     all_htmls = vis_lib.make_report_from_example_htmls(htmls[:max_samples_to_html])

@@ -87,8 +87,13 @@ class LoggerInterface(ABC):
         pass
 
     @abstractmethod
-    def log_html(self, html: str) -> None:
+    def log_html(self, name: str, html: str) -> None:
         """Log HTML."""
+        pass
+
+    @abstractmethod
+    def log_histogram(self, name: str, values: list[int | float], num_bins: int) -> None:
+        """Log histogram."""
         pass
 
 
@@ -144,7 +149,17 @@ class TensorboardLogger(LoggerInterface):
             name: Data identifier
             html: HTML data
         """
-        raise self.writer.add_text(name, html)
+        self.writer.add_text(name, html)
+
+    def log_histogram(self, name: str, values: list[int | float], num_bins: int) -> None:
+        """Log histogram data to Tensorboard.
+
+        Args:
+            name: Data identifier
+            values: Data values 
+            num_bins: Number of histogram bins
+        """
+        self.writer.add_histogram(name, values, max_bins=num_bins)
 
 
 class WandbLogger(LoggerInterface):
@@ -223,6 +238,18 @@ class WandbLogger(LoggerInterface):
             html: HTML data
         """
         self.run.log({name: wandb.Html(html)})
+
+    def log_histogram(self, name: str, values: list[int | float], num_bins: int) -> None:
+        """Log histogram data to Tensorboard.
+
+        Args:
+            name: Data identifier
+            values: Data values 
+            num_bins: Number of histogram bins
+        """
+        data = [[v] for v in values]
+        table = wandb.Table(data=data, columns=[name])
+        self.run.log({f"{name}_histogram": wandb.plot.histogram(table, name, title=f"{name} distribution")})
 
 
 class GpuMetricSnapshot(TypedDict):
@@ -730,6 +757,11 @@ class Logger(LoggerInterface):
         """Log HTML data."""
         for logger in self.loggers:
             logger.log_html(name, html)
+
+    def log_histogram(self, name: str, values: list[int | float], num_bins: int) -> None:
+        """Log histogram data."""
+        for logger in self.loggers:
+            logger.log_histogram(name, values, num_bins)
 
     def __del__(self) -> None:
         """Clean up resources when the logger is destroyed."""
