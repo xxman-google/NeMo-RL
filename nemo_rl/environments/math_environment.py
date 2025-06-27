@@ -186,7 +186,7 @@ class MathEnvironment(EnvironmentInterface):
             "math": MathVerifyWorker,
             "code": CodeVerifyWorker,
             "multichoice": MultichoiceVerifyWorker,
-        }[cfg]
+        }[verifier_type]
         self.workers = [
             worker_cls.options(  # type: ignore # (decorated with @ray.remote)
                 runtime_env={"py_executable": PY_EXECUTABLES.SYSTEM}
