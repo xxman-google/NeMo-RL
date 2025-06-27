@@ -17,6 +17,7 @@ import logging
 import re
 from typing import Any, Optional, TypedDict
 
+import evaluate as hf_evaluate
 import ray
 import torch
 from math_verify.errors import TimeoutException
@@ -53,7 +54,7 @@ def _mute_output():
 
 
 @ray.remote
-class HFVerifyWorker:
+class MathVerifyWorker:
     def __init__(self) -> None:
         logging.getLogger("math_verify").setLevel(logging.CRITICAL)
 
@@ -135,8 +136,44 @@ class MultichoiceVerifyWorker:
         return results
 
 
+@ray.remote
+class CodeVerifyWorker:
+    def __init__(self) -> None:
+        self._pass_at_k = hf_evaluate.load("code_eval")
+
+    def _find_code(self, response: str) -> str:
+        pattern = re.compile(r"```python\n(.*?)```", re.DOTALL)
+        matches = pattern.findall(response)
+        extracted_answer = matches[0] if len(matches) >= 1 else response
+        return extracted_answer
+
+    def verify(
+        self, pred_responses: list[str], tests_list: list[str]
+    ) -> list[[float, str]]:
+        """Verify the correctness of the predicted responses against the ground truth.
+
+        Args:
+            pred_responses: list[str]. The predicted responses from the LLM.
+            tests_list: list[str]. The unit tests.
+
+        Returns:
+            list[[float, str]]. The rewards and extracted code segment for each predicted response.
+        """
+        outputs = []
+        for response, tests in zip(pred_responses, tests_list):
+            code = self._find_code(response)
+            predictions = [[code]]
+            results = self._pass_at_k.compute(
+                references=[tests], predictions=predictions, k=[1]
+            )
+            score = float(results[0]["pass@1"] == 1.0)
+            outputs.append((score, code))
+        return outputs
+
+
 class MathEnvironmentMetadata(TypedDict):
-    ground_truth: str
+    ground_truth: Optional[str]
+    tests: Optional[str]
 
 
 @ray.remote(max_restarts=-1, max_task_retries=-1)
@@ -144,11 +181,12 @@ class MathEnvironment(EnvironmentInterface):
     def __init__(self, cfg: MathEnvConfig):
         self.cfg = cfg
         self.num_workers = cfg["num_workers"]
-        worker_cls = (
-            MultichoiceVerifyWorker
-            if cfg.get("verifier_type", "math") == "multichoice"
-            else HFVerifyWorker
-        )
+        verifier_type = cfg.get("verifier_type", "math")
+        worker_cls = {
+            "math": MathVerifyWorker,
+            "code": CodeVerifyWorker,
+            "multichoice": MultichoiceVerifyWorker,
+        }[cfg]
         self.workers = [
             worker_cls.options(  # type: ignore # (decorated with @ray.remote)
                 runtime_env={"py_executable": PY_EXECUTABLES.SYSTEM}
@@ -191,18 +229,21 @@ class MathEnvironment(EnvironmentInterface):
             ]
             assistant_response_batch.append("".join(assistant_responses))
 
-        ground_truths = [g["ground_truth"] for g in metadata]
+        verifier_metadata_key = self.cfg.get("verifier_metadata_key", "ground_truth")
+        verifier_metadata = [g[verifier_metadata_key] for g in metadata]
 
         chunked_assistant_response_batch = chunk_list_to_workers(
             assistant_response_batch, self.num_workers
         )
-        chunked_ground_truths = chunk_list_to_workers(ground_truths, self.num_workers)
+        chunked_verifier_metadata = chunk_list_to_workers(
+            verifier_metadata, self.num_workers
+        )
 
         # # Process each chunk in parallel
         futures = [
-            self.workers[i].verify.remote(chunk, ground_truth_chunk)
-            for i, (chunk, ground_truth_chunk) in enumerate(
-                zip(chunked_assistant_response_batch, chunked_ground_truths)
+            self.workers[i].verify.remote(chunk, metadata_chunk)
+            for i, (chunk, metadata_chunk) in enumerate(
+                zip(chunked_assistant_response_batch, chunked_verifier_metadata)
             )
         ]
 
