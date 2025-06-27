@@ -14,6 +14,7 @@
 import contextlib
 import io
 import logging
+import os
 import re
 from typing import Any, Optional, TypedDict
 
@@ -35,6 +36,9 @@ from nemo_rl.environments.metrics import (
 )
 from nemo_rl.environments.utils import chunk_list_to_workers
 from nemo_rl.evals import answer_parsing
+
+# This is needed for running code evaluation
+os.environ["HF_ALLOW_CODE_EVAL"] = "1"
 
 
 class MathEnvConfig(TypedDict):

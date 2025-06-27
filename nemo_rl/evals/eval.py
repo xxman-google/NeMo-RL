@@ -176,6 +176,7 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
     # Extract for easier access
     generation_config = master_config["generation"]
     eval_config = master_config["eval"]
+    env_config = master_config["env"]["math"]
     logger_config = master_config["logger"]
     metric = eval_config["metric"]
     num_tests_per_prompt = eval_config["num_tests_per_prompt"]
@@ -220,12 +221,18 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
             for i in range(len(batch["message_log"]))
         ]
         env_return = ray.get(env.step.remote(to_env, batch["extra_env_info"]))
-        for prompt, response, reward, metadata, observation in zip(prompts, output_texts, env_return.rewards, env_return.metadata, env_return.observations):
+        for prompt, response, reward, metadata, observation in zip(
+            prompts,
+            output_texts,
+            env_return.rewards,
+            env_return.metadata,
+            env_return.observations,
+        ):
             html = vis_lib.jinja_env.from_string(vis_lib.HTML_JINJA).render(
                 prompt_messages=[{"content": prompt, "role": "user"}],
                 next_message=dict(content=response, role="assistant"),
                 score=reward.item(),
-                correct_answer=metadata["ground_truth"],
+                correct_answer=metadata[env_config["verifier_metadata_key"]],
                 extracted_answer=observation["extracted_answer"],
             )
             htmls.append(html)
@@ -260,4 +267,3 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
     max_samples_to_html = logger_config.get("max_samples_to_html", 30)
     all_htmls = vis_lib.make_report_from_example_htmls(htmls[:max_samples_to_html])
     logger.log_html("Decoding Results", all_htmls)
-

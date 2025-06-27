@@ -28,6 +28,7 @@ from nemo_rl.data.eval_datasets import (
     aime2024,
     gpqa,
     math,
+    mbpp,
     mmlu,
     mmlu_pro,
 )
@@ -99,6 +100,17 @@ def setup_data(tokenizer: AutoTokenizer, data_config, env_configs):
     elif dataset_name == "math500":
         base_dataset = math.MathDataset(
             variant="math_500_test",
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
+    elif dataset_name == "mbpp":
+        base_dataset = mbpp.MBPPDataset(
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
+    elif dataset_name == "mbpp_sanitized":
+        base_dataset = mbpp.MBPPDataset(
+            variant="sanitized",
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
