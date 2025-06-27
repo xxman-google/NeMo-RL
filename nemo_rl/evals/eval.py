@@ -227,7 +227,7 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
     }[env_config["verifier_type"]]()
 
     # Run evaluation loop
-    score, count = 0.0, 0
+    score = 0.0
     htmls = []
     generation_lengths = []
     pass_k_value = eval_config["pass_k_value"]
