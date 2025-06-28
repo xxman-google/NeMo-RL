@@ -16,6 +16,7 @@ import os
 from typing import TypedDict
 
 import ray
+import torch
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer
 
@@ -40,6 +41,7 @@ class EvalConfig(TypedDict):
     metric: str
     num_tests_per_prompt: int
     seed: int
+    pass_k_value: int
 
 
 class MasterConfig(TypedDict):
@@ -88,11 +90,14 @@ def setup(
 
     # Check settings
     metric = eval_config["metric"]
+    pass_k_value = eval_config["pass_k_value"]
     num_tests_per_prompt = eval_config["num_tests_per_prompt"]
     temperature = generation_config["temperature"]
     top_k = generation_config["top_k"]
-    # TODO @yukih: support pass@k and cons@k
-    assert metric in ["pass@1"], f"Invalid metric: {metric}"
+
+    # TODO @yukih: support cons@k
+    # Validate metrics
+    assert metric in ["pass@k"], f"Invalid metric: {metric}"
     if num_tests_per_prompt > 1:
         assert temperature > 0 and top_k != 1, (
             "temperature > 0 and top_k != 1 are required for multiple samples"
@@ -102,6 +107,13 @@ def setup(
     # ==========================
     logger = Logger(logger_config)
     logger.log_hyperparams(master_config)
+
+    assert pass_k_value >= 1, (
+        "pass_k_value must be greater than or equal to 1 for pass@k metric"
+    )
+    assert num_tests_per_prompt >= pass_k_value, (
+        "num_tests_per_prompt must be greater than or equal to pass_k_value for pass@k metric"
+    )
 
     # ==========================
     #           Data
@@ -161,7 +173,39 @@ def setup(
 # ===============================================================================
 
 
+<<<<<<< HEAD
 def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
+=======
+def eval_pass_k(rewards: torch.Tensor, num_tests_per_prompt: int, k: int) -> float:
+    """Evaluate pass@k score using an unbiased estimator.
+
+    Reference: https://github.com/huggingface/evaluate/blob/32546aafec25cdc2a5d7dd9f941fc5be56ba122f/metrics/code_eval/code_eval.py#L198-L213
+    Args:
+        rewards: Tensor of shape (batch_size * num_tests_per_prompt)
+        k: int (pass@k value)
+
+    Returns:
+        pass_k_score: float
+    """
+
+    def eval_single_chunk(n: int, c: int, k: int) -> float:
+        """Calculates 1 - comb(n - c, k) / comb(n, k)."""
+        if n - c < k:
+            return 1.0
+        return float(1.0 - torch.prod(1.0 - k / torch.arange(n - c + 1, n + 1)).item())
+
+    # rewards is a 1d tensor of size (batch_size * num_tests_per_prompt)
+    group_rewards = rewards.split(num_tests_per_prompt)
+    pass_k_score = 0.0
+    for group_reward in group_rewards:
+        num_correct = group_reward.sum().item()
+        pass_k_score += eval_single_chunk(num_tests_per_prompt, num_correct, k)
+
+    return pass_k_score
+
+
+def run_env_eval(vllm_generation, dataloader, env, master_config):
+>>>>>>> 06220d7 (feat: Support pass@k (#536))
     """Main entry point for running evaluation using environment.
 
     Generates model responses and evaluates them by env.
@@ -190,10 +234,9 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
     score, count = 0.0, 0
     htmls = []
     generation_lengths = []
-    for batch in dataloader:
-        # update stats
-        count += batch.size * num_tests_per_prompt
+    pass_k_value = eval_config["pass_k_value"]
 
+    for batch in dataloader:
         # measure multiple samples
         if num_tests_per_prompt > 1:
             batch = batch.repeat_interleave(num_tests_per_prompt)
@@ -226,10 +269,11 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
             for i in range(len(batch["message_log"]))
         ]
         env_return = ray.get(env.step.remote(to_env, batch["extra_env_info"]))
+        rewards = env_return.rewards
         for prompt, response, reward, metadata, observation in zip(
             prompts,
             output_texts,
-            env_return.rewards,
+            rewards,
             env_return.metadata,
             env_return.observations,
         ):
@@ -243,8 +287,8 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
             htmls.append(html)
 
         # update stats
-        if metric == "pass@1":
-            score += env_return.rewards.sum().item()
+        if metric == "pass@k":
+            score += eval_pass_k(rewards, num_tests_per_prompt, pass_k_value)
         else:
             raise ValueError(f"Invalid metric: {metric}")
 
@@ -259,13 +303,13 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
     temperature = generation_config["temperature"]
     top_p = generation_config["top_p"]
     top_k = generation_config["top_k"]
-    average_score = score / count
+    average_score = score / len(dataloader.dataset)
 
     print("\n" + "=" * 60)
     print(f"{model_name=} {dataset_name=}")
     print(f"{max_new_tokens=} {temperature=} {top_p=} {top_k=}\n")
-    print(f"{metric=} {num_tests_per_prompt=}\n")
-    print(f"score={average_score:.4f} ({score}/{count})")
+    print(f"{metric=} {pass_k_value=} {num_tests_per_prompt=}\n")
+    print(f"score={average_score:.4f} ({score}/{len(dataloader.dataset)})")
     print("=" * 60 + "\n")
     logger.log_histogram("generation length", generation_lengths, num_bins=10)
     logger.log_metrics({metric: average_score}, step=0)
