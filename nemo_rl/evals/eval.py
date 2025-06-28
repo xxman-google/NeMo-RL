@@ -220,6 +220,7 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
     logger_config = master_config["logger"]
     metric = eval_config["metric"]
     num_tests_per_prompt = eval_config["num_tests_per_prompt"]
+    pass_k_value = eval_config["pass_k_value"]
     render_template = {
         "math": vis_lib.MathRenderTemplate,
         "code": vis_lib.CodeRenderTemplate,
