@@ -180,6 +180,11 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
     logger_config = master_config["logger"]
     metric = eval_config["metric"]
     num_tests_per_prompt = eval_config["num_tests_per_prompt"]
+    render_template = {
+        "math": vis_lib.MathRenderTemplate,
+        "code": vis_lib.CodeRenderTemplate,
+        "multichoice": vis_lib.MathRenderTemplate,
+    }[env_config["verifier_type"]]()
 
     # Run evaluation loop
     score, count = 0.0, 0
@@ -228,9 +233,9 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
             env_return.metadata,
             env_return.observations,
         ):
-            html = vis_lib.jinja_env.from_string(vis_lib.HTML_JINJA).render(
-                prompt_messages=[{"content": prompt, "role": "user"}],
-                next_message=dict(content=response, role="assistant"),
+            html = render_template.render(
+                prompt=prompt,
+                response=response,
                 score=reward.item(),
                 correct_answer=metadata[env_config["verifier_metadata_key"]],
                 extracted_answer=observation["extracted_answer"],

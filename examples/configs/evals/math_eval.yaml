@@ -35,6 +35,8 @@ data:
 env:
   math:
     num_workers: 8
+    verifier_type: "math"
+    verifier_metadata_key: "ground_truth"
 
 logger:
   log_dir: "logs"  # Base directory for all logs
