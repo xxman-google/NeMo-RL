@@ -18,9 +18,7 @@ class MBPPDataset:
         filename = "mbpp.jsonl" if variant == "full" else "sanitized-mbpp.json"
         file_path = f"https://raw.githubusercontent.com/google-research/google-research/refs/heads/master/mbpp/{filename}"
         ds = load_dataset("json", data_files=file_path, split="train")
-        self._template = (
-            "{question} Your code should pass these tests:\n\n{unit_tests}\n"
-        )
+        self._template = "{question} Your code should pass these tests:\n{unit_tests}\n"
         if variant == "sanitized":
             self.rekeyed_ds = ds.map(
                 self._rekey_sanitized, remove_columns=ds.column_names

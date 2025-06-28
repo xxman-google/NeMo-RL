@@ -9,7 +9,9 @@ from nemo_rl.data.interfaces import TaskDataSpec
 
 
 class HumanEvalDataset:
-    def __init__(self, prompt_file: str, system_prompt_file: Optional[str] = None):
+    def __init__(
+        self, prompt_file: Optional[str], system_prompt_file: Optional[str] = None
+    ):
         ds = load_dataset("openai/openai_humaneval", split="test")
         self.rekeyed_ds = ds.map(self._rekey, remove_columns=ds.column_names)
         self.task_spec = TaskDataSpec(
