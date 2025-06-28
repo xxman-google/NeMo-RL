@@ -1,8 +1,9 @@
 # Evaluation Configuration
 eval:
-  metric: "pass@1" # only pass@1 is supported now
+  metric: "pass@k" # only pass@1 is supported now
   num_tests_per_prompt: 1 # every prompt will be tested num_tests_per_prompt times and use the average score as the final score
   seed: 42
+  pass_k_value: 1
 
 generation:
   backend: "vllm" # only vllm is supported for evaluation
@@ -36,6 +37,7 @@ env:
   math:
     num_workers: 8
     verifier_type: "multichoice"
+    verifier_metadata_key: "ground_truth"
 
 logger:
   log_dir: "logs"  # Base directory for all logs
