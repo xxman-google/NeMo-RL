@@ -28,6 +28,7 @@ from nemo_rl.data.eval_datasets import (
     aime2024,
     gpqa,
     humaneval,
+    ifeval,
     math,
     mbpp,
     mmlu,
@@ -83,6 +84,11 @@ def setup_data(tokenizer: AutoTokenizer, data_config, env_configs):
         )
     elif dataset_name == "humaneval":
         base_dataset = humaneval.HumanEvalDataset(
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
+    elif dataset_name == "ifeval":
+        base_dataset = ifeval.IFEvalDataset(
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )

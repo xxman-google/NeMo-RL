@@ -36,6 +36,7 @@ from nemo_rl.environments.metrics import (
 )
 from nemo_rl.environments.utils import chunk_list_to_workers
 from nemo_rl.evals import answer_parsing
+from nemo_rl.evals.ifeval import instructions_registry
 
 # This is needed for running code evaluation
 os.environ["HF_ALLOW_CODE_EVAL"] = "1"
@@ -74,7 +75,7 @@ class MathVerifyWorker:
 
     def verify(
         self, pred_responses: list[str], ground_truths: list[str]
-    ) -> list[tuple[float, str]]:
+    ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
         Args:
@@ -82,7 +83,7 @@ class MathVerifyWorker:
             ground_truths: list[str]. The ground truth responses.
 
         Returns:
-            list[tuple[float, str]]. The rewards and the extracted answer for each predicted response.
+            list[tuple[float, str, str]]. The rewards, correct answer, and the extracted answer for each predicted response.
         """
         results = []
         for response, ground_truth in zip(pred_responses, ground_truths):
@@ -101,9 +102,9 @@ class MathVerifyWorker:
                         ret_score = 0.0
                         extracted_answer = None
 
-                results.append((float(ret_score), extracted_answer))
+                results.append((float(ret_score), ground_truth, extracted_answer))
             except Exception:
-                results.append((0.0, extracted_answer))
+                results.append((0.0, ground_truth, extracted_answer))
         return results
 
 
@@ -111,7 +112,7 @@ class MathVerifyWorker:
 class MultichoiceVerifyWorker:
     def verify(
         self, pred_responses: list[str], ground_truths: list[str]
-    ) -> list[tuple[float, str]]:
+    ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
         Args:
@@ -119,7 +120,7 @@ class MultichoiceVerifyWorker:
             ground_truths: list[str]. The ground truth responses.
 
         Returns:
-            list[tuple[float, str]]. The rewards and extracted answers for each predicted response.
+            list[tuple[float, str, str]]. The rewards, correct answer, and extracted answers for each predicted response.
         """
         results = []
         for response, ground_truth in zip(pred_responses, ground_truths):
@@ -136,7 +137,7 @@ class MultichoiceVerifyWorker:
                     )
                     break
             score = 1.0 if extracted_answer == ground_truth else 0.0
-            results.append((score, extracted_answer))
+            results.append((score, ground_truth, extracted_answer))
         return results
 
 
@@ -153,7 +154,7 @@ class CodeVerifyWorker:
 
     def verify(
         self, pred_responses: list[str], tests_list: list[str]
-    ) -> list[[float, str]]:
+    ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
         Args:
@@ -161,7 +162,7 @@ class CodeVerifyWorker:
             tests_list: list[str]. The unit tests.
 
         Returns:
-            list[[float, str]]. The rewards and extracted code segment for each predicted response.
+            list[tuple[float, str, str]]. The rewards, unit tests, and extracted code segment for each predicted response.
         """
         outputs = []
         for response, tests in zip(pred_responses, tests_list):
@@ -171,13 +172,71 @@ class CodeVerifyWorker:
                 references=[tests], predictions=predictions, k=[1]
             )
             score = float(results[0]["pass@1"] == 1.0)
-            outputs.append((score, code))
+            outputs.append((score, tests, code))
+        return outputs
+
+
+@ray.remote
+class IFVerifyWorker:
+    """Response verifier worker for instruction following problems."""
+
+    def _remove_kwargs_none(self, kwargs) -> dict[str, Any]:
+        return {k: v for k, v in kwargs.items() if v is not None}
+
+    def _is_following(
+        self, response: str, checker_info: dict[str, Any]
+    ) -> tuple[bool, list[str], list[str]]:
+        instruction_list = checker_info["instruction_id_list"]
+        checker_kwargs = checker_info["checker_kwargs"]
+        prompt = checker_info["prompt"]
+        is_following_list = []
+        descriptions = []
+        results = []
+        for index, instruction_id in enumerate(instruction_list):
+            instruction_cls = instructions_registry.INSTRUCTION_DICT[instruction_id]
+            instruction = instruction_cls(instruction_id)
+
+            description = instruction.build_description(
+                **self._remove_kwargs_none(checker_kwargs[index])
+            )
+            descriptions.append(description)
+            args = instruction.get_instruction_args()
+            if args and "prompt" in args:
+                instruction.build_description(prompt=prompt)
+
+            if response.strip() and instruction.check_following(response):
+                is_following_list.append(True)
+                results.append(f"{instruction_id}: True")
+            else:
+                is_following_list.append(False)
+                results.append(f"{instruction_id}: False")
+        return all(is_following_list), descriptions, results
+
+    def verify(
+        self, pred_responses: list[str], checker_info_list: list[dict[str, Any]]
+    ) -> list[tuple[float, str, str]]:
+        """Verify the correctness of the predicted responses against the ground truth.
+
+        Args:
+            pred_responses: list[str]. The predicted responses from the LLM.
+            checker_info_list: list[dict[str, Any]]. The instruction lists and constraints.
+
+        Returns:
+            list[tuple[float, str, str]]. The rewards, instruction descriptions, and predicted responses.
+        """
+        outputs = []
+        for response, checker_info in zip(pred_responses, checker_info_list):
+            score, descriptions, results = self._is_following(response, checker_info)
+            description = "\n".join(descriptions)
+            results = "\n".join(results)
+            outputs.append((float(score), description, results))
         return outputs
 
 
 class MathEnvironmentMetadata(TypedDict):
     ground_truth: Optional[str]
     tests: Optional[str]
+    checker_info: Optional[dict[str, Any]]
 
 
 @ray.remote(max_restarts=-1, max_task_retries=-1)
@@ -190,6 +249,7 @@ class MathEnvironment(EnvironmentInterface):
             "math": MathVerifyWorker,
             "code": CodeVerifyWorker,
             "multichoice": MultichoiceVerifyWorker,
+            "instruction_following": IFVerifyWorker,
         }[verifier_type]
         self.workers = [
             worker_cls.options(  # type: ignore # (decorated with @ray.remote)
@@ -255,9 +315,9 @@ class MathEnvironment(EnvironmentInterface):
 
         # flatten the results
         results = [
-            (score, extracted_answer)
+            (score, correct_answer, extracted_answer)
             for sublist in results
-            for (score, extracted_answer) in sublist
+            for (score, correct_answer, extracted_answer) in sublist
         ]
         observations = [
             {
@@ -266,12 +326,13 @@ class MathEnvironment(EnvironmentInterface):
                 if score
                 else "Environment: incorrect",
                 "extracted_answer": extracted_answer,
+                "correct_answer": correct_answer,
             }
-            for score, extracted_answer in results
+            for score, correct_answer, extracted_answer in results
         ]
 
         # create a tensor of rewards and done flags
-        rewards = torch.tensor([score for score, _ in results]).cpu()
+        rewards = torch.tensor([score for score, _, _ in results]).cpu()
         done = torch.ones_like(rewards).cpu()
 
         next_stop_strings = [None] * len(message_log_batch)

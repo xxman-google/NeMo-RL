@@ -209,3 +209,58 @@ def coding_processor(
     if "task_name" in datum_dict:
         output["task_name"] = datum_dict["task_name"]
     return output
+
+
+def if_processor(
+    datum_dict: dict[str, Any],
+    task_data_spec: TaskDataSpec,
+    tokenizer: TokenizerType,
+    max_seq_length: int,
+    idx: int,
+) -> DatumSpec:
+    """Process a datum dictionary (directly loaded from dataset) into a DatumSpec for instruction following problems."""
+    question = datum_dict["prompt"]
+    extra_env_info = {"checker_info": datum_dict["checker_info"]}
+
+    message_log = []
+
+    # system prompt
+    if task_data_spec.system_prompt:
+        sys_prompt: dict[str, str | torch.Tensor] = {
+            "role": "system",
+            "content": task_data_spec.system_prompt,
+        }
+        sys = tokenizer.apply_chat_template(
+            [cast(dict[str, str], sys_prompt)],
+            tokenize=False,
+            add_generation_prompt=False,
+            add_special_tokens=False,
+        )
+        sys_prompt["token_ids"] = tokenizer(sys, return_tensors="pt")["input_ids"][0]
+        message_log.append(sys_prompt)
+
+    # user prompt
+    if task_data_spec.prompt:
+        question = task_data_spec.prompt.format(question)
+    user_message = {"role": "user", "content": question}
+    message = tokenizer.apply_chat_template(
+        [user_message],
+        tokenize=False,
+        add_generation_prompt=True,
+        add_special_tokens=False,
+    )
+    user_message["token_ids"] = tokenizer(message, return_tensors="pt")["input_ids"][0]
+    user_message["content"] = message
+    message_log.append(user_message)
+
+    length = sum(len(m["token_ids"]) for m in message_log)
+    output: DatumSpec = {
+        "message_log": message_log,
+        "length": length,
+        "extra_env_info": extra_env_info,
+        "loss_multiplier": 1.0,
+        "idx": idx,
+    }
+    if "task_name" in datum_dict:
+        output["task_name"] = datum_dict["task_name"]
+    return output

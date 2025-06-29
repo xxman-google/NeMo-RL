@@ -225,6 +225,7 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
         "math": vis_lib.MathRenderTemplate,
         "code": vis_lib.CodeRenderTemplate,
         "multichoice": vis_lib.MathRenderTemplate,
+        "instruction_following": vis_lib.BaseRenderTemplate,
     }[env_config["verifier_type"]]()
 
     # Run evaluation loop
@@ -267,19 +268,18 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
         ]
         env_return = ray.get(env.step.remote(to_env, batch["extra_env_info"]))
         rewards = env_return.rewards
-        for prompt, response, reward, metadata, observation in zip(
+        for prompt, response, reward, observation in zip(
             prompts,
             output_texts,
             rewards,
-            env_return.metadata,
             env_return.observations,
         ):
             html = render_template.render(
                 prompt=prompt,
                 response=response,
                 score=reward.item(),
-                correct_answer=metadata[env_config["verifier_metadata_key"]],
-                extracted_answer=observation["extracted_answer"],
+                correct_answer=observation.get("correct_answer", None),
+                extracted_answer=observation.get("extracted_answer", None),
             )
             htmls.append(html)
 

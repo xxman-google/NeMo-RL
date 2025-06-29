@@ -43,7 +43,10 @@ dependencies = [
     "nvtx",
     "matplotlib",
     "plotly",
-    "evaluate"
+    "evaluate",
+    "langdetect",
+    "nltk>=3.9.1",
+    "immutabledict",
 ]
 
 [project.optional-dependencies]

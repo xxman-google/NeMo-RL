@@ -17,8 +17,8 @@ HTML_JINJA = """
 <h3>Sampled message</h3>
 {{ preformatted_message_to_html(next_message) | safe }}
 <h3>Results</h3>
-<p>Correct Answer: {{ correct_answer }} </p>
-<p>Extracted Answer: {{ extracted_answer }} </p>
+<pre>Correct Answer: {{ correct_answer }} </pre>
+<pre>Extracted Answer: {{ extracted_answer }} </pre>
 <p>Score: {{ score }}</p>
 """
 
