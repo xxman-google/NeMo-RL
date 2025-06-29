@@ -41,9 +41,6 @@ from nemo_rl.evals.ifeval import instructions_registry
 # This is needed for running code evaluation
 os.environ["HF_ALLOW_CODE_EVAL"] = "1"
 
-# This is needed for running code evaluation
-os.environ["HF_ALLOW_CODE_EVAL"] = "1"
-
 
 class MathEnvConfig(TypedDict):
     num_workers: int
