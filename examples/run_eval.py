@@ -66,11 +66,19 @@ def setup_data(tokenizer: AutoTokenizer, data_config, env_configs):
 
     # load dataset
     dataset_name = data_config["dataset_name"]
-    if dataset_name == "mmlu":
-        base_dataset = mmlu.MMLUDataset(
-            prompt_file=data_config["prompt_file"],
-            system_prompt_file=data_config["system_prompt_file"],
-        )
+    if dataset_name.startswith("mmlu"):
+        if dataset_name == "mmlu":
+            base_dataset = mmlu.MMLUDataset(
+                prompt_file=data_config["prompt_file"],
+                system_prompt_file=data_config["system_prompt_file"],
+            )
+        else:
+            language = dataset_name.split("_")[1]
+            base_dataset = mmlu.MMLUDataset(
+                language=language,
+                prompt_file=data_config["prompt_file"],
+                system_prompt_file=data_config["system_prompt_file"],
+            )
     elif dataset_name == "aime2024":
         base_dataset = aime2024.AIME2024Dataset(
             prompt_file=data_config["prompt_file"],

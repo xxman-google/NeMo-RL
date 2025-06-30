@@ -87,6 +87,7 @@ _markdown_message_template = """
 _report_template = """<!DOCTYPE html>
 <html>
     <head>
+        <meta charset="utf-8">
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
         <style>
             .message {

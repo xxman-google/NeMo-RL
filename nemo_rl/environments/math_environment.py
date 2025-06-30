@@ -107,6 +107,7 @@ class MathVerifyWorker:
                 results.append((0.0, ground_truth, extracted_answer))
         return results
 
+
 @ray.remote
 class MultichoiceVerifyWorker:
     def verify(
@@ -123,7 +124,7 @@ class MultichoiceVerifyWorker:
         """
         results = []
         for response, ground_truth in zip(pred_responses, ground_truths):
-            response = normalize_response(response)
+            response = answer_parsing.normalize_response(response)
             extracted_answer = None
             for answer_regex in answer_parsing.MULTILINGUAL_ANSWER_REGEXES:
                 regex = answer_parsing.MULTILINGUAL_ANSWER_PATTERN_TEMPLATE.format(
