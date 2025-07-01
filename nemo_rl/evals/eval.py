@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import collections
 import os
-from typing import TypedDict
+from typing import Optional, TypedDict
 
 import ray
 import torch
@@ -180,7 +181,14 @@ def setup(
 # ===============================================================================
 
 
-def eval_pass_k(rewards: torch.Tensor, num_tests_per_prompt: int, k: int) -> float:
+def eval_pass_k(
+    rewards: torch.Tensor,
+    num_tests_per_prompt: int,
+    k: int,
+    subjects: Optional[list[str]] = None,
+    subject_counts: Optional[dict[str, int]] = None,
+    subject_scores: Optional[dict[str, float]] = None,
+) -> float:
     """Evaluate pass@k score using an unbiased estimator.
 
     Reference: https://github.com/huggingface/evaluate/blob/32546aafec25cdc2a5d7dd9f941fc5be56ba122f/metrics/code_eval/code_eval.py#L198-L213
@@ -200,10 +208,21 @@ def eval_pass_k(rewards: torch.Tensor, num_tests_per_prompt: int, k: int) -> flo
 
     # rewards is a 1d tensor of size (batch_size * num_tests_per_prompt)
     group_rewards = rewards.split(num_tests_per_prompt)
+    if subjects is not None:
+        group_subjects = [
+            subjects[i : i + num_tests_per_prompt]
+            for i in range(0, len(subjects), num_tests_per_prompt)
+        ]
+
     pass_k_score = 0.0
-    for group_reward in group_rewards:
+    for group_idx, group_reward in enumerate(group_rewards):
         num_correct = group_reward.sum().item()
-        pass_k_score += eval_single_chunk(num_tests_per_prompt, num_correct, k)
+        cur_score = eval_single_chunk(num_tests_per_prompt, num_correct, k)
+        pass_k_score += cur_score
+        if subjects is not None:
+            subject = group_subjects[group_idx][0]
+            subject_counts[subject] += 1
+            subject_scores[subject] += cur_score
 
     return pass_k_score
 
@@ -240,6 +259,8 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
     htmls = []
     generation_lengths = []
     pass_k_value = eval_config["pass_k_value"]
+    subject_scores = collections.defaultdict(float)
+    subject_counts = collections.defaultdict(int)
 
     for batch in dataloader:
         # measure multiple samples
@@ -292,10 +313,22 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
 
         # update stats
         if metric == "pass@k":
-            score += eval_pass_k(rewards, num_tests_per_prompt, pass_k_value)
+            subjects = (
+                None
+                if "subject" not in batch["extra_env_info"][0]
+                else [info["subject"] for info in batch["extra_env_info"]]
+            )
+            cur_score = eval_pass_k(
+                rewards,
+                num_tests_per_prompt,
+                pass_k_value,
+                subjects,
+                subject_counts,
+                subject_scores,
+            )
+            score += cur_score
         else:
             raise ValueError(f"Invalid metric: {metric}")
-
     # Cleanup before printing results
     ray.get(env.shutdown.remote())
     vllm_generation.shutdown()
@@ -316,7 +349,20 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
     print(f"score={average_score:.4f} ({score}/{len(dataloader.dataset)})")
     print("=" * 60 + "\n")
     logger.log_histogram("generation length", generation_lengths, num_bins=10)
-    logger.log_metrics({metric: average_score}, step=0)
     max_samples_to_html = logger_config.get("max_samples_to_html", 30)
     all_htmls = vis_lib.make_report_from_example_htmls(htmls[:max_samples_to_html])
     logger.log_html("Decoding Results", all_htmls)
+
+    if subject_scores:
+        columns = ["Subjects", "Scores", "Counts"]
+        subject_names = sorted(subject_scores.keys())
+        subject_data = [["Overall", average_score, len(dataloader.dataset)]]
+        for name in subject_names:
+            subject_data.append(
+                [
+                    name,
+                    subject_scores[name] / subject_counts[name],
+                    subject_counts[name],
+                ]
+            )
+        logger.log_table("Subject Results", columns, subject_data)

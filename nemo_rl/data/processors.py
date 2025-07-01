@@ -108,6 +108,8 @@ def multichoice_qa_processor(
     extra_env_info = {"ground_truth": answer}
     if "subject" in datum_dict:
         extra_env_info.update({"subject": datum_dict["subject"]})
+    if "category" in datum_dict:
+        extra_env_info.update({"category": datum_dict["category"]})
 
     message_log = []
 

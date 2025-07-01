@@ -93,8 +93,15 @@ class LoggerInterface(ABC):
         pass
 
     @abstractmethod
-    def log_histogram(self, name: str, values: list[int | float], num_bins: int) -> None:
+    def log_histogram(
+        self, name: str, values: list[int | float], num_bins: int
+    ) -> None:
         """Log histogram."""
+        pass
+
+    @abstractmethod
+    def log_table(self, name: str, columns: list[str], data: list[list[Any]]) -> None:
+        """Log table."""
         pass
 
 
@@ -152,15 +159,21 @@ class TensorboardLogger(LoggerInterface):
         """
         self.writer.add_text(name, html)
 
-    def log_histogram(self, name: str, values: list[int | float], num_bins: int) -> None:
+    def log_histogram(
+        self, name: str, values: list[int | float], num_bins: int
+    ) -> None:
         """Log histogram data to Tensorboard.
 
         Args:
             name: Data identifier
-            values: Data values 
+            values: Data values
             num_bins: Number of histogram bins
         """
         self.writer.add_histogram(name, values, max_bins=num_bins)
+
+    def log_table(self, name: str, columns: list[str], data: list[list[Any]]) -> None:
+        """Log table data to Tensorboard. Not supported."""
+        print("Table logging not supported in Tensorboard.")
 
 
 class WandbLogger(LoggerInterface):
@@ -350,17 +363,36 @@ class WandbLogger(LoggerInterface):
         """
         self.run.log({name: wandb.Html(html)})
 
-    def log_histogram(self, name: str, values: list[int | float], num_bins: int) -> None:
+    def log_histogram(
+        self, name: str, values: list[int | float], num_bins: int
+    ) -> None:
         """Log histogram data to Tensorboard.
 
         Args:
             name: Data identifier
-            values: Data values 
+            values: Data values
             num_bins: Number of histogram bins
         """
         data = [[v] for v in values]
         table = wandb.Table(data=data, columns=[name])
-        self.run.log({f"{name}_histogram": wandb.plot.histogram(table, name, title=f"{name} distribution")})
+        self.run.log(
+            {
+                f"{name}_histogram": wandb.plot.histogram(
+                    table, name, title=f"{name} distribution"
+                )
+            }
+        )
+
+    def log_table(self, name: str, columns: list[str], data: list[list[Any]]) -> None:
+        """Log table data to wandb.
+
+        Args:
+            name: Data identifier
+            columns: Column names
+            data: A 2D list of table values
+        """
+        table = wandb.Table(data=data, columns=columns)
+        self.run.log({name: table})
 
 
 class GpuMetricSnapshot(TypedDict):
@@ -869,10 +901,17 @@ class Logger(LoggerInterface):
         for logger in self.loggers:
             logger.log_html(name, html)
 
-    def log_histogram(self, name: str, values: list[int | float], num_bins: int) -> None:
+    def log_histogram(
+        self, name: str, values: list[int | float], num_bins: int
+    ) -> None:
         """Log histogram data."""
         for logger in self.loggers:
             logger.log_histogram(name, values, num_bins)
+
+    def log_table(self, name: str, columns: list[str], data: list[list[Any]]) -> None:
+        """Log table data."""
+        for logger in self.loggers:
+            logger.log_table(name, columns, data)
 
     def __del__(self) -> None:
         """Clean up resources when the logger is destroyed."""
