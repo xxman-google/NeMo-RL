@@ -1,5 +1,6 @@
 """MSGM dataset."""
 
+import functools
 import io
 from typing import Any, Optional
 
@@ -75,7 +76,14 @@ class MGSMDataset:
             prompt_file=None,
             system_prompt_file=system_prompt_file,
         )
-        self.processor = processors.math_data_processor
+        self.processor = functools.partial(
+            processors.data_processor,
+            question_key="problem",
+            extra_env_info_key_maps=[
+                ("expected_answer", "ground_truth"),
+                ("lang", "lang"),
+            ],
+        )
 
     def _url_to_fileobj(self, url: str) -> Any:
         response = requests.get(url)

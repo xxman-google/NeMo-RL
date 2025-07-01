@@ -21,7 +21,7 @@ generation:
     tensor_parallel_size: 1
     pipeline_parallel_size: 1
     gpu_memory_utilization: 0.9
-    max_model_len: 2048
+    max_model_len: 4096
 
 tokenizer:
   name: ${generation.model_name} ## specify if you'd like to use a tokenizer different from the model's default
@@ -37,7 +37,6 @@ env:
   math:
     num_workers: 8
     verifier_type: "math"
-    verifier_metadata_key: "ground_truth"
 
 logger:
   log_dir: "logs"  # Base directory for all logs

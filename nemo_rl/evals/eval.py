@@ -247,6 +247,7 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
     metric = eval_config["metric"]
     num_tests_per_prompt = eval_config["num_tests_per_prompt"]
     pass_k_value = eval_config["pass_k_value"]
+    metric_group_key = env_config.get("metric_group_key", None)
     render_template = {
         "math": vis_lib.MathRenderTemplate,
         "code": vis_lib.CodeRenderTemplate,
@@ -313,11 +314,10 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
 
         # update stats
         if metric == "pass@k":
-            subjects = (
-                None
-                if "subject" not in batch["extra_env_info"][0]
-                else [info["subject"] for info in batch["extra_env_info"]]
-            )
+            if metric_group_key is not None:
+                subjects = [info[metric_group_key] for info in batch["extra_env_info"]]
+            else:
+                subjects = None
             cur_score = eval_pass_k(
                 rewards,
                 num_tests_per_prompt,

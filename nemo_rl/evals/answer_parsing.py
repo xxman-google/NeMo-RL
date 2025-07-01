@@ -1,5 +1,6 @@
 """Contains utility functions for answer parsing."""
 
+import re
 
 MULTILINGUAL_ANSWER_PATTERN_TEMPLATE = (
     "(?i){}[ \t]*([A-D]|[أ-د]|[অ]|[ব]|[ড]|[ঢ]|[Ａ]|[Ｂ]|[Ｃ]|[Ｄ])"
@@ -49,6 +50,33 @@ MULTILINGUAL_ANSWER_REGEXES = [
     "Ànúgọ\s*:",
     "Àṣàyàn\s*:",
 ]
+LANG_TO_ANSWER_PREFIX = {
+    "en": "Answer",
+    "bn": "উত্তর",
+    "de": "Antwort",
+    "es": "Respuesta",
+    "fr": "Réponse",
+    "ja": "答え",
+    "ru": "Ответ",
+    "sw": "Jibu",
+    "te": "సమాధానం",
+    "th": "คำตอบ",
+    "zh": "答案",
+}
+
+
+def mgsm_parse_answer(answer: str, answer_prefix: str) -> str:
+    if answer_prefix not in answer:
+        return ""
+
+    answer_text = answer.split(answer_prefix)[-1].strip()
+
+    # find all the numbers (including decimals) in the string
+    numbers = re.findall(r"\d+\.?\d*", answer_text.replace(",", ""))
+
+    # return the first number (removing trailing decimal point if present),
+    # or an empty string if there were no numbers
+    return numbers[-1].rstrip(".") if numbers else ""
 
 
 def normalize_extracted_answer(extracted_answer: str) -> str:
@@ -73,10 +101,7 @@ def normalize_extracted_answer(extracted_answer: str) -> str:
 
 
 def normalize_response(response: str) -> str:
-    """
-    Normalize the response by removing markdown and LaTeX formatting that may prevent a match.
-    """
-
+    """Normalize the response by removing markdown and LaTeX formatting that may prevent a match."""
     return (
         response.replace("**", "")
         .replace("$\\boxed{", "")

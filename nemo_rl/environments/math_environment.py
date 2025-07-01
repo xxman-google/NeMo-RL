@@ -58,6 +58,12 @@ def _mute_output():
         yield
 
 
+class MathEnvironmentMetadata(TypedDict):
+    ground_truth: Optional[str]
+    tests: Optional[str]
+    checker_info: Optional[dict[str, Any]]
+
+
 @ray.remote
 class MathVerifyWorker:
     def __init__(self) -> None:
@@ -74,7 +80,7 @@ class MathVerifyWorker:
         )
 
     def verify(
-        self, pred_responses: list[str], ground_truths: list[str]
+        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
@@ -86,7 +92,8 @@ class MathVerifyWorker:
             list[tuple[float, str, str]]. The rewards, correct answer, and the extracted answer for each predicted response.
         """
         results = []
-        for response, ground_truth in zip(pred_responses, ground_truths):
+        for response, metadata in zip(pred_responses, metadata_list):
+            ground_truth = metadata["ground_truth"]
             try:
                 ground_truth_parsable = "\\boxed{" + ground_truth + "}"
                 with _mute_output():
@@ -109,9 +116,43 @@ class MathVerifyWorker:
 
 
 @ray.remote
+class MGSMVerifyWorker:
+    def _score_mgsm(target: str, prediction: str) -> bool:
+        if "." in prediction:
+            prediction = prediction.rstrip("0").rstrip(".")
+
+        target = target.replace(",", "")
+        prediction = prediction.replace(",", "")
+
+        return target == prediction
+
+    def verify(
+        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
+    ) -> list[tuple[float, str, str]]:
+        """Verify the correctness of the predicted responses against the ground truth.
+
+        Args:
+            pred_responses: list[str]. The predicted responses from the LLM.
+            ground_truths: list[str]. The ground truth responses.
+
+        Returns:
+            list[tuple[float, str, str]]. The rewards, correct answer, and the extracted answer for each predicted response.
+        """
+        results = []
+        for response, metadata in zip(pred_responses, metadata_list):
+            lang = metadata["lang"]
+            correct_answer = metadata["ground_truth"]
+            answer_prefix = answer_parsing.LANG_TO_ANSWER_PREFIX[lang]
+            extracted_answer = answer_parsing.mgsm_parse_answer(response, answer_prefix)
+            score = self._score_mgsm(correct_answer, extracted_answer)
+            results.append((score, correct_answer, extracted_answer))
+        return results
+
+
+@ray.remote
 class MultichoiceVerifyWorker:
     def verify(
-        self, pred_responses: list[str], ground_truths: list[str]
+        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
@@ -123,7 +164,8 @@ class MultichoiceVerifyWorker:
             list[tuple[float, str, str]]. The rewards, correct answer, and extracted answers for each predicted response.
         """
         results = []
-        for response, ground_truth in zip(pred_responses, ground_truths):
+        for response, metadata in zip(pred_responses, metadata_list):
+            ground_truth = metadata["ground_truth"]
             response = answer_parsing.normalize_response(response)
             extracted_answer = None
             for answer_regex in answer_parsing.MULTILINGUAL_ANSWER_REGEXES:
@@ -153,7 +195,7 @@ class CodeVerifyWorker:
         return extracted_answer
 
     def verify(
-        self, pred_responses: list[str], tests_list: list[str]
+        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
@@ -165,7 +207,8 @@ class CodeVerifyWorker:
             list[tuple[float, str, str]]. The rewards, unit tests, and extracted code segment for each predicted response.
         """
         outputs = []
-        for response, tests in zip(pred_responses, tests_list):
+        for response, metadata in zip(pred_responses, metadata_list):
+            tests = metadata["tests"]
             code = self._find_code(response)
             predictions = [[code]]
             results = self._pass_at_k.compute(
@@ -213,7 +256,7 @@ class IFVerifyWorker:
         return all(is_following_list), descriptions, results
 
     def verify(
-        self, pred_responses: list[str], checker_info_list: list[dict[str, Any]]
+        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
@@ -225,18 +268,13 @@ class IFVerifyWorker:
             list[tuple[float, str, str]]. The rewards, instruction descriptions, and predicted responses.
         """
         outputs = []
-        for response, checker_info in zip(pred_responses, checker_info_list):
+        for response, metadata in zip(pred_responses, metadata_list):
+            checker_info = metadata["checker_info"]
             score, descriptions, results = self._is_following(response, checker_info)
             description = "\n".join(descriptions)
             results = "\n".join(results)
             outputs.append((float(score), description, results))
         return outputs
-
-
-class MathEnvironmentMetadata(TypedDict):
-    ground_truth: Optional[str]
-    tests: Optional[str]
-    checker_info: Optional[dict[str, Any]]
 
 
 @ray.remote(max_restarts=-1, max_task_retries=-1)
@@ -293,15 +331,10 @@ class MathEnvironment(EnvironmentInterface):
             ]
             assistant_response_batch.append("".join(assistant_responses))
 
-        verifier_metadata_key = self.cfg.get("verifier_metadata_key", "ground_truth")
-        verifier_metadata = [g[verifier_metadata_key] for g in metadata]
-
         chunked_assistant_response_batch = chunk_list_to_workers(
             assistant_response_batch, self.num_workers
         )
-        chunked_verifier_metadata = chunk_list_to_workers(
-            verifier_metadata, self.num_workers
-        )
+        chunked_verifier_metadata = chunk_list_to_workers(metadata, self.num_workers)
 
         # # Process each chunk in parallel
         futures = [

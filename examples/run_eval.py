@@ -31,6 +31,7 @@ from nemo_rl.data.eval_datasets import (
     ifeval,
     math,
     mbpp,
+    mgsm,
     mmlu,
     mmlu_pro,
 )
@@ -132,6 +133,10 @@ def setup_data(tokenizer: AutoTokenizer, data_config, env_configs):
         base_dataset = mbpp.MBPPDataset(
             variant="sanitized",
             prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
+    elif dataset_name == "mgsm":
+        base_dataset = mgsm.MGSMDataset(
             system_prompt_file=data_config["system_prompt_file"],
         )
     else:
