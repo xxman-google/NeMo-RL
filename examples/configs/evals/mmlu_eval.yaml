@@ -36,7 +36,7 @@ data:
 env:
   math:
     num_workers: 8
-    verifier_type: "multichoice"
+    verifier_type: "multilingual_multichoice"
     metric_group_key: "category"
 
 logger:

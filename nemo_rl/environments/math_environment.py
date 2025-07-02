@@ -117,7 +117,7 @@ class MathVerifyWorker:
 
 @ray.remote
 class MGSMVerifyWorker:
-    def _score_mgsm(target: str, prediction: str) -> bool:
+    def _score_mgsm(self, target: str, prediction: str) -> bool:
         if "." in prediction:
             prediction = prediction.rstrip("0").rstrip(".")
 
@@ -150,7 +150,7 @@ class MGSMVerifyWorker:
 
 
 @ray.remote
-class MultichoiceVerifyWorker:
+class MultilingualMultichoiceVerifyWorker:
     def verify(
         self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
@@ -165,7 +165,7 @@ class MultichoiceVerifyWorker:
         """
         results = []
         for response, metadata in zip(pred_responses, metadata_list):
-            ground_truth = metadata["ground_truth"]
+            ground_truth = answer_parsing.normalize_response(metadata["ground_truth"])
             response = answer_parsing.normalize_response(response)
             extracted_answer = None
             for answer_regex in answer_parsing.MULTILINGUAL_ANSWER_REGEXES:
@@ -178,6 +178,35 @@ class MultichoiceVerifyWorker:
                         match.group(1)
                     )
                     break
+            score = 1.0 if extracted_answer == ground_truth else 0.0
+            results.append((score, ground_truth, extracted_answer))
+        return results
+
+
+@ray.remote
+class EnglishMultichoiceVerifyWorker:
+    def verify(
+        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
+    ) -> list[tuple[float, str, str]]:
+        """Verify the correctness of the predicted responses against the ground truth.
+
+        Args:
+            pred_responses: list[str]. The predicted responses from the LLM.
+            ground_truths: list[str]. The ground truth responses.
+
+        Returns:
+            list[tuple[float, str, str]]. The rewards, correct answer, and extracted answers for each predicted response.
+        """
+        results = []
+        for response, metadata in zip(pred_responses, metadata_list):
+            ground_truth = answer_parsing.normalize_response(metadata["ground_truth"])
+            response = answer_parsing.normalize_response(response)
+            extracted_answer = None
+            match = re.search("(?i)Answer\s*:[ \t]*([A-Z])", response)
+            if match:
+                extracted_answer = answer_parsing.normalize_extracted_answer(
+                    match.group(1)
+                )
             score = 1.0 if extracted_answer == ground_truth else 0.0
             results.append((score, ground_truth, extracted_answer))
         return results
@@ -284,10 +313,12 @@ class MathEnvironment(EnvironmentInterface):
         self.num_workers = cfg["num_workers"]
         verifier_type = cfg.get("verifier_type", "math")
         worker_cls = {
-            "math": MathVerifyWorker,
             "code": CodeVerifyWorker,
-            "multichoice": MultichoiceVerifyWorker,
+            "english_multichoice": EnglishMultichoiceVerifyWorker,
             "instruction_following": IFVerifyWorker,
+            "math": MathVerifyWorker,
+            "mgsm": MGSMVerifyWorker,
+            "multilingual_multichoice": MultilingualMultichoiceVerifyWorker,
         }[verifier_type]
         self.workers = [
             worker_cls.options(  # type: ignore # (decorated with @ray.remote)

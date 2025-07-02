@@ -67,7 +67,7 @@ def setup_data(tokenizer: AutoTokenizer, data_config, env_configs):
 
     # load dataset
     dataset_name = data_config["dataset_name"]
-    if dataset_name.startswith("mmlu"):
+    if dataset_name.startswith("mmlu") and dataset_name != "mmlu_pro":
         if dataset_name == "mmlu":
             base_dataset = mmlu.MMLUDataset(
                 prompt_file=data_config["prompt_file"],

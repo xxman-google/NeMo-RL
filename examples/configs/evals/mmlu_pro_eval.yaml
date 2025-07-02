@@ -29,15 +29,15 @@ tokenizer:
 
 data:
   max_input_seq_length: ${generation.vllm_cfg.max_model_len} # useless since we directly use prompts in evaluation
-  prompt_file: null
+  prompt_file: "examples/prompts/mmlu_pro.txt"
   system_prompt_file: null
-  dataset_name: "mgsm"
+  dataset_name: "mmlu_pro"
 
 env:
   math:
     num_workers: 8
-    verifier_type: "mgsm"
-    metric_group_key: "lang"
+    verifier_type: "english_multichoice"
+    metric_group_key: "subject"
 
 logger:
   log_dir: "logs"  # Base directory for all logs

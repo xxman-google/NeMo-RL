@@ -250,8 +250,10 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
     metric_group_key = env_config.get("metric_group_key", None)
     render_template = {
         "math": vis_lib.MathRenderTemplate,
+        "mgsm": vis_lib.MathRenderTemplate,
         "code": vis_lib.CodeRenderTemplate,
-        "multichoice": vis_lib.MathRenderTemplate,
+        "english_multichoice": vis_lib.MathRenderTemplate,
+        "multilingual_multichoice": vis_lib.MathRenderTemplate,
         "instruction_following": vis_lib.BaseRenderTemplate,
     }[env_config["verifier_type"]]()
 
@@ -329,6 +331,7 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
             score += cur_score
         else:
             raise ValueError(f"Invalid metric: {metric}")
+
     # Cleanup before printing results
     ray.get(env.shutdown.remote())
     vllm_generation.shutdown()
