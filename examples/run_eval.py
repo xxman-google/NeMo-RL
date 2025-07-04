@@ -24,17 +24,7 @@ from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 from nemo_rl.algorithms.utils import get_tokenizer
 from nemo_rl.data.datasets import AllTaskProcessedDataset
-from nemo_rl.data.eval_datasets import (
-    aime2024,
-    gpqa,
-    humaneval,
-    ifeval,
-    math,
-    mbpp,
-    mgsm,
-    mmlu,
-    mmlu_pro,
-)
+from nemo_rl.data.eval_datasets import load_eval_dataset
 from nemo_rl.distributed.ray_actor_environment_registry import (
     get_actor_python_env,
 )
@@ -42,6 +32,7 @@ from nemo_rl.distributed.virtual_cluster import init_ray
 from nemo_rl.environments.math_environment import MathEnvironment
 from nemo_rl.evals.eval import MasterConfig, run_env_eval, setup
 from nemo_rl.models.generation import configure_generation_config
+from nemo_rl.utils.config import load_config
 
 TokenizerType = PreTrainedTokenizerBase
 
@@ -66,81 +57,7 @@ def setup_data(tokenizer: AutoTokenizer, data_config, env_configs):
     print("Setting up data...")
 
     # load dataset
-    dataset_name = data_config["dataset_name"]
-    if dataset_name.startswith("mmlu") and dataset_name != "mmlu_pro":
-        if dataset_name == "mmlu":
-            base_dataset = mmlu.MMLUDataset(
-                prompt_file=data_config["prompt_file"],
-                system_prompt_file=data_config["system_prompt_file"],
-            )
-        else:
-            language = dataset_name.split("_")[1]
-            base_dataset = mmlu.MMLUDataset(
-                language=language,
-                prompt_file=data_config["prompt_file"],
-                system_prompt_file=data_config["system_prompt_file"],
-            )
-    elif dataset_name == "aime2024":
-        base_dataset = aime2024.AIME2024Dataset(
-            prompt_file=data_config["prompt_file"],
-            system_prompt_file=data_config["system_prompt_file"],
-        )
-    elif dataset_name == "gpqa":
-        base_dataset = gpqa.GPQADataset(
-            variant="main",
-            prompt_file=data_config["prompt_file"],
-            system_prompt_file=data_config["system_prompt_file"],
-        )
-    elif dataset_name == "humaneval":
-        base_dataset = humaneval.HumanEvalDataset(
-            prompt_file=data_config["prompt_file"],
-            system_prompt_file=data_config["system_prompt_file"],
-        )
-    elif dataset_name == "ifeval":
-        base_dataset = ifeval.IFEvalDataset(
-            prompt_file=data_config["prompt_file"],
-            system_prompt_file=data_config["system_prompt_file"],
-        )
-    elif dataset_name == "gpqa_diamond":
-        base_dataset = gpqa.GPQADataset(
-            variant="diamond",
-            prompt_file=data_config["prompt_file"],
-            system_prompt_file=data_config["system_prompt_file"],
-        )
-    elif dataset_name == "mmlu_pro":
-        base_dataset = mmlu_pro.MMLUProDataset(
-            prompt_file=data_config["prompt_file"],
-            system_prompt_file=data_config["system_prompt_file"],
-        )
-    elif dataset_name == "math":
-        base_dataset = math.MathDataset(
-            variant="math_test",
-            prompt_file=data_config["prompt_file"],
-            system_prompt_file=data_config["system_prompt_file"],
-        )
-    elif dataset_name == "math500":
-        base_dataset = math.MathDataset(
-            variant="math_500_test",
-            prompt_file=data_config["prompt_file"],
-            system_prompt_file=data_config["system_prompt_file"],
-        )
-    elif dataset_name == "mbpp":
-        base_dataset = mbpp.MBPPDataset(
-            prompt_file=data_config["prompt_file"],
-            system_prompt_file=data_config["system_prompt_file"],
-        )
-    elif dataset_name == "mbpp_sanitized":
-        base_dataset = mbpp.MBPPDataset(
-            variant="sanitized",
-            prompt_file=data_config["prompt_file"],
-            system_prompt_file=data_config["system_prompt_file"],
-        )
-    elif dataset_name == "mgsm":
-        base_dataset = mgsm.MGSMDataset(
-            system_prompt_file=data_config["system_prompt_file"],
-        )
-    else:
-        raise ValueError(f"Unknown dataset {dataset_name}.")
+    base_dataset = load_eval_dataset(data_config)
     rekeyed_ds = base_dataset.rekeyed_ds
 
     env = MathEnvironment.options(
@@ -172,7 +89,7 @@ def main():
             os.path.dirname(__file__), "configs", "evals", "eval.yaml"
         )
 
-    config = OmegaConf.load(args.config)
+    config = load_config(args.config)
     print(f"Loaded configuration from: {args.config}")
 
     if overrides:
