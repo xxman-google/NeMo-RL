@@ -375,6 +375,7 @@ def sft_train(
         logger.log_metrics(validation_timings, total_steps, prefix="timing/validation")
 
     policy.prepare_for_training()
+    total_valid_toks = 0
 
     while (
         current_epoch < max_num_epochs
@@ -496,6 +497,8 @@ def sft_train(
                     metrics[k] = np.mean(v).item()
                 else:
                     metrics[k] = np.sum(v).item()
+            total_valid_toks += metrics["global_valid_toks"]
+            metrics["total_valid_toks (M)"] = total_valid_toks * 1e-6
             timing_metrics = timer.get_timing_metrics(reduction_op="sum")
 
             print("\n📊 Training Results:")
@@ -512,7 +515,7 @@ def sft_train(
                 if k != "total_step_time":
                     percent = (v / total_time * 100) if total_time > 0 else 0
                     print(f"  • {k}: {v:.2f}s ({percent:.1f}%)")
-
+            timing_metrics["toks_per_sec"] = metrics["global_valid_toks"] / total_time
             logger.log_metrics(metrics, total_steps + 1, prefix="train")
             logger.log_metrics(timing_metrics, total_steps + 1, prefix="timing/train")
 
