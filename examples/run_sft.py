@@ -96,6 +96,8 @@ def setup_data(tokenizer: AutoTokenizer, data_config: DataConfig):
         data = hf_datasets.OasstDataset(output_dir="/tmp/open_assistant")
     elif data_cls == "squad":
         data = hf_datasets.SquadDataset()
+    elif data_cls == "tulu3sft":
+        data = hf_datasets.Tulu3SftDataset()
     elif data_cls == "prompt_response_dataset":
         data = hf_datasets.PromptResponseDataset(
             data_config["train_data_path"],

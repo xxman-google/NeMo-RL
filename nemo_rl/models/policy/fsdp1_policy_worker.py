@@ -363,7 +363,7 @@ class FSDP1PolicyWorker:
 
                         # when FSDP reduces the gradients over the DP dim, they're automatically averaged
                         # but we want to sum them so we cancel out the average here
-                        loss *= torch.distributed.get_world_size()
+                        # loss *= torch.distributed.get_world_size()
                         loss.backward()
                     if num_valid_samples > 0:
                         mb_losses.append(loss.item())
