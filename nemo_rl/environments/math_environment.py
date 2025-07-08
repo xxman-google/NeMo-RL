@@ -80,19 +80,19 @@ class MathVerifyWorker:
         )
 
     def verify(
-        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
+        self, pred_data: list[dict[str, str]], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
         Args:
-            pred_responses: list[str]. The predicted responses from the LLM.
+            pred_data: list[dict[str, str]]. The prompt and predicted responses from the LLM.
             ground_truths: list[str]. The ground truth responses.
 
         Returns:
             list[tuple[float, str, str]]. The rewards, correct answer, and the extracted answer for each predicted response.
         """
         results = []
-        for response, metadata in zip(pred_responses, metadata_list):
+        for response, metadata in zip(pred_data, metadata_list):
             ground_truth = metadata["ground_truth"]
             try:
                 ground_truth_parsable = "\\boxed{" + ground_truth + "}"
@@ -127,23 +127,23 @@ class MGSMVerifyWorker:
         return target == prediction
 
     def verify(
-        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
+        self, pred_data: list[dict[str, str]], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
         Args:
-            pred_responses: list[str]. The predicted responses from the LLM.
+            pred_data: list[dict[str, str]]. The prompt and predicted responses from the LLM.
             ground_truths: list[str]. The ground truth responses.
 
         Returns:
             list[tuple[float, str, str]]. The rewards, correct answer, and the extracted answer for each predicted response.
         """
         results = []
-        for response, metadata in zip(pred_responses, metadata_list):
+        for data, metadata in zip(pred_data, metadata_list):
             lang = metadata["lang"]
             correct_answer = metadata["ground_truth"]
             answer_prefix = answer_parsing.LANG_TO_ANSWER_PREFIX[lang]
-            extracted_answer = answer_parsing.mgsm_parse_answer(response, answer_prefix)
+            extracted_answer = answer_parsing.mgsm_parse_answer(data["response"], answer_prefix)
             score = self._score_mgsm(correct_answer, extracted_answer)
             results.append((score, correct_answer, extracted_answer))
         return results
@@ -152,21 +152,21 @@ class MGSMVerifyWorker:
 @ray.remote
 class MultilingualMultichoiceVerifyWorker:
     def verify(
-        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
+        self, pred_data: list[dict[str, str]], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
         Args:
-            pred_responses: list[str]. The predicted responses from the LLM.
-            ground_truths: list[str]. The ground truth responses.
+            pred_data: list[dict[str, str]]. The prompt and predicted responses from the LLM.
+            metadata_list: list[MathEnvironmentMetadata]. The metadata for each prediction.
 
         Returns:
             list[tuple[float, str, str]]. The rewards, correct answer, and extracted answers for each predicted response.
         """
         results = []
-        for response, metadata in zip(pred_responses, metadata_list):
+        for data, metadata in zip(pred_data, metadata_list):
             ground_truth = answer_parsing.normalize_response(metadata["ground_truth"])
-            response = answer_parsing.normalize_response(response)
+            response = answer_parsing.normalize_response(data["response"])
             extracted_answer = None
             for answer_regex in answer_parsing.MULTILINGUAL_ANSWER_REGEXES:
                 regex = answer_parsing.MULTILINGUAL_ANSWER_PATTERN_TEMPLATE.format(
@@ -186,21 +186,21 @@ class MultilingualMultichoiceVerifyWorker:
 @ray.remote
 class EnglishMultichoiceVerifyWorker:
     def verify(
-        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
+        self, pred_data: list[dict[str, str]], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
         Args:
-            pred_responses: list[str]. The predicted responses from the LLM.
-            ground_truths: list[str]. The ground truth responses.
+            pred_data: list[dict[str, str]]. The prompt and predicted responses from the LLM.
+            metadata_list: list[MathEnvironmentMetadata]. The metadata for each prediction.
 
         Returns:
             list[tuple[float, str, str]]. The rewards, correct answer, and extracted answers for each predicted response.
         """
         results = []
-        for response, metadata in zip(pred_responses, metadata_list):
+        for data, metadata in zip(pred_data, metadata_list):
             ground_truth = answer_parsing.normalize_response(metadata["ground_truth"])
-            response = answer_parsing.normalize_response(response)
+            response = answer_parsing.normalize_response(data["response"])
             extracted_answer = None
             match = re.search("(?i)Answer\s*:[ \t]*([A-Z])", response)
             if match:
@@ -224,21 +224,21 @@ class CodeVerifyWorker:
         return extracted_answer
 
     def verify(
-        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
+        self, pred_data: list[dict[str, str]], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
         Args:
-            pred_responses: list[str]. The predicted responses from the LLM.
+            pred_data: list[dict[str, str]]. The prompt and predicted responses from the LLM.
             tests_list: list[str]. The unit tests.
 
         Returns:
             list[tuple[float, str, str]]. The rewards, unit tests, and extracted code segment for each predicted response.
         """
         outputs = []
-        for response, metadata in zip(pred_responses, metadata_list):
+        for data, metadata in zip(pred_data, metadata_list):
             tests = metadata["tests"]
-            code = self._find_code(response)
+            code = self._find_code(data["response"])
             predictions = [[code]]
             results = self._pass_at_k.compute(
                 references=[tests], predictions=predictions, k=[1]
@@ -285,21 +285,21 @@ class IFVerifyWorker:
         return all(is_following_list), descriptions, results
 
     def verify(
-        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
+        self, pred_data: list[dict[str, str]], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
         Args:
-            pred_responses: list[str]. The predicted responses from the LLM.
+            pred_data: list[dict[str, str]]. The prompt and predicted responses from the LLM.
             checker_info_list: list[dict[str, Any]]. The instruction lists and constraints.
 
         Returns:
             list[tuple[float, str, str]]. The rewards, instruction descriptions, and predicted responses.
         """
         outputs = []
-        for response, metadata in zip(pred_responses, metadata_list):
+        for data, metadata in zip(pred_data, metadata_list):
             checker_info = metadata["checker_info"]
-            score, descriptions, results = self._is_following(response, checker_info)
+            score, descriptions, results = self._is_following(data["response"], checker_info)
             description = "\n".join(descriptions)
             results = "\n".join(results)
             outputs.append((float(score), description, results))
@@ -354,6 +354,7 @@ class MathEnvironment(EnvironmentInterface):
         # Extract the assistant's responses from the message history
         # Each message list should have at least one assistant response
         assistant_response_batch = []
+        prompt_batch = []
         for conversation in message_log_batch:
             assistant_responses = [
                 interaction["content"]
@@ -361,17 +362,22 @@ class MathEnvironment(EnvironmentInterface):
                 if interaction["role"] == "assistant"
             ]
             assistant_response_batch.append("".join(assistant_responses))
+            user_messages = [
+                interaction["content"]
+                for interaction in conversation
+                if interaction["role"] == "user"
+            ]
+            prompt_batch.append("".join(user_messages))
 
-        chunked_assistant_response_batch = chunk_list_to_workers(
-            assistant_response_batch, self.num_workers
-        )
+        chunk = [{"prompt": p, "response": r} for p, r in zip(prompt_batch, assistant_response_batch)]
+        chunked_batch = chunk_list_to_workers(chunk, self.num_workers)
         chunked_verifier_metadata = chunk_list_to_workers(metadata, self.num_workers)
 
         # # Process each chunk in parallel
         futures = [
             self.workers[i].verify.remote(chunk, metadata_chunk)
             for i, (chunk, metadata_chunk) in enumerate(
-                zip(chunked_assistant_response_batch, chunked_verifier_metadata)
+                zip(chunked_input_batch, chunked_verifier_metadata)
             )
         ]
 
