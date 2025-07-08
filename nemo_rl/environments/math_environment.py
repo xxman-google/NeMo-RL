@@ -66,7 +66,7 @@ class MathEnvironmentMetadata(TypedDict):
 
 @ray.remote
 class MathVerifyWorker:
-    def __init__(self) -> None:
+    def __init__(self, cfg: MathEnvConfig) -> None:
         logging.getLogger("math_verify").setLevel(logging.CRITICAL)
 
         # Use Latex and plain math extraction from predictions
@@ -117,6 +117,9 @@ class MathVerifyWorker:
 
 @ray.remote
 class MGSMVerifyWorker:
+    def __init__(self, cfg: MathEnvConfig) -> None:
+        pass
+
     def _score_mgsm(self, target: str, prediction: str) -> bool:
         if "." in prediction:
             prediction = prediction.rstrip("0").rstrip(".")
@@ -151,6 +154,9 @@ class MGSMVerifyWorker:
 
 @ray.remote
 class MultilingualMultichoiceVerifyWorker:
+    def __init__(self, cfg: MathEnvConfig) -> None:
+        pass
+
     def verify(
         self, pred_data: list[dict[str, str]], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
@@ -185,6 +191,9 @@ class MultilingualMultichoiceVerifyWorker:
 
 @ray.remote
 class EnglishMultichoiceVerifyWorker:
+    def __init__(self, cfg: MathEnvConfig) -> None:
+        pass
+
     def verify(
         self, pred_data: list[dict[str, str]], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
@@ -214,7 +223,7 @@ class EnglishMultichoiceVerifyWorker:
 
 @ray.remote
 class CodeVerifyWorker:
-    def __init__(self) -> None:
+    def __init__(self, cfg: MathEnvConfig) -> None:
         self._pass_at_k = hf_evaluate.load("code_eval")
 
     def _find_code(self, response: str) -> str:
@@ -251,6 +260,8 @@ class CodeVerifyWorker:
 @ray.remote
 class IFVerifyWorker:
     """Response verifier worker for instruction following problems."""
+    def __init__(self, cfg: MathEnvConfig) -> None:
+        pass
 
     def _remove_kwargs_none(self, kwargs) -> dict[str, Any]:
         return {k: v for k, v in kwargs.items() if v is not None}
@@ -323,7 +334,7 @@ class MathEnvironment(EnvironmentInterface):
         self.workers = [
             worker_cls.options(  # type: ignore # (decorated with @ray.remote)
                 runtime_env={"py_executable": PY_EXECUTABLES.SYSTEM}
-            ).remote()
+            ).remote(cfg)
             for _ in range(self.num_workers)
         ]
 
