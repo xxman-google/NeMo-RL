@@ -46,6 +46,10 @@ class MathEnvConfig(TypedDict):
     num_workers: int
     stop_strings: Optional[list[str]]  # Default stop strings for this env
     verifier_type: Optional[str]
+    grader_model_name: Optional[str]  # Model to use for grading, e.g., "gpt-4o"
+    grader_system_message: Optional[str]  # System message for the grader model
+    grader_temperature: Optional[float]  # Temperature for the grader model
+    grader_max_tokens: Optional[int]  # Max tokens for the grader model
 
 
 @contextlib.contextmanager
@@ -317,6 +321,53 @@ class IFVerifyWorker:
         return outputs
 
 
+@ray.remote
+class QAVerifyWorker:
+    def __init__(self, cfg: MathEnvConfig) -> None:
+        self.grader_model = GptGraderModel(
+            model=cfg.get("grader_model", "gpt-4o"),
+            system_message=cfg.get("grader_system_message", OPENAI_SYSTEM_MESSAGE_CHATGPT),
+            temperature=cfg.get("grader_temperature", 0.5),
+            max_tokens=cfg.get("grader_max_tokens", 1024),
+        )
+
+    def _grade_sample(self, problem: str, ground_truth: str, predicted_answer: str) -> str:
+        grader_prompt = GRADER_TEMPLATE.format(
+            question=problem,
+            target=ground_truth,
+            predicted_answer=predicted_answer,
+        )
+        prompt_messages = [
+            self.grader_model._pack_message(content=grader_prompt, role="user")
+        ]
+        grader_response = self.grader_model(prompt_messages)
+        grading_response = grader_response.response_text
+        # Extract the grading letter (A, B, C) from the response
+        match = re.search(r"(A|B|C)", grading_response)
+        return match.group(0) if match else "C"  # Default to "NOT_ATTEMPTED" if no match
+
+    def verify(
+        self, pred_data: list[dict[str, str]], metadata_list: list[MathEnvironmentMetadata]
+    ) -> list[tuple[float, str, str]]:
+        """Verify the correctness of the predicted responses against the ground truth.
+        Args:
+            pred_data: list[dict[str, str]]. The prompt and predicted responses from the LLM.
+            tests_list: list[str]. The unit tests.
+        Returns:
+            list[tuple[float, str, str]]. The rewards, unit tests, and extracted code segment for each predicted response.
+        """
+        outputs = []
+        for data, metadata in zip(pred_data, metadata_list):
+            ground_truth = metadata["ground_truth"]
+            grade_letter = self.grade_sample(problem, ground_truth, data["response"])
+            is_correct = grade_letter == "A"
+            is_incorrect = grade_letter == "B"
+            is_not_attempted = grade_letter == "C"
+            score = is_correct
+            outputs.append((score, ground_truth, data["response"]))
+        return outputs
+
+
 @ray.remote(max_restarts=-1, max_task_retries=-1)
 class MathEnvironment(EnvironmentInterface):
     def __init__(self, cfg: MathEnvConfig):
@@ -330,6 +381,7 @@ class MathEnvironment(EnvironmentInterface):
             "math": MathVerifyWorker,
             "mgsm": MGSMVerifyWorker,
             "multilingual_multichoice": MultilingualMultichoiceVerifyWorker,
+            "simple_qa": QAVerifyWorker,
         }[verifier_type]
         self.workers = [
             worker_cls.options(  # type: ignore # (decorated with @ray.remote)
