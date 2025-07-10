@@ -1,4 +1,5 @@
 import time
+from dataclasses import dataclass
 from typing import Any
 
 import openai
@@ -118,7 +119,7 @@ class GraderModel:
     ) -> GraderResponse:
         raise NotImplementedError
 
-class GptGraderModel(GradeModel):
+class GptGraderModel(GraderModel):
     """
     Sample from OpenAI's chat completion API
     """
@@ -193,6 +194,7 @@ class GptGraderModel(GradeModel):
                 )
             except Exception as e:
                 exception_backoff = 2**trial  # expontial back off
+                print(f"[Retry {trial}] Exception occurred: {type(e).__name__}: {e}")
                 print(
                     f"Rate limit exception so wait and retry {trial} after {exception_backoff} sec",
                     e,
