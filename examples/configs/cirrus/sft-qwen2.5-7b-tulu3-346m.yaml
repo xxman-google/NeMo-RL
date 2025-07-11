@@ -1,9 +1,9 @@
 sft:
   max_num_epochs: 1
-  max_num_steps: 436
+  max_num_steps: 13944
   val_period: 100
   val_batches: 32
-  val_global_batch_size: 128
+  val_global_batch_size: 64
   val_micro_batch_size: 4
   val_at_start: true
   seed: 42
@@ -12,14 +12,14 @@ checkpointing:
   checkpoint_dir: "results/cirrus_sft_qwen2p5_7b_tulu3"
   metric_name: val_loss
   higher_is_better: false
-  keep_top_k: 3
-  save_period: 500
+  save_period: 1000
+  keep_top_k: null
 policy:
-  model_name: "Qwen/Qwen2.5-7B-Instruct"
+  model_name: "Qwen/Qwen2.5-7B"
   tokenizer:
-    name: "Qwen/Qwen2.5-7B"
+    name: "Qwen/Qwen2.5-7B-Instruct"
     chat_template: "default"
-  train_global_batch_size: 128
+  train_global_batch_size: 64
   train_micro_batch_size: 4
   max_total_sequence_length: 2048
   precision: bfloat16
@@ -40,7 +40,7 @@ policy:
   optimizer:
     name: torch.optim.AdamW
     kwargs:
-      lr: 1e-05
+      lr: 7e-06
       weight_decay: 0.1
       betas:
         - 0.9
@@ -56,8 +56,8 @@ policy:
         total_iters: 100
     - name: "torch.optim.lr_scheduler.CosineAnnealingLR"
       kwargs:
-        T_max: 336
-        eta_min: 1e-6
+        T_max: 13844
+        eta_min: 7e-7
     - milestones: [100]
 data:
   max_input_seq_length: 2048
@@ -72,10 +72,10 @@ logger:
   monitor_gpus: true
   wandb:
     project: cirrus
-    name: sft_qwen2p5_7b_tulu3
+    name: sft_qwen2p5_7b_tulu3_346m
   gpu_monitoring:
     collection_interval: 30
     flush_interval: 30
 cluster:
   gpus_per_node: 8
-  num_nodes: 4
+  num_nodes: 2
