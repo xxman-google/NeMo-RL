@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import ast
-import ast
 import contextlib
 import io
 import logging
@@ -316,13 +315,13 @@ class EnglishMultichoiceVerifyWorker:
 class ArcAgiVerifyWorker:
     """Response verifier worker for ARC-AGI problems."""
 
-    def _extract_grid(self, s: str) -> Optional[list[list[int]]]:
-        # Regex for a 2x2 grid of integers (optionally with whitespace)
-        pattern = r'\[\s*(\[\s*\d+(?:\s*,\s*\d+)*\s*\]\s*,?\s*)+\]'
+    def _extract_response_grid(self, s: str) -> Optional[list[list[int]]]:
+        # Regex for a 2D grid of integers (optionally with whitespace)
+        pattern = r'<output>\s*(\[[^\]]*(?:\][^\[]*\[?[^\]]*)*)\s*</output>'
         match = re.search(pattern, s, re.DOTALL)
         if not match:
             return None
-        grid_str = match.group(0)
+        grid_str = match.group(1)
         try:
             return ast.literal_eval(grid_str)
         except (SyntaxError, ValueError):
@@ -342,7 +341,7 @@ class ArcAgiVerifyWorker:
         """
         results = []
         for response, metadata in zip(pred_responses, metadata_list):
-            extracted_answer = self._extract_grid(response)
+            extracted_answer = self._extract_response_grid(response)
             score = 1.0 if extracted_answer == metadata["ground_truth"] else 0.0
             results.append((score, metadata["ground_truth"], extracted_answer))
         return results
