@@ -1,0 +1,2 @@
+You will be given a set of 'training' examples, which are pairs of (input, output) 2D grids. Your task is to learn the function that maps each input grid to its corresponding output grid. Given the 'test' input grid, give its output grid.
+

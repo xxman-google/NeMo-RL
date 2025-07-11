@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import ast
 import contextlib
 import io
 import logging
@@ -310,6 +311,45 @@ class EnglishMultichoiceVerifyWorker:
 #         return outputs
 
 
+@ray.remote
+class ArcAgiVerifyWorker:
+    """Response verifier worker for ARC-AGI problems."""
+
+    def _extract_grid(s: str) -> Optional[list[list[int]]]:
+        # Regex for a 2x2 grid of integers (optionally with whitespace)
+        pattern = r'\[\s*(\[\s*\d+(?:\s*,\s*\d+)*\s*\]\s*,?\s*)+\]'
+        match = re.search(pattern, s, re.DOTALL)
+        if not match:
+            return None
+        grid_str = match.group(0)
+        try:
+            return ast.literal_eval(grid_str)
+        except (SyntaxError, ValueError):
+            return None
+
+    def verify(
+        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
+    ) -> list[tuple[float, str, str]]:
+        """Verify the correctness of the predicted responses against the ground truth.
+
+        Args:
+            pred_responses: list[str]. The predicted responses from the LLM.
+            metadata_list: list[MathEnvironmentMetadata]. The metadata containing ground truth and other info.
+
+        Returns:
+            list[tuple[float, str, str]]. The rewards, correct answer, and extracted answer for each predicted response.
+        """
+        results = []
+        for response, metadata in zip(pred_responses, metadata_list):
+            training_examples = metadata["training_examples"]
+            test_input = metadata["test_input"]
+            ground_truth = self._extract_grid(metadata["ground_truth"])
+            extracted_answer = self._extract_grid(response)
+            score = 1.0 if extracted_answer == ground_truth else 0.0
+            results.append((score, ground_truth, extracted_answer))
+        return results
+
+
 @ray.remote(max_restarts=-1, max_task_retries=-1)  # pragma: no cover
 class MathEnvironment(EnvironmentInterface):
     def __init__(self, cfg: MathEnvConfig):
@@ -323,6 +363,7 @@ class MathEnvironment(EnvironmentInterface):
             "math": MathVerifyWorker,
             "mgsm": MGSMVerifyWorker,
             "multilingual_multichoice": MultilingualMultichoiceVerifyWorker,
+            "arc_agi": ArcAgiVerifyWorker,
         }[verifier_type]
         self.workers = [
             worker_cls.options(  # type: ignore # (decorated with @ray.remote)
