@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import collections
 import os
 from typing import Optional, TypedDict
@@ -239,6 +240,25 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
         master_config: Configuration settings.
         logger: Logger for recording evaluation results.
     """
+    # Check if async engine is enabled and run appropriate version
+    if master_config["generation"]["vllm_cfg"]["async_engine"]:
+        asyncio.run(
+            _run_env_eval_impl(
+                vllm_generation, dataloader, env, master_config, logger, use_async=True
+            )
+        )
+    else:
+        asyncio.run(
+            _run_env_eval_impl(
+                vllm_generation, dataloader, env, master_config, logger, use_async=False
+            )
+        )
+
+
+async def _run_env_eval_impl(
+    vllm_generation, dataloader, env, master_config, logger, use_async=False
+):
+    """Unified implementation for both sync and async evaluation."""
     # Extract for easier access
     generation_config = master_config["generation"]
     eval_config = master_config["eval"]
@@ -279,9 +299,10 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
 
         # generate by vllm
         inputs = BatchedDataDict({"prompts": prompts})
-        outputs = vllm_generation.generate_text(inputs)
-        output_texts = outputs["texts"]
-        generation_lengths.extend(outputs["generation_lengths"])
+        output_texts, batch_generation_lengths = await _generate_texts(
+            vllm_generation, inputs, use_async
+        )
+        generation_lengths.extend(batch_generation_lengths)
 
         # append to message_log
         for idx, output in enumerate(output_texts):
@@ -337,29 +358,81 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
     vllm_generation.shutdown()
 
     # Print results
+    _print_results(
+        master_config,
+        generation_config,
+        score,
+        len(dataloader.dataset),
+        metric,
+        pass_k_value,
+        num_tests_per_prompt,
+        logger,
+        subject_counts,
+        subject_scores,
+        htmls,
+        generation_lengths,
+    )
+
+
+async def _generate_texts(vllm_generation, inputs, use_async):
+    """Generate texts using either sync or async method."""
+    if use_async:
+        # Use async generation - collect all results
+        output_texts, generation_lengths = [], []
+        async for idx, result in vllm_generation.generate_text_async(inputs):
+            output_texts.append((idx, result["texts"][0]))
+            generation_lengths.append((idx, result["generation_lengths"][0]))
+
+        # Sort by index to maintain order
+        output_texts.sort(key=lambda x: x[0])
+        generation_lengths.sort(key=lambda x: x[0])
+        return [text for _, text in output_texts], [l for _, l in generation_lengths]
+    else:
+        # Use sync generation
+        outputs = vllm_generation.generate_text(inputs)
+        output_texts = outputs["texts"]
+        generation_lengths = outputs["generation_lengths"]
+        return output_texts, generation_lengths
+
+
+def _print_results(
+    master_config,
+    generation_config,
+    score,
+    dataset_size,
+    metric,
+    pass_k_value,
+    num_tests_per_prompt,
+    logger,
+    subject_counts,
+    subject_scores,
+    htmls,
+    generation_lengths,
+):
+    """Print evaluation results."""
     dataset_name = os.path.basename(master_config["data"]["dataset_name"])
     model_name = os.path.basename(generation_config["model_name"])
     max_new_tokens = generation_config["vllm_cfg"]["max_model_len"]
     temperature = generation_config["temperature"]
     top_p = generation_config["top_p"]
     top_k = generation_config["top_k"]
-    average_score = score / len(dataloader.dataset)
+    average_score = score / dataset_size
 
     print("\n" + "=" * 60)
     print(f"{model_name=} {dataset_name=}")
     print(f"{max_new_tokens=} {temperature=} {top_p=} {top_k=}\n")
     print(f"{metric=} {pass_k_value=} {num_tests_per_prompt=}\n")
-    print(f"score={average_score:.4f} ({score}/{len(dataloader.dataset)})")
+    print(f"score={average_score:.4f} ({score}/{dataset_size})")
     print("=" * 60 + "\n")
     logger.log_histogram("generation length", generation_lengths, num_bins=10)
-    max_samples_to_html = logger_config.get("max_samples_to_html", 30)
+    max_samples_to_html = master_config["logger"].get("max_samples_to_html", 30)
     all_htmls = vis_lib.make_report_from_example_htmls(htmls[:max_samples_to_html])
     logger.log_html("Decoding Results", all_htmls)
 
     if subject_scores:
         columns = ["Subjects", "Scores", "Counts"]
         subject_names = sorted(subject_scores.keys())
-        subject_data = [["Overall", average_score, len(dataloader.dataset)]]
+        subject_data = [["Overall", average_score, dataset_size]]
         for name in subject_names:
             subject_data.append(
                 [

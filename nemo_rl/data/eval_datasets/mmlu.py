@@ -111,7 +111,6 @@ class MMLUDataset:
             data_files = (
                 "https://openaipublic.blob.core.windows.net/simple-evals/mmlu.csv"
             )
-
         ds = load_dataset(
             "csv",
             data_files=data_files,

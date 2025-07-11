@@ -76,7 +76,7 @@ class VllmConfig(GenerationConfig):
 
 @ray.remote(
     runtime_env={**get_nsight_config_if_pattern_matches("vllm_generation_worker")}
-)
+)  # pragma: no cover
 class VllmGenerationWorker:
     def __repr__(self) -> str:
         """Customizes the actor's prefix in the Ray logs.
@@ -318,10 +318,6 @@ class VllmGenerationWorker:
 
         os.environ["VLLM_USE_V1"] = os.environ.get("NRL_VLLM_USE_V1", "1")
         os.environ["VLLM_ALLOW_INSECURE_SERIALIZATION"] = "1"
-
-        if not self.cfg["colocated"]["enabled"]:
-            os.environ["NCCL_SHM_DISABLE"] = "1"
-            os.environ["NCCL_P2P_DISABLE"] = "1"
 
         load_format = self.cfg["vllm_cfg"]["load_format"]
         if ModelFlag.VLLM_LOAD_FORMAT_AUTO.matches(self.model_name):
@@ -803,6 +799,12 @@ class VllmGenerationWorker:
             BatchedDataDict containing:
                 - texts: List of generated text responses
         """
+        # Check if async engine is enabled
+        if self.cfg["vllm_cfg"]["async_engine"]:
+            raise RuntimeError(
+                "generate_text cannot be used with async_engine=True. Use generate_text_async instead."
+            )
+
         # Extract stop_strings if provided, else use default from config
         batch_stop_strings: list[list[str] | None] = data.get(
             "stop_strings", [self.cfg.get("stop_strings")] * len(data["prompts"])
@@ -847,6 +849,108 @@ class VllmGenerationWorker:
             {"texts": texts, "generation_lengths": generation_lengths}
         )
         return return_data
+
+    async def generate_text_async(
+        self, data: BatchedDataDict[GenerationDatumSpec], greedy: bool = False
+    ) -> AsyncGenerator[tuple[int, BatchedDataDict[GenerationOutputSpec]], None]:
+        """Generate text responses asynchronously, yielding results as they are ready.
+
+        Args:
+            data: BatchedDataDict containing prompts with text strings
+            greedy: Whether to use greedy decoding instead of sampling
+
+        Yields:
+            Tuple of (original_index, BatchedDataDict containing single text response)
+        """
+        if not self.cfg["vllm_cfg"]["async_engine"]:
+            raise RuntimeError(
+                "generate_text_async can only be used when async_engine is enabled in vLLM config."
+            )
+
+        # Handle empty input case
+        if len(data["prompts"]) == 0:
+            return
+
+        prompts = data["prompts"]
+        batch_size = len(prompts)
+
+        # Extract stop_strings if provided, else use default from config
+        batch_stop_strings: list[list[str] | None] = data.get(
+            "stop_strings", [self.cfg.get("stop_strings")] * batch_size
+        )
+
+        # Create tasks for each prompt
+        async def process_single_prompt(prompt_idx):
+            """Process a single prompt and return the result."""
+            prompt = prompts[prompt_idx]
+
+            # Get stop strings for this specific prompt
+            per_prompt_stop_strings = None
+            if batch_stop_strings and prompt_idx < len(batch_stop_strings):
+                per_prompt_stop_strings = batch_stop_strings[prompt_idx]
+
+            # Merge stop strings
+            final_stop_strings = self._merge_stop_strings(
+                [per_prompt_stop_strings] if per_prompt_stop_strings else None
+            )
+
+            # Create sampling parameters
+            top_k = self.cfg["top_k"] if self.cfg["top_k"] is not None else -1
+            sampling_params = self.SamplingParams(
+                temperature=self.cfg["temperature"] if not greedy else 0,
+                top_p=self.cfg["top_p"],
+                top_k=top_k if not greedy else 1,
+                max_tokens=self.cfg["max_new_tokens"],
+                stop_token_ids=self.cfg["stop_token_ids"],
+                stop=final_stop_strings,
+                include_stop_str_in_output=True,  # returning stop strings like hf
+            )
+
+            request_id = str(uuid.uuid4())
+
+            # Generate using vLLM async engine
+            vllm_request_generator = self.llm.generate(
+                prompt=prompt,
+                sampling_params=sampling_params,
+                request_id=request_id,
+            )
+
+            # Get the final result from the generator
+            final_request_output = None
+            async for req_output in vllm_request_generator:
+                final_request_output = req_output
+
+            if final_request_output is None:
+                raise RuntimeError(f"No output received for request {request_id}")
+
+            # Extract the generated text
+            generated_text = final_request_output.outputs[0].text
+            generation_length = len(final_request_output.outputs[0].token_ids)
+
+            # Create result in BatchedDataDict format
+            result_batch = BatchedDataDict[GenerationOutputSpec](
+                {"texts": [generated_text], "generation_lengths": [generation_length]}
+            )
+
+            return (prompt_idx, result_batch)
+
+        # Create tasks for all prompts and yield results as they complete
+        prompt_tasks = [
+            asyncio.create_task(process_single_prompt(i)) for i in range(batch_size)
+        ]
+
+        # Yield results as they become available
+        for completed_task in asyncio.as_completed(prompt_tasks):
+            try:
+                result = await completed_task
+                yield result
+            except Exception as e:
+                # Cancel remaining tasks
+                for task in prompt_tasks:
+                    if not task.done():
+                        task.cancel()
+                await asyncio.gather(*prompt_tasks, return_exceptions=True)
+                raise e
 
     def shutdown(self) -> bool:
         """Clean up vLLM resources."""
@@ -1226,6 +1330,13 @@ class VllmGeneration(GenerationInterface):
             "nemo_rl.models.generation.vllm.VllmGenerationWorker", config
         )
 
+        # It's necessary to set env_vars here to ensure that vllm non-leader workers also have these env_vars
+        # Explicitly set NCCL_CUMEM_ENABLE to 1 to avoid the P2P initialization error for PyNCCLCommunicator.
+        # See https://github.com/NVIDIA-NeMo/RL/issues/564 for more details.
+        env_vars = {}
+        if not self.cfg["colocated"]["enabled"]:
+            os.environ["NCCL_CUMEM_ENABLE"] = "1"
+
         # Check if we need parallelism-aware worker group creation
         if self.model_parallel_size > 1:
             # For parallelism, create node-aware worker groups
@@ -1237,6 +1348,7 @@ class VllmGeneration(GenerationInterface):
                 name_prefix=name_prefix,
                 bundle_indices_list=node_bundle_indices,
                 sharding_annotations=self.sharding_annotations,
+                env_vars=env_vars,
             )
         else:
             # Use standard worker group creation for non-parallel case
@@ -1246,6 +1358,7 @@ class VllmGeneration(GenerationInterface):
                 name_prefix=name_prefix,
                 workers_per_node=workers_per_node,
                 sharding_annotations=self.sharding_annotations,
+                env_vars=env_vars,
             )
 
         # Number of data parallel groups is the number of tied worker groups
@@ -1478,6 +1591,12 @@ class VllmGeneration(GenerationInterface):
             f"data must be a BatchedDataDict, got type: {type(data)}"
         )
 
+        # Check if async engine is enabled
+        if self.cfg["vllm_cfg"]["async_engine"]:
+            raise RuntimeError(
+                "generate_text cannot be used with async_engine=True. Use generate_text_async instead."
+            )
+
         # Shard the data across the tied worker groups
         dp_size = self.sharding_annotations.get_axis_size("data_parallel")
         sharded_data: list[SlicedDataDict] = data.shard_by_batch_size(
@@ -1510,28 +1629,35 @@ class VllmGeneration(GenerationInterface):
 
         return combined
 
-    async def generate_async(
-        self, data: BatchedDataDict[GenerationDatumSpec], greedy: bool = False
+    async def _async_generate_base(
+        self,
+        data: BatchedDataDict[GenerationDatumSpec],
+        method_name: str,
+        data_validation_fn,
+        greedy: bool = False,
     ) -> AsyncGenerator[tuple[int, BatchedDataDict[GenerationOutputSpec]], None]:
-        """Generate responses asynchronously, yielding individual samples as they complete.
+        """Base async generation method that handles common worker management logic.
 
-        This method provides per-sample streaming across all workers, yielding each
-        sample result as soon as it's ready, regardless of which worker processed it.
+        Args:
+            data: Input data for generation
+            method_name: Name of the worker method to call ('generate_async' or 'generate_text_async')
+            data_validation_fn: Function to validate input data
+            greedy: Whether to use greedy decoding
+
+        Yields:
+            Tuple of (original_index, BatchedDataDict containing generation result)
         """
         if not self.cfg["vllm_cfg"]["async_engine"]:
             raise RuntimeError(
-                "generate_async can only be used when async_engine is enabled in VllmConfig."
+                f"{method_name} can only be used when async_engine is enabled in vLLM config."
             )
 
         assert isinstance(data, BatchedDataDict), (
             f"data must be a BatchedDataDict, got type: {type(data)}"
         )
-        assert "input_ids" in data and "input_lengths" in data, (
-            "input_ids and input_lengths are required in data for vLLM generation"
-        )
 
-        # Handle empty input case
-        if len(data["input_ids"]) == 0:
+        # Validate input data and handle empty case
+        if not data_validation_fn(data):
             return
 
         # Determine the leader worker for the current data parallel shard
@@ -1539,9 +1665,9 @@ class VllmGeneration(GenerationInterface):
             self.current_generate_dp_shard_idx
         )
 
-        # Run the generate_async method on the selected leader worker. This returns an ObjectRefGenerator.
+        # Run the async method on the selected leader worker
         worker_gen_proxy = self.worker_group.run_single_worker_single_data(
-            method_name="generate_async",
+            method_name=method_name,
             worker_idx=leader_worker_idx,
             data=data,
             greedy=greedy,
@@ -1624,6 +1750,52 @@ class VllmGeneration(GenerationInterface):
         assert worker_task.done(), (
             f"Worker task {leader_worker_idx} should be done but isn't"
         )
+
+    async def generate_text_async(
+        self, data: BatchedDataDict[GenerationDatumSpec], greedy: bool = False
+    ) -> AsyncGenerator[tuple[int, BatchedDataDict[GenerationOutputSpec]], None]:
+        """Generate text responses asynchronously, yielding results as they are ready.
+
+        Args:
+            data: BatchedDataDict containing prompts with text strings
+            greedy: Whether to use greedy decoding instead of sampling
+
+        Yields:
+            Tuple of (original_index, BatchedDataDict containing single text response)
+        """
+
+        def validate_text_data(data):
+            if len(data["prompts"]) == 0:
+                return False  # Return False for empty case to trigger early return
+            return True
+
+        async for result in self._async_generate_base(
+            data, "generate_text_async", validate_text_data, greedy
+        ):
+            yield result
+
+    async def generate_async(
+        self, data: BatchedDataDict[GenerationDatumSpec], greedy: bool = False
+    ) -> AsyncGenerator[tuple[int, BatchedDataDict[GenerationOutputSpec]], None]:
+        """Generate responses asynchronously, yielding individual samples as they complete.
+
+        This method provides per-sample streaming across all workers, yielding each
+        sample result as soon as it's ready, regardless of which worker processed it.
+        """
+
+        def validate_generate_data(data):
+            if "input_ids" not in data or "input_lengths" not in data:
+                raise AssertionError(
+                    "input_ids and input_lengths are required in data for vLLM generation"
+                )
+            if len(data["input_ids"]) == 0:
+                return False  # Return False for empty case to trigger early return
+            return True
+
+        async for result in self._async_generate_base(
+            data, "generate_async", validate_generate_data, greedy
+        ):
+            yield result
 
     def prepare_for_generation(self, *args: Any, **kwargs: Any) -> bool:
         """Wake workers up for colocated inference."""

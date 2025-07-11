@@ -64,7 +64,7 @@ class MathEnvironmentMetadata(TypedDict):
     checker_info: Optional[dict[str, Any]]
 
 
-@ray.remote
+@ray.remote  # pragma: no cover
 class MathVerifyWorker:
     def __init__(self) -> None:
         logging.getLogger("math_verify").setLevel(logging.CRITICAL)
@@ -115,7 +115,7 @@ class MathVerifyWorker:
         return results
 
 
-@ray.remote
+@ray.remote  # pragma: no cover
 class MGSMVerifyWorker:
     def _score_mgsm(self, target: str, prediction: str) -> bool:
         if "." in prediction:
@@ -149,7 +149,7 @@ class MGSMVerifyWorker:
         return results
 
 
-@ray.remote
+@ray.remote  # pragma: no cover
 class MultilingualMultichoiceVerifyWorker:
     def verify(
         self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
@@ -183,7 +183,7 @@ class MultilingualMultichoiceVerifyWorker:
         return results
 
 
-@ray.remote
+@ray.remote  # pragma: no cover
 class EnglishMultichoiceVerifyWorker:
     def verify(
         self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
@@ -306,7 +306,7 @@ class IFVerifyWorker:
         return outputs
 
 
-@ray.remote(max_restarts=-1, max_task_retries=-1)
+@ray.remote(max_restarts=-1, max_task_retries=-1)  # pragma: no cover
 class MathEnvironment(EnvironmentInterface):
     def __init__(self, cfg: MathEnvConfig):
         self.cfg = cfg
