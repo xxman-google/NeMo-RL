@@ -3,7 +3,7 @@ sft:
   max_num_steps: 1000
   val_period: 100
   val_batches: 32
-  val_global_batch_size: 32
+  val_global_batch_size: 64
   val_micro_batch_size: 4
   val_at_start: true
   seed: 42
@@ -19,9 +19,9 @@ policy:
   tokenizer:
     name: "Qwen/Qwen2.5-7B"
     chat_template: "default"
-  train_global_batch_size: 32
+  train_global_batch_size: 64
   train_micro_batch_size: 4
-  max_total_sequence_length: 4096
+  max_total_sequence_length: 2048
   precision: bfloat16
   fsdp_offload_enabled: false
   activation_checkpointing_enabled: false
@@ -60,7 +60,7 @@ policy:
         eta_min: 1e-6
     - milestones: [100]
 data:
-  max_input_seq_length: 4096
+  max_input_seq_length: 2048
   dataset_name: "tulu3sft"
   add_bos: true
   add_eos: true
@@ -78,4 +78,4 @@ logger:
     flush_interval: 30
 cluster:
   gpus_per_node: 8
-  num_nodes: 1
+  num_nodes: 2
