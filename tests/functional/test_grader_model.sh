@@ -8,5 +8,5 @@
 
 # install openai package if not already installed
 # pip install openai
-export OPENAI_API_KEY="your_openai_api_key"
-python -m tests.functional.test_grader_model
+export OPENAI_API_KEY="your_openai_api_key_here"
+uv run --extra mcore tests/functional/test_grader_model.py

@@ -47,6 +47,7 @@ dependencies = [
     "langdetect",
     "nltk>=3.9.1",
     "immutabledict",
+    "openai>=1.0",
 ]
 
 [project.optional-dependencies]
