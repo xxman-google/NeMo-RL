@@ -127,6 +127,18 @@ def _construct_arc_agi_prompt(
     return output
 
 
+def _construct_arc_agi_prompt(
+    prompt: str, training_examples: list[dict[str, Any]], test_input: list[list[int]]
+) -> str:
+    """Construct ARC-AGI prompt from training examples and test input."""
+    output = prompt
+    output += f"'training_examples':\n{training_examples}\n\n"
+    output += f"'test_input':\n{test_input}\n\n"
+    output += "The final output grid response should be formatted exactly as follows:\n\n"
+    output += "<output>\n[output grid]\n</output>\n"
+    return output
+
+
 def multichoice_qa_processor(
     datum_dict: dict[str, Any],
     task_data_spec: TaskDataSpec,
@@ -200,7 +212,7 @@ def arc_agi_processor(
     """Process a datum dictionary (directly loaded from dataset) into a DatumSpec for ARC-AGI examples."""
     training_examples = datum_dict["training_examples"]
     test_input = datum_dict["test_input"]
-    ground_truth = datum_dict["expected_output"]
+    ground_truth = datum_dict["ground_truth"]
     extra_env_info = {"ground_truth": ground_truth}
 
     message_log = []
