@@ -1,0 +1,15 @@
+# ARC-AGI evaluation Configuration
+defaults: "eval.yaml"
+
+data:
+  prompt_file: "examples/prompts/arc_agi.txt"
+  dataset_name: "arc_agi"
+
+generation:
+  vllm_cfg:
+    max_model_len: 4096
+
+env:
+  math:
+    verifier_type: "arc_agi"
+    verifier_metadata_key: "ground_truth"
