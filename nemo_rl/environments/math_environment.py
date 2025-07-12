@@ -37,6 +37,7 @@ from nemo_rl.environments.metrics import (
 from nemo_rl.environments.utils import chunk_list_to_workers
 from nemo_rl.evals import answer_parsing
 from nemo_rl.evals.ifeval import instructions_registry
+from nemo_rl.evals.grader_model import GptGraderModel, OPENAI_SYSTEM_MESSAGE_CHATGPT, QA_GRADER_TEMPLATE
 
 # This is needed for running code evaluation
 os.environ["HF_ALLOW_CODE_EVAL"] = "1"
@@ -332,7 +333,7 @@ class QAVerifyWorker:
         )
 
     def _grade_sample(self, problem: str, ground_truth: str, predicted_answer: str) -> str:
-        grader_prompt = GRADER_TEMPLATE.format(
+        grader_prompt = QA_GRADER_TEMPLATE.format(
             question=problem,
             target=ground_truth,
             predicted_answer=predicted_answer,
@@ -359,7 +360,7 @@ class QAVerifyWorker:
         outputs = []
         for data, metadata in zip(pred_data, metadata_list):
             ground_truth = metadata["ground_truth"]
-            grade_letter = self.grade_sample(problem, ground_truth, data["response"])
+            grade_letter = self._grade_sample(data["prompt"], ground_truth, data["response"])
             is_correct = grade_letter == "A"
             is_incorrect = grade_letter == "B"
             is_not_attempted = grade_letter == "C"
@@ -440,7 +441,7 @@ class MathEnvironment(EnvironmentInterface):
         futures = [
             self.workers[i].verify.remote(chunk, metadata_chunk)
             for i, (chunk, metadata_chunk) in enumerate(
-                zip(chunked_input_batch, chunked_verifier_metadata)
+                zip(chunked_batch, chunked_verifier_metadata)
             )
         ]
 
