@@ -255,6 +255,7 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
         "english_multichoice": vis_lib.MathRenderTemplate,
         "multilingual_multichoice": vis_lib.MathRenderTemplate,
         "instruction_following": vis_lib.BaseRenderTemplate,
+        "simple_qa": vis_lib.BaseRenderTemplate,
     }[env_config["verifier_type"]]()
 
     # Run evaluation loop

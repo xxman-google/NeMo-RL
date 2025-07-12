@@ -22,6 +22,7 @@ from nemo_rl.data.eval_datasets.mbpp import MBPPDataset
 from nemo_rl.data.eval_datasets.mgsm import MGSMDataset
 from nemo_rl.data.eval_datasets.mmlu import MMLUDataset
 from nemo_rl.data.eval_datasets.mmlu_pro import MMLUProDataset
+from nemo_rl.data.eval_datasets.simpleqa import SimpleQADataset
 
 
 def load_eval_dataset(data_config):
@@ -54,6 +55,11 @@ def load_eval_dataset(data_config):
         )
     elif dataset_name == "ifeval":
         base_dataset = IFEvalDataset(
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
+    elif dataset_name == "simpleqaeval":
+        base_dataset = SimpleQADataset(
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
