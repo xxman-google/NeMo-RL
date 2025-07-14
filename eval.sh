@@ -21,8 +21,8 @@ for benchmark_name in "${benchmarks[@]}"; do
   echo "Reading from config: ${config_file}"
   wandb_name="$exp_name-$benchmark_name"
   if [ $benchmark_name = "math500" ]; then
-    uv run examples/run_eval.py --config $config_file data.dataset_name="math500" cluster.gpus_per_node=8 generation.model_name=$ckpt_path logger.wandb.name=$wandb_name
+    uv run examples/run_eval.py --config $config_file data.dataset_name="math500" generation.stop_token_ids=\[151643,151645\] cluster.gpus_per_node=8 generation.model_name=$ckpt_path logger.wandb.name=$wandb_name
   else
-    uv run examples/run_eval.py --config $config_file cluster.gpus_per_node=8 generation.model_name=$ckpt_path logger.wandb.name=$wandb_name
+    uv run examples/run_eval.py --config $config_file generation.stop_token_ids=\[151643,151645\] cluster.gpus_per_node=8 generation.model_name=$ckpt_path logger.wandb.name=$wandb_name
   fi
 done

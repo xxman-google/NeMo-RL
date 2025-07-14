@@ -202,7 +202,10 @@ class EnglishMultichoiceVerifyWorker:
             ground_truth = answer_parsing.normalize_response(metadata["ground_truth"])
             response = answer_parsing.normalize_response(response)
             extracted_answer = None
-            match = re.search("(?i)Answer\s*:[ \t]*([A-Z])", response)
+            match = re.search(
+                "(?i)(?:Answer\s*:|answer is)[ \t]*([A-Z])[.]*\s*$", response
+            )
+            # match = re.search("(?i)Answer\s*:[ \t]*([A-Z])\s*$", response)
             if match:
                 extracted_answer = answer_parsing.normalize_extracted_answer(
                     match.group(1)
