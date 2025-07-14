@@ -421,6 +421,7 @@ class VllmGenerationWorker:
             stop_token_ids=self.cfg["stop_token_ids"],
             stop=stop_strings,
             include_stop_str_in_output=True,
+            skip_special_tokens=self.cfg.get("skip_special_tokens", True),
         )
 
     def generate(
@@ -834,6 +835,7 @@ class VllmGenerationWorker:
             stop_token_ids=self.cfg["stop_token_ids"],
             stop=stop_strings,
             include_stop_str_in_output=True,  # returning stop strings like hf
+            skip_special_tokens=self.cfg.get("skip_special_tokens", True),
         )
 
         # Generate outputs
@@ -904,6 +906,7 @@ class VllmGenerationWorker:
                 stop_token_ids=self.cfg["stop_token_ids"],
                 stop=final_stop_strings,
                 include_stop_str_in_output=True,  # returning stop strings like hf
+                skip_special_tokens=self.cfg.get("skip_special_tokens", True),
             )
 
             request_id = str(uuid.uuid4())
