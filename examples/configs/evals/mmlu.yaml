@@ -1,8 +1,5 @@
-# MMLU evaluation Configuration
-defaults: "eval.yaml"
-
-generation:
-  model_name: "Qwen/Qwen2.5-7B-Instruct"
+# Math evaluation Configuration
+defaults: "gpqa_eval.yaml"
 
 data:
   prompt_file: "examples/prompts/mmlu.txt"
@@ -10,4 +7,5 @@ data:
 
 env:
   math:
-    verifier_type: "multichoice"
+    verifier_type: "english_multichoice"
+    metric_group_key: "subject"
