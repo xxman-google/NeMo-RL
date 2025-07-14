@@ -1,5 +1,5 @@
 # Math evaluation Configuration
-defaults: "gpqa_eval.yaml"
+defaults: "gpqa.yaml"
 
 data:
   prompt_file: "examples/prompts/cot.txt"
