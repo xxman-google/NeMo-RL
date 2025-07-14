@@ -442,3 +442,8 @@ def _print_results(
                 ]
             )
         logger.log_table("Subject Results", columns, subject_data)
+    else:
+        columns = ["Name", "Scores", "Counts"]
+        logger.log_table(
+            "Overall Results", columns, [[dataset_name, average_score, dataset_size]]
+        )
