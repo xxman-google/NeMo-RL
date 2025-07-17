@@ -22,6 +22,7 @@ from nemo_rl.data.eval_datasets.mbpp import MBPPDataset
 from nemo_rl.data.eval_datasets.mgsm import MGSMDataset
 from nemo_rl.data.eval_datasets.mmlu import MMLUDataset
 from nemo_rl.data.eval_datasets.mmlu_pro import MMLUProDataset
+from nemo_rl.data.eval_datasets.tulu3_sft import Tulu3SftDataset
 
 
 def load_eval_dataset(data_config):
@@ -110,6 +111,11 @@ def load_eval_dataset(data_config):
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
+    elif dataset_name == "tulu3_sft":
+        base_dataset = Tulu3SftDataset(
+            source=data_config["subset"],
+            prompt_file=data_config["prompt_file"],
+        )
     else:
         raise ValueError(f"Unknown dataset {dataset_name}.")
     return base_dataset
@@ -126,4 +132,5 @@ __all__ = [
     "MGSMDataset",
     "MMLUDataset",
     "MMLUProDataset",
+    "Tulu3SftDataset",
 ]
