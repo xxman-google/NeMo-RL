@@ -1,0 +1,2 @@
+# AIME2024 evaluation Configuration
+defaults: "eval.yaml"
