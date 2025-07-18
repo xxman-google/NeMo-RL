@@ -1,6 +1,6 @@
 sft:
   max_num_epochs: 1
-  max_num_steps: 538
+  max_num_steps: 2152
   val_period: 100
   val_batches: 32
   val_global_batch_size: 128
@@ -13,7 +13,7 @@ checkpointing:
   metric_name: val_loss
   higher_is_better: false
   keep_top_k: null
-  save_period: 1000
+  save_period: 600
 policy:
   model_name: "Qwen/Qwen2.5-14B"
   tokenizer:
@@ -56,11 +56,11 @@ policy:
         total_iters: 100
     - name: "torch.optim.lr_scheduler.CosineAnnealingLR"
       kwargs:
-        T_max: 438
+        T_max: 2052
         eta_min: 8.85e-7
     - milestones: [100]
 data:
-  max_input_seq_length: 2048
+  max_input_seq_length: ${policy.max_total_sequence_length}
   dataset_name: "tulu3sft"
   add_bos: true
   add_eos: true
@@ -72,7 +72,7 @@ logger:
   monitor_gpus: true
   wandb:
     project: cirrus
-    name: "sft_qwen2p5_14b_tulu3_22m_lr8.85e-6"
+    name: "sft_qwen2p5_14b_tulu3_86m_lr8.85e-6"
   gpu_monitoring:
     collection_interval: 30
     flush_interval: 30

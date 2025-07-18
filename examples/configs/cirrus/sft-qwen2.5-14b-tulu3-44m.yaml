@@ -1,9 +1,9 @@
 sft:
   max_num_epochs: 1
-  max_num_steps: 1744
+  max_num_steps: 1076
   val_period: 100
   val_batches: 32
-  val_global_batch_size: 64
+  val_global_batch_size: 128
   val_micro_batch_size: 4
   val_at_start: true
   seed: 42
@@ -13,14 +13,14 @@ checkpointing:
   metric_name: val_loss
   higher_is_better: false
   keep_top_k: null
-  save_period: 500
+  save_period: 600
 policy:
   model_name: "Qwen/Qwen2.5-14B"
   tokenizer:
     name: "Qwen/Qwen2.5-14B-Instruct"
     chat_template: "default"
-  train_global_batch_size: 64
-  train_micro_batch_size: 4
+  train_global_batch_size: 128
+  train_micro_batch_size: 2
   max_total_sequence_length: 2048
   precision: bfloat16
   fsdp_offload_enabled: false
@@ -28,19 +28,19 @@ policy:
   dtensor_cfg:
     enabled: true
     cpu_offload: false
-    sequence_parallel: true
+    sequence_parallel: false
     activation_checkpointing: true
-    tensor_parallel_size: 4
+    tensor_parallel_size: 1
     context_parallel_size: 1
     custom_parallel_plan: null
   dynamic_batching:
     enabled: False
-  make_sequence_length_divisible_by: 4
+  make_sequence_length_divisible_by: 1
   max_grad_norm: 1
   optimizer:
     name: torch.optim.AdamW
     kwargs:
-      lr: 5.67e-06
+      lr: 8.85e-06
       weight_decay: 0.1
       betas:
         - 0.9
@@ -56,8 +56,8 @@ policy:
         total_iters: 100
     - name: "torch.optim.lr_scheduler.CosineAnnealingLR"
       kwargs:
-        T_max: 1644
-        eta_min: 5.67e-7
+        T_max: 976
+        eta_min: 8.85e-7
     - milestones: [100]
 data:
   max_input_seq_length: 2048
@@ -72,10 +72,10 @@ logger:
   monitor_gpus: true
   wandb:
     project: cirrus
-    name: "sft_qwen2p5_14b_tulu3_44m_lr5.67e-6"
+    name: "sft_qwen2p5_14b_tulu3_44m_lr8.85e-6"
   gpu_monitoring:
     collection_interval: 30
     flush_interval: 30
 cluster:
   gpus_per_node: 8
-  num_nodes: 2
+  num_nodes: 4

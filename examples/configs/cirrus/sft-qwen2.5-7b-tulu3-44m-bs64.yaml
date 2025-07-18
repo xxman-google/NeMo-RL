@@ -4,7 +4,7 @@ sft:
   val_period: 100
   val_batches: 32
   val_global_batch_size: 64
-  val_micro_batch_size: 4
+  val_micro_batch_size: 2
   val_at_start: true
   seed: 42
 checkpointing:
@@ -12,7 +12,7 @@ checkpointing:
   checkpoint_dir: "results/cirrus_sft_qwen2p5_7b_tulu3"
   metric_name: val_loss
   higher_is_better: false
-  save_period: 500
+  save_period: 1000
   keep_top_k: null
 policy:
   model_name: "Qwen/Qwen2.5-7B"
@@ -20,7 +20,7 @@ policy:
     name: "Qwen/Qwen2.5-7B-Instruct"
     chat_template: "default"
   train_global_batch_size: 64
-  train_micro_batch_size: 4
+  train_micro_batch_size: 2
   max_total_sequence_length: 2048
   precision: bfloat16
   fsdp_offload_enabled: false
@@ -78,4 +78,4 @@ logger:
     flush_interval: 30
 cluster:
   gpus_per_node: 8
-  num_nodes: 2
+  num_nodes: 4
