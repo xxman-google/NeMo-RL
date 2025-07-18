@@ -48,6 +48,8 @@ dependencies = [
     "nltk>=3.9.1",
     "immutabledict",
     "evaluate",
+    "absl-py",
+    "tqdm",
 ]
 
 [project.optional-dependencies]
