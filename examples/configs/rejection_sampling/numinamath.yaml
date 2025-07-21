@@ -1,4 +1,4 @@
-# Evaluation Configuration
+# Rejection sampling configuration
 rejection_sampling:
   num_tests_per_prompt: 1 # every prompt will be tested num_tests_per_prompt times and use the average score as the final score
 
@@ -37,8 +37,7 @@ tokenizer:
 data:
   max_input_seq_length: ${generation.vllm_cfg.max_model_len} # useless since we directly use prompts in evaluation
   prompt_file: null
-  dataset_name: "tulu3_sft"
-  subset: "ai2-adapt-dev/numinamath_tir_math_decontaminated"
+  dataset_name: "numima_math"
 
 env:
   math:
