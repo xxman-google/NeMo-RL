@@ -45,7 +45,7 @@ class MathTrainDataset:
             prompt_file=prompt_file,
             system_prompt_file=system_prompt_file,
         )
-        self.processor = processors.data_processor
+        self.processor = processors.math_rejection_sampling_processor
 
     def _extract_answer(self, solution: str):
         start_idx = solution.find("\\boxed{") + len("\\boxed")

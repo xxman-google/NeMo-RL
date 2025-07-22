@@ -178,6 +178,13 @@ def multichoice_qa_processor(
     return output
 
 
+math_rejection_sampling_processor = functools.partial(
+    data_processor,
+    extra_env_info_key_maps=[
+        ("expected_answer", "ground_truth"),
+        ("problem", "problem"),
+    ],
+)
 coding_processor = functools.partial(
     data_processor,
     question_key="question",

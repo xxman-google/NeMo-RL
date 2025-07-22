@@ -1,0 +1,8 @@
+# Math train split rejection sampling configuration
+defaults: "numinamath.yaml"
+
+data:
+  dataset_name: "math_train"
+
+logger:
+  num_ouput_shards: 1
