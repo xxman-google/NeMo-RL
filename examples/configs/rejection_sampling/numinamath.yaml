@@ -1,6 +1,7 @@
 # Rejection sampling configuration
 rejection_sampling:
-  num_tests_per_prompt: 1 # every prompt will be tested num_tests_per_prompt times and use the average score as the final score
+  num_tests_per_prompt: 5 # every prompt will be tested num_tests_per_prompt times and use the average score as the final score
+  metric: "pass@1,5"
   seed: 42
 
 generation:
