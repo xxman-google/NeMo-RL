@@ -120,7 +120,6 @@ def main():
     # Setup tokenizer
     tokenizer = get_tokenizer(config["tokenizer"])
     enable_thinking = config["generation"].get("enable_thinking", False)
-    print("run_rejection_sampling: ", enable_thinking)
     config["generation"] = configure_generation_config(
         config["generation"], tokenizer, is_eval=True
     )
@@ -141,7 +140,7 @@ def main():
     ) = setup(config, tokenizer, dataset)
 
     # Run evaluation
-    run_env_rejection_sampling(
+    dataset = run_env_rejection_sampling(
         vllm_generation,
         dataloader,
         env,

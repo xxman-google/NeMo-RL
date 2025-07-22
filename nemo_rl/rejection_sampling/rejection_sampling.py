@@ -13,9 +13,14 @@
 # limitations under the License.
 
 import asyncio
+import itertools
+import os
 from typing import TypedDict
 
+import numpy as np
 import ray
+import tqdm
+from datasets import Dataset
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer
 
@@ -154,7 +159,7 @@ def setup(
 
 
 # ===============================================================================
-# Evaluation
+# Rejection sampling
 # ===============================================================================
 
 
@@ -185,6 +190,16 @@ def run_env_rejection_sampling(vllm_generation, dataloader, env, master_config, 
         )
 
 
+def write_to_parquet(dataset: Dataset, num_shards: int, output_dir: str):
+    for i in tqdm.tqdm(range(num_shards), desc="Sharding"):
+        shard = dataset.shard(num_shards=num_shards, index=i)
+        output_path = os.path.join(
+            output_dir, f"train-{i:05d}-of-{num_shards:05d}.parquet"
+        )
+        print(f"Writing shard {i} to {output_path}...")
+        shard.to_parquet(output_path)
+
+
 async def _run_env_rejection_sampling_impl(
     vllm_generation, dataloader, env, master_config, logger, use_async=False
 ):
@@ -194,19 +209,18 @@ async def _run_env_rejection_sampling_impl(
     rejection_sampling_config = master_config["rejection_sampling"]
     env_config = master_config["env"]["math"]
     logger_config = master_config["logger"]
+    dataset_name = master_config["data"]["dataset_name"]
     num_tests_per_prompt = rejection_sampling_config["num_tests_per_prompt"]
     render_template = {
         "math": vis_lib.MathRenderTemplate,
-        "mgsm": vis_lib.MathRenderTemplate,
         "code": vis_lib.CodeRenderTemplate,
-        "english_multichoice": vis_lib.MathRenderTemplate,
-        "multilingual_multichoice": vis_lib.MathRenderTemplate,
         "instruction_following": vis_lib.BaseRenderTemplate,
     }[env_config["verifier_type"]]()
 
     # Run rejection sampling loop
     htmls = []
     generation_lengths = []
+    data = []
 
     for batch in dataloader:
         # measure multiple samples
@@ -219,6 +233,8 @@ async def _run_env_rejection_sampling_impl(
             content = [message["content"] for message in message_log]
             content = "\n".join(content)
             prompts.append(content)
+        # problems are prompts without chat template
+        problems = [info["problem"] for info in batch["extra_env_info"]]
 
         # generate by vllm
         inputs = BatchedDataDict({"prompts": prompts})
@@ -242,25 +258,30 @@ async def _run_env_rejection_sampling_impl(
             for i in range(len(batch["message_log"]))
         ]
         env_return = ray.get(env.step.remote(to_env, batch["extra_env_info"]))
-        rewards = env_return.rewards
-        for prompt, response, reward, observation in zip(
-            prompts,
-            output_texts,
-            rewards,
-            env_return.observations,
+        rewards = itertools.batched(env_return.rewards.tolist(), num_tests_per_prompt)
+        output_texts = itertools.batched(output_texts, num_tests_per_prompt)
+        problems = itertools.batched(problems, num_tests_per_prompt)
+        for chunk_rewards, chunk_outputs, chunk_problems in zip(
+            rewards, output_texts, problems
         ):
-            html = render_template.render(
-                prompt=prompt,
-                response=response,
-                score=reward.item(),
-                correct_answer=observation.get("correct_answer", None),
-                extracted_answer=observation.get("extracted_answer", None),
-            )
-            htmls.append(html)
+            sorted_indices = np.argsort(chunk_rewards)
+            last_idx = sorted_indices[-1]
+            if chunk_rewards[last_idx] == 0.0:
+                continue
+            messages = [
+                {"role": "user", "content": chunk_problems[last_idx]},
+                {"role": "assistant", "content": chunk_outputs[last_idx]},
+            ]
+            data.append({"messages": messages})
 
     # Cleanup before printing results
     ray.get(env.shutdown.remote())
     vllm_generation.shutdown()
+    write_to_parquet(
+        Dataset.from_list(data),
+        num_shards=logger_config["num_ouput_shards"],
+        output_dir=os.path.join(logger_config["log_dir"], dataset_name),
+    )
 
 
 async def _generate_texts(vllm_generation, inputs, use_async):
