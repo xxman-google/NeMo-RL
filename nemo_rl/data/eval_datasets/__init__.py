@@ -13,11 +13,13 @@
 # limitations under the License.
 
 from nemo_rl.data.eval_datasets.aime2024 import AIME2024Dataset
+from nemo_rl.data.eval_datasets.deepscaler import DeepScaleRDataset
 from nemo_rl.data.eval_datasets.gpqa import GPQADataset
 from nemo_rl.data.eval_datasets.humaneval import HumanEvalDataset
 from nemo_rl.data.eval_datasets.ifeval import IFEvalDataset
 from nemo_rl.data.eval_datasets.local_math_dataset import LocalMathDataset
 from nemo_rl.data.eval_datasets.math import MathDataset
+from nemo_rl.data.eval_datasets.math_train import MathTrainDataset
 from nemo_rl.data.eval_datasets.mbpp import MBPPDataset
 from nemo_rl.data.eval_datasets.mgsm import MGSMDataset
 from nemo_rl.data.eval_datasets.mmlu import MMLUDataset
@@ -42,6 +44,11 @@ def load_eval_dataset(data_config):
                 prompt_file=data_config["prompt_file"],
                 system_prompt_file=data_config["system_prompt_file"],
             )
+    elif dataset_name == "deepscaler":
+        base_dataset = DeepScaleRDataset(
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
     elif dataset_name == "mbpp":
         base_dataset = MBPPDataset(
             prompt_file=data_config["prompt_file"],
@@ -95,6 +102,11 @@ def load_eval_dataset(data_config):
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
+    elif dataset_name == "math_train":
+        base_dataset = MathTrainDataset(
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
     elif dataset_name == "math500":
         base_dataset = MathDataset(
             variant="math_500_test",
@@ -129,11 +141,13 @@ def load_eval_dataset(data_config):
 
 __all__ = [
     "AIME2024Dataset",
+    "DeepScaleRDataset",
     "GPQADataset",
     "HumanEvalDataset",
     "IFEvalDataset",
     "LocalMathDataset",
     "MathDataset",
+    "MathTrainDataset",
     "MBPPDataset",
     "MGSMDataset",
     "MMLUDataset",
