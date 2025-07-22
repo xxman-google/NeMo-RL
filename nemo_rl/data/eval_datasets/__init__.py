@@ -15,6 +15,7 @@
 from nemo_rl.data.eval_datasets.aime2024 import AIME2024Dataset
 from nemo_rl.data.eval_datasets.deepscaler import DeepScaleRDataset
 from nemo_rl.data.eval_datasets.gpqa import GPQADataset
+from nemo_rl.data.eval_datasets.gsm8k import Gsm8kDataset
 from nemo_rl.data.eval_datasets.humaneval import HumanEvalDataset
 from nemo_rl.data.eval_datasets.ifeval import IFEvalDataset
 from nemo_rl.data.eval_datasets.local_math_dataset import LocalMathDataset
@@ -85,6 +86,18 @@ def load_eval_dataset(data_config):
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
+    elif dataset_name == "gsm8k_train":
+        base_dataset = Gsm8kDataset(
+            split="train",
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
+    elif dataset_name == "gsm8k_test":
+        base_dataset = Gsm8kDataset(
+            split="test",
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
     elif dataset_name == "gpqa_diamond":
         base_dataset = GPQADataset(
             variant="diamond",
@@ -143,6 +156,7 @@ __all__ = [
     "AIME2024Dataset",
     "DeepScaleRDataset",
     "GPQADataset",
+    "Gsm8kDataset",
     "HumanEvalDataset",
     "IFEvalDataset",
     "LocalMathDataset",
