@@ -1,12 +1,13 @@
 # Rejection sampling configuration
 rejection_sampling:
   num_tests_per_prompt: 1 # every prompt will be tested num_tests_per_prompt times and use the average score as the final score
+  seed: 42
 
 generation:
   backend: "vllm" # only vllm is supported for evaluation
   max_new_tokens: ${generation.vllm_cfg.max_model_len}
-  temperature: 0.7
-  top_p: 0.8
+  temperature: 0.6
+  top_p: 0.95
   top_k: 20 
   num_prompts_per_step: -1 # -1 means pass all prompts at once
   model_name: "Qwen/Qwen3-14B"
@@ -18,7 +19,7 @@ generation:
     tensor_parallel_size: 1
     pipeline_parallel_size: 1
     gpu_memory_utilization: 0.9
-    max_model_len: 32768
+    max_model_len: 4096
     enforce_eager: False
   colocated:
     # true: generation shares training GPUs
@@ -36,7 +37,8 @@ tokenizer:
 
 data:
   max_input_seq_length: ${generation.vllm_cfg.max_model_len} # useless since we directly use prompts in evaluation
-  prompt_file: null
+  prompt_file: "examples/prompts/cot.txt"
+  system_prompt_file: null
   dataset_name: "numima_math"
 
 env:
@@ -47,6 +49,7 @@ env:
 
 logger:
   log_dir: "logs"  # Base directory for all logs
+  num_ouput_shards: 1
   wandb_enabled: true # Make sure you do a ``wandb login [Your API key]'' before running
   tensorboard_enabled: false # Disable because it does not supprt HTML logging
   monitor_gpus: true  # If true, will monitor GPU usage and log to wandb and/or tensorboard
