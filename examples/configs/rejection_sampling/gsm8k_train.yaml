@@ -1,0 +1,12 @@
+# GSM8K train split rejection sampling configuration
+defaults: "numinamath.yaml"
+
+rejection_sampling:
+  num_tests_per_prompt: 10
+  metric: "pass@1,5,10"
+
+data:
+  dataset_name: "gsm8k_train"
+
+logger:
+  num_ouput_shards: 1
