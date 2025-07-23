@@ -44,7 +44,7 @@ class DeepScaleRDataset:
             prompt_file=prompt_file,
             system_prompt_file=system_prompt_file,
         )
-        self.processor = processors.data_processor
+        self.processor = processors.math_rejection_sampling_processor
 
     def _rekey(self, data: dict[str, Any]):
         return {
