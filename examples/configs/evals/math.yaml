@@ -3,7 +3,6 @@ defaults: "gpqa.yaml"
 
 generation:
   model_name: "Qwen/Qwen2.5-7B-Instruct"
-  skip_special_tokens: false
 
 data:
   prompt_file: "examples/prompts/cot.txt"

@@ -1,15 +1,16 @@
-# Rejection sampling configuration
+# Rejection sampling configuration for Qwen3 14B model (no-thinking mode)
+
 rejection_sampling:
-  num_tests_per_prompt: 5 # every prompt will be tested num_tests_per_prompt times and use the average score as the final score
-  metric: "pass@1,5"
+  num_tests_per_prompt: 10 # every prompt will be tested num_tests_per_prompt times and use the average score as the final score
+  metric: "pass@1,5,10"
   seed: 42
 
 generation:
   backend: "vllm" # only vllm is supported for evaluation
   max_new_tokens: ${generation.vllm_cfg.max_model_len}
-  temperature: 0.6
-  top_p: 0.95
-  top_k: 20 
+  temperature: 0.7
+  top_p: 0.8
+  top_k: 20
   num_prompts_per_step: -1 # -1 means pass all prompts at once
   model_name: "Qwen/Qwen3-14B"
   stop_token_ids: null
@@ -20,7 +21,7 @@ generation:
     tensor_parallel_size: 1
     pipeline_parallel_size: 1
     gpu_memory_utilization: 0.9
-    max_model_len: 4096
+    max_model_len: 38912
     enforce_eager: False
   colocated:
     # true: generation shares training GPUs
@@ -40,7 +41,7 @@ data:
   max_input_seq_length: ${generation.vllm_cfg.max_model_len} # useless since we directly use prompts in evaluation
   prompt_file: "examples/prompts/cot.txt"
   system_prompt_file: null
-  dataset_name: "numima_math"
+  dataset_name: "numina_math"
 
 env:
   math:
