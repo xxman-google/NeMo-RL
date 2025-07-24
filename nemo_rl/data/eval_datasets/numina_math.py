@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""NuminaMath dataset."""
+"""NuminaMath 1.5 dataset."""
 
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from datasets import load_dataset
 
@@ -25,36 +25,51 @@ from nemo_rl.data.interfaces import TaskDataSpec
 class NuminaMathDataset:
     def __init__(
         self,
+        source: Literal[
+            "amc_aime",
+            "aops_forum",
+            "cn_contest",
+            "cn_k12",
+            "inequalities",
+            "metamath",
+            "number_theory",
+            "olympiads",
+            "olympiads_ref",
+            "orca_math",
+            "synthetic_math",
+            "all",
+        ] = "amc_aime",
         prompt_file: Optional[str] = None,
         system_prompt_file: Optional[str] = None,
     ):
         """Initialize the NuminaMath subset.
 
         Args:
+            source: data source.
             prompt_file: Path to the prompt file to use.
+            system_prompt_file: Path to the system prompt file to use.
         """
-        ds = load_dataset(
-            "parquet",
-            data_files="/tmp/run_outputs/tulu3_sft_math/train-00000-of-00001.parquet",
-            split="train",
-        )
-        self.rekeyed_ds = ds.map(self._rekey, remove_columns=["messages"])
+        ds = load_dataset("AI-MO/NuminaMath-1.5", split="train")
+        if source != "all":
+            ds = ds.filter(
+                lambda example: example["source"] == source
+                and example["question_type"] == "math-word-problem"
+            )
+        else:
+            ds = ds.filter(
+                lambda example: example["question_type"] == "math-word-problem"
+            )
+        self.rekeyed_ds = ds.map(self._rekey, remove_columns=ds.column_names)
         self.task_spec = TaskDataSpec(
             task_name="NuminaMath",
             prompt_file=prompt_file,
             system_prompt_file=system_prompt_file,
         )
-        self.processor = processors.data_processor
+        self.processor = processors.math_rejection_sampling_processor
 
     def _rekey(self, data: dict[str, Any]):
-        questions = []
-        answers = []
-        for msg in data["messages"]:
-            if msg["role"] == "user":
-                questions.append(msg["content"])
-            elif msg["role"] == "assistant":
-                answers.append(msg["content"])
         return {
-            "problem": questions[0],
-            "expected_answer": answers[0],
+            "problem": data["problem"],
+            "expected_answer": data["answer"],
+            "source": data["source"],
         }
