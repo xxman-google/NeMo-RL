@@ -122,7 +122,9 @@ def _construct_arc_agi_prompt(
     output = prompt
     output += f"'training_examples':\n{training_examples}\n\n"
     output += f"'test_input':\n{test_input}\n\n"
-    output += "The final output grid response should be formatted exactly as follows:\n\n"
+    output += (
+        "The final output grid response should be formatted exactly as follows:\n\n"
+    )
     output += "<output>\n[output grid]\n</output>\n"
     return output
 
@@ -172,6 +174,7 @@ def multichoice_qa_processor(
         tokenize=False,
         add_generation_prompt=True,
         add_special_tokens=False,
+        enable_thinking=task_data_spec.enable_thinking,
     )
     user_message["token_ids"] = tokenizer(message, return_tensors="pt")["input_ids"][0]
     user_message["content"] = message
