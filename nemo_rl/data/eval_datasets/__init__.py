@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from nemo_rl.data.eval_datasets.aime2024 import AIME2024Dataset
+from nemo_rl.data.eval_datasets.aime2025 import AIME2025Dataset
 from nemo_rl.data.eval_datasets.deepscaler import DeepScaleRDataset
 from nemo_rl.data.eval_datasets.gpqa import GPQADataset
 from nemo_rl.data.eval_datasets.gsm8k import Gsm8kDataset
@@ -78,6 +79,11 @@ def load_eval_dataset(data_config):
         )
     elif dataset_name == "aime2024":
         base_dataset = AIME2024Dataset(
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
+    elif dataset_name == "aime2025":
+        base_dataset = AIME2025Dataset(
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
@@ -162,6 +168,7 @@ def load_eval_dataset(data_config):
 
 __all__ = [
     "AIME2024Dataset",
+    "AIME2025Dataset",
     "DeepScaleRDataset",
     "GPQADataset",
     "Gsm8kDataset",

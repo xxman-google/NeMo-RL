@@ -1,0 +1,6 @@
+# AIME2025 evaluation Configuration
+defaults: "eval.yaml"
+
+data:
+  prompt_file: "examples/prompts/cot.txt"
+  dataset_name: "aime2025"
