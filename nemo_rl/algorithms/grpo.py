@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+import warnings
 from pathlib import Path
-from typing import Any, Optional, Tuple, TypedDict, TypeVar, cast
+from typing import Any, Optional, TypedDict, TypeVar, cast
 
 import numpy as np
 import ray
@@ -82,7 +83,6 @@ class GRPOConfig(TypedDict):
     val_batch_size: int
     val_at_start: bool
     max_val_samples: int
-    checkpoint_dir: str
 
 
 class GRPOSaveState(TypedDict):
@@ -127,7 +127,7 @@ def setup(
 ) -> tuple[
     ColocatablePolicyInterface,
     Optional[GenerationInterface],
-    Tuple[RayVirtualCluster, RayVirtualCluster],
+    tuple[RayVirtualCluster, RayVirtualCluster],
     StatefulDataLoader,
     Optional[StatefulDataLoader],
     ClippedPGLossFn,
@@ -139,7 +139,7 @@ def setup(
     """Main entry point for running GRPO algorithm.
 
     Returns:
-        Tuple of policy, cluster, dataloader, tokenizer, loss_fn, math_env, logger, master_config, val_dataloader
+        tuple of policy, cluster, dataloader, tokenizer, loss_fn, math_env, logger, master_config, val_dataloader
     """
     # Extract individual configs for easier access
     policy_config = master_config["policy"]
@@ -169,19 +169,6 @@ def setup(
     )
     if grpo_save_state is None:
         grpo_save_state = _default_grpo_save_state()
-
-    # config validation checks
-    if master_config["checkpointing"]["enabled"]:
-        assert master_config["checkpointing"]["save_period"] > 0
-        assert (
-            master_config["checkpointing"]["save_period"]
-            % master_config["grpo"]["val_period"]
-            == 0
-        ), (
-            f"Checkpointing save period {master_config['checkpointing']['save_period']} "
-            f"must be a multiple of validation period {master_config['grpo']['val_period']}"
-            f", or we won't know what metric to save!"
-        )
 
     # ==========================
     #           Data
@@ -230,7 +217,7 @@ def setup(
             use_gpus=True,
             num_gpus_per_node=cluster_config["gpus_per_node"],
             max_colocated_worker_groups=1
-            if generation_config["backend"] in ("hf", "megatron")
+            if generation_config["backend"] == "megatron"
             else 2,
         )
         train_cluster = cluster
@@ -238,8 +225,8 @@ def setup(
         print(f"  ✓ Ray cluster initialized with {cluster_config['num_nodes']} nodes")
 
     else:
-        assert generation_config["backend"] not in ("hf", "megatron"), (
-            "Non-colocated inference is not supported for either the HF or Megatron generation backends. "
+        assert generation_config["backend"] != "megatron", (
+            "Non-colocated inference is not supported for Megatron generation backends. "
             "Please use vLLM backend for generation."
         )
 
@@ -315,7 +302,7 @@ def setup(
     backend = generation_config["backend"]
     generation_config["model_name"] = policy_config["model_name"]  # Needed for vLLM
 
-    if backend in ("hf", "megatron"):
+    if backend == "megatron":
         policy_generation = None
         print(
             f"  ✓ Using {backend} backend for generation with {policy_config['model_name']}"
@@ -359,6 +346,10 @@ def setup(
         futures_inference = policy_generation.init_collective(ip, port, world_size)  # type: ignore
         # wait for all futures to complete
         ray.get(futures_train + futures_inference)
+
+    # prepare refit info
+    state_dict_info = policy.prepare_refit_info()
+    policy_generation.prepare_refit_info(state_dict_info)
 
     loss_fn = ClippedPGLossFn(loss_config)
 
@@ -428,20 +419,22 @@ def refit_policy_generation(
         grouped_param_keys = policy.prepare_weights_for_ipc(
             _refit_buffer_size_gb=_refit_buffer_size_gb
         )
+        total_num_keys = sum(len(k) for k in grouped_param_keys)
+        print(
+            f"[Refit] Split {total_num_keys} keys into {len(grouped_param_keys)} groups"
+        )
         # do update
         for keys in grouped_param_keys:
             ipc_handles = policy.get_weights_ipc_handles(keys)
-            update_success = policy_generation.update_weights(ipc_handles)
+            update_success = policy_generation.update_weights_from_ipc_handles(
+                ipc_handles
+            )
             if not update_success:
                 break
     else:
-        # prepare info for update weights
-        state_dict_info = policy.prepare_info_for_collective()
         # update weights through nccl
         futures_train = policy.broadcast_weights_for_collective()
-        futures_inference = policy_generation.update_weights_from_collective(
-            state_dict_info
-        )
+        futures_inference = policy_generation.update_weights_from_collective()
         # wait for all futures to complete
         ray.get(futures_train)
         results = ray.get(futures_inference)
@@ -484,7 +477,7 @@ def grpo_train(
     """Run GRPO training algorithm."""
     timer = Timer()
     NEED_REFIT = True
-    # If policy_generation is None, use the policy as the generation interface (hf framework backend)
+    # If policy_generation is None, use the policy as the generation interface (megatron framework backend)
     if policy_generation is None:
         policy_generation = policy  # type: ignore
         NEED_REFIT = False
@@ -679,7 +672,7 @@ def grpo_train(
             )
 
             # Run validation if it's a validation step
-            if is_last_step or (val_period > 0 and (step + 1) % val_period == 0):
+            if val_period > 0 and (step + 1) % val_period == 0:
                 if NEED_REFIT and POLICY_GENERATION_STALE:
                     refit_policy_generation(
                         policy, policy_generation, colocated_inference
@@ -710,8 +703,23 @@ def grpo_train(
                 policy.prepare_for_training()
 
                 grpo_save_state["step"] = step + 1
-                grpo_save_state["val_reward"] = val_metrics["accuracy"]
+                if val_metrics is not None:
+                    grpo_save_state["val_reward"] = val_metrics["accuracy"]
+                elif "val_reward" in grpo_save_state:
+                    del grpo_save_state["val_reward"]
                 grpo_save_state["consumed_samples"] = consumed_samples
+
+                if master_config["checkpointing"]["metric_name"] is not None:
+                    if (
+                        master_config["checkpointing"]["metric_name"]
+                        not in grpo_save_state
+                    ):
+                        warnings.warn(
+                            f"You asked to save checkpoints based on {master_config['checkpointing']['metric_name']} but the metric is not found in the save state. "
+                            "Saving most recent k checkpoints instead."
+                        )
+                        master_config["checkpointing"]["metric_name"] = None
+
                 with timer.time("checkpointing"):
                     print(f"Saving checkpoint for step {step + 1}...")
                     checkpoint_path = checkpointer.init_tmp_checkpoint(

@@ -41,7 +41,7 @@ basic_vllm_test_config: VllmConfig = {
         "name": model_name,
     },
     "dtype": "bfloat16",
-    "max_new_tokens": 5,
+    "max_new_tokens": 5,  # Small number of tokens for testing
     "temperature": 0.8,
     "top_p": 1.0,
     "top_k": None,
@@ -68,52 +68,50 @@ basic_vllm_test_config: VllmConfig = {
     "vllm_kwargs": {},
 }
 
-
-def get_basic_hf_test_config(enable_dtensor: bool = False) -> PolicyConfig:
-    # Create HF-specific config with required parameters
-    return {
-        "model_name": basic_vllm_test_config["model_name"],
-        "tokenizer": {
-            "name": basic_vllm_test_config["tokenizer"]["name"],
+basic_dtensor_test_config: PolicyConfig = {
+    "model_name": basic_vllm_test_config["model_name"],
+    "tokenizer": {
+        "name": basic_vllm_test_config["tokenizer"]["name"],
+    },
+    # Required training parameters
+    "train_global_batch_size": 1,
+    "train_micro_batch_size": 1,
+    "learning_rate": 5e-6,
+    "logprob_batch_size": 1,
+    "max_new_tokens": 16,
+    "do_sample": False,
+    "precision": "float32",
+    "optimizer": {
+        "name": "torch.optim.AdamW",
+        "kwargs": {
+            "lr": 5e-6,
+            "weight_decay": 0.01,
+            "betas": [0.9, 0.999],
+            "eps": 1e-8,
         },
-        # Required training parameters
-        "train_global_batch_size": 1,
-        "train_micro_batch_size": 1,
-        "learning_rate": 5e-6,
-        "logprob_batch_size": 1,
-        "max_new_tokens": 16,
-        "do_sample": False,
-        "precision": "float32",
-        "fsdp_offload_enabled": False,
-        "activation_checkpointing_enabled": False,
-        "optimizer": {
-            "name": "torch.optim.AdamW",
-            "kwargs": {
-                "lr": 5e-6,
-                "weight_decay": 0.01,
-                "betas": [0.9, 0.999],
-                "eps": 1e-8,
-            },
-        },
-        "dtensor_cfg": {
-            "enabled": enable_dtensor,
-            "cpu_offload": False,
-            "sequence_parallel": False,
-            "activation_checkpointing": False,
-            "tensor_parallel_size": 1,
-            "context_parallel_size": 1,
-            "custom_parallel_plan": None,
-        },
-        "dynamic_batching": {
-            "enabled": enable_dtensor,  # Dynamic batching is only supported with DTensor
-            "train_mb_tokens": 40,
-            "logprob_mb_tokens": 40,
-            "sequence_length_round": 4,
-        },
-        "max_grad_norm": 1.0,
-        "make_sequence_length_divisible_by": 1,
-        "generation": deepcopy(basic_vllm_test_config),
-    }
+    },
+    "dtensor_cfg": {
+        "enabled": True,
+        "cpu_offload": False,
+        "sequence_parallel": False,
+        "activation_checkpointing": False,
+        "tensor_parallel_size": 1,
+        "context_parallel_size": 1,
+        "custom_parallel_plan": None,
+    },
+    "dynamic_batching": {
+        "enabled": True,
+        "train_mb_tokens": 40,
+        "logprob_mb_tokens": 40,
+        "sequence_length_round": 4,
+    },
+    "sequence_packing": {
+        "enabled": False,
+    },
+    "max_grad_norm": 1.0,
+    "make_sequence_length_divisible_by": 1,
+    "generation": deepcopy(basic_vllm_test_config),
+}
 
 
 def get_basic_megatron_test_config(
@@ -136,20 +134,14 @@ def get_basic_megatron_test_config(
         "learning_rate": 5e-6,
         "logprob_batch_size": 2,
         "precision": precision,
-        "generation": {
-            "backend": "megatron",
-            "temperature": 1.0,
-            "max_new_tokens": 16,  # Small number of tokens for testing
-            "top_p": 1.0,
-            "top_k": None,
-            "stop_token_ids": None,
-            "stop_strings": None,
-        },
         "dtensor_cfg": {
             "enabled": False,  # Disabled for Megatron tests
         },
         "dynamic_batching": {
             "enabled": False,  # Start with simple batching
+        },
+        "sequence_packing": {
+            "enabled": False,
         },
         "megatron_cfg": {
             "enabled": True,
@@ -157,12 +149,19 @@ def get_basic_megatron_test_config(
             "activation_checkpointing": activation_checkpointing,
             "converter_type": "Qwen2ForCausalLM",  # Use Qwen2 converter for Qwen3 models (compatible)
             "tensor_model_parallel_size": tp,
+            "expert_tensor_parallel_size": 1,
+            "expert_model_parallel_size": 1,
             "pipeline_model_parallel_size": pp,
             "num_layers_in_first_pipeline_stage": None,
             "num_layers_in_last_pipeline_stage": None,
             "context_parallel_size": 1,
             "pipeline_dtype": precision,
             "sequence_parallel": sequence_parallel,
+            "freeze_moe_router": True,
+            "moe_router_dtype": "fp64",
+            "moe_router_load_balancing_type": "none",
+            "moe_router_bias_update_rate": 0.0,
+            "apply_rope_fusion": True,
             "optimizer": {
                 "optimizer": "adam",
                 "lr": 5.0e-6,
@@ -198,6 +197,7 @@ def get_basic_megatron_test_config(
         "optimizer": None,  # Remove default FSDP optimizer
         "scheduler": None,  # Remove default scheduler
         "max_grad_norm": 1.0,
+        "generation": deepcopy(basic_vllm_test_config),
     }
 
 
@@ -264,17 +264,15 @@ def policy_cluster_separate():
         print(f"Error during policy_cluster_separate shutdown: {e}")
 
 
-@pytest.fixture(scope="function")
-def generation_cluster_separate():
-    """Create a virtual cluster for the VllmGeneration policy, using 1 GPU."""
-    cluster = _create_ray_virtual_cluster_for_test(
-        "vllm-test-generation-cluster-separate"
+def get_generation_cluster_separate(num_gpus_per_node: int = 1) -> RayVirtualCluster:
+    """Create a virtual cluster for the VllmGeneration policy, using num_gpus_per_node GPU."""
+    return RayVirtualCluster(
+        bundle_ct_per_node_list=[num_gpus_per_node],
+        use_gpus=True,
+        max_colocated_worker_groups=1,
+        num_gpus_per_node=num_gpus_per_node,
+        name="vllm-test-generation-cluster-separate",
     )
-    yield cluster
-    try:
-        cluster.shutdown()
-    except Exception as e:
-        print(f"Error during generation_cluster_separate shutdown: {e}")
 
 
 @pytest.fixture(scope="function")
@@ -421,14 +419,21 @@ async def test_vllm_policy_generation_async(
         vllm_config["vllm_cfg"]["async_engine"] = True
         vllm_config["vllm_cfg"]["tensor_parallel_size"] = tensor_parallel_size
         vllm_config["vllm_cfg"]["pipeline_parallel_size"] = pipeline_parallel_size
-        hf_config = get_basic_hf_test_config(enable_dtensor=True)
+        dtensor_config = basic_dtensor_test_config
         from nemo_rl.models.policy.lm_policy import Policy
 
+        print("creating vllm policy...")
         async_policy = VllmGeneration(cluster, vllm_config)
         async_policy.finish_generation()
-        print("creating hf policy...")
 
-        lm_policy = Policy(cluster, hf_config, tokenizer)
+        print("creating lm policy...")
+        lm_policy = Policy(cluster, dtensor_config, tokenizer)
+
+        print("preparing refit info...")
+        state_dict_info = lm_policy.prepare_refit_info()
+        async_policy.prepare_refit_info(state_dict_info)
+
+        print("refitting vllm policy...")
         refit_policy_generation(
             lm_policy, async_policy, vllm_config["colocated"]["enabled"]
         )
@@ -523,8 +528,11 @@ def test_vllm_worker_seed_behavior(cluster, tokenizer):
 
     from nemo_rl.models.policy.lm_policy import Policy
 
-    hf_config = get_basic_hf_test_config(enable_dtensor=False)
-    lm_policy = Policy(cluster, hf_config, tokenizer)
+    dtensor_config = basic_dtensor_test_config
+    lm_policy = Policy(cluster, dtensor_config, tokenizer)
+
+    state_dict_info = lm_policy.prepare_refit_info()
+    policy.prepare_refit_info(state_dict_info)
 
     print("refitting vllm policy...")
     refit_policy_generation(lm_policy, policy, vllm_config["colocated"]["enabled"])
@@ -621,10 +629,7 @@ def test_vllm_worker_seed_behavior(cluster, tokenizer):
 @pytest.mark.timeout(140)
 @pytest.mark.asyncio
 @pytest.mark.parametrize("async_engine", [True, False])
-@pytest.mark.parametrize("enable_dtensor", [True, False])
-async def test_vllm_generation_with_hf_training(
-    cluster, tokenizer, enable_dtensor, async_engine
-):
+async def test_vllm_generation_with_hf_training(cluster, tokenizer, async_engine):
     """1. Use vLLM for generation
     2. Use HF policy for training and logprob computation
 
@@ -638,8 +643,8 @@ async def test_vllm_generation_with_hf_training(
     vllm_config["vllm_cfg"]["async_engine"] = async_engine
     vllm_config = configure_generation_config(vllm_config, tokenizer)
 
-    hf_config = get_basic_hf_test_config(enable_dtensor=enable_dtensor)
-    hf_config["train_global_batch_size"] = 4
+    dtensor_config = deepcopy(basic_dtensor_test_config)
+    dtensor_config["train_global_batch_size"] = 4
 
     vllm_policy = None
     lm_policy = None
@@ -680,8 +685,12 @@ async def test_vllm_generation_with_hf_training(
         vllm_policy = VllmGeneration(cluster, vllm_config)
         vllm_policy.finish_generation()
 
-        print("Creating HF policy...")
-        lm_policy = Policy(cluster, hf_config, tokenizer)
+        print("Creating DTensor policy...")
+        lm_policy = Policy(cluster, dtensor_config, tokenizer)
+
+        print("preparing refit info...")
+        state_dict_info = lm_policy.prepare_refit_info()
+        vllm_policy.prepare_refit_info(state_dict_info)
 
         print("refitting vllm policy...")
         refit_policy_generation(
@@ -923,16 +932,21 @@ def test_vllm_weight_update_and_prefix_cache_reset(
     if tensor_parallel_size > 1:
         vllm_config["vllm_kwargs"] = {"distributed_executor_backend": "ray"}
 
-    hf_config = get_basic_hf_test_config(enable_dtensor=enable_dtensor)
+    dtensor_config = basic_dtensor_test_config
 
     # Create policies
     vllm_policy = None
     lm_policy = None
     try:
-        print(f"Creating HF policy for TP={tensor_parallel_size}...")
-        lm_policy = Policy(cluster, hf_config, tokenizer)
+        print(f"Creating DTensor policy for TP={tensor_parallel_size}...")
+        lm_policy = Policy(cluster, dtensor_config, tokenizer)
+
         print(f"Creating vLLM policy for TP={tensor_parallel_size}...")
         vllm_policy = VllmGeneration(cluster, vllm_config)
+
+        print("preparing refit info...")
+        state_dict_info = lm_policy.prepare_refit_info()
+        vllm_policy.prepare_refit_info(state_dict_info)
 
         # Prepare input data (batch size 2)
         text = """Answer the question based on the context below. Keep the answer short and concise. Respond "Unsure about answer" if not sure about the answer. Context: Teplizumab traces its roots to a New Jersey drug company called Ortho Pharmaceutical. There, scientists generated an early version of the antibody, dubbed OKT3. Originally sourced from mice, the molecule was able to bind to the surface of T cells and limit their cell-killing potential. In 1986, it was approved to help prevent organ rejection after kidney transplants, making it the first therapeutic antibody allowed for human use.Question: What was OKT3 originally sourced from?Answer:"""
@@ -971,7 +985,7 @@ def test_vllm_weight_update_and_prefix_cache_reset(
         grouped_param_keys = lm_policy.prepare_weights_for_ipc()
         for keys in grouped_param_keys:
             ipc_handles = lm_policy.get_weights_ipc_handles(keys)
-            update_success = vllm_policy.update_weights(ipc_handles)
+            update_success = vllm_policy.update_weights_from_ipc_handles(ipc_handles)
             assert update_success, "Weight update should succeed"
         print("vLLM weights successfully updated.")
 
@@ -1032,9 +1046,13 @@ def test_vllm_weight_update_memory(cluster, tokenizer, enable_dtensor):
     vllm_policy = VllmGeneration(cluster, vllm_config)
     vllm_policy.finish_generation()
 
-    print("Creating HF policy...")
-    hf_config = get_basic_hf_test_config(enable_dtensor=enable_dtensor)
-    lm_policy = Policy(cluster, hf_config, tokenizer)
+    print("Creating DTensor policy...")
+    dtensor_config = basic_dtensor_test_config
+    lm_policy = Policy(cluster, dtensor_config, tokenizer)
+
+    print("preparing refit info...")
+    state_dict_info = lm_policy.prepare_refit_info()
+    vllm_policy.prepare_refit_info(state_dict_info)
 
     print("refitting vllm policy...")
     # take it outside statistics to get clean peak memory during refit
@@ -1109,9 +1127,13 @@ def test_vllm_generation_with_stop(
         # set to sleep first if not in eval mode
         vllm_generation.finish_generation()
 
-        print("Creating HF policy...")
-        hf_config = get_basic_hf_test_config(enable_dtensor=enable_dtensor)
-        lm_policy = Policy(cluster, hf_config, tokenizer)
+        print("Creating DTensor policy...")
+        dtensor_config = basic_dtensor_test_config
+        lm_policy = Policy(cluster, dtensor_config, tokenizer)
+
+        print("preparing refit info...")
+        state_dict_info = lm_policy.prepare_refit_info()
+        vllm_generation.prepare_refit_info(state_dict_info)
 
         print("refitting vllm policy...")
         refit_policy_generation(
@@ -1177,13 +1199,22 @@ def test_vllm_non_divisible_batch_handling(policy):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("async_engine", [True, False])
+@pytest.mark.parametrize("tensor_parallel_size", [1, 2])
 async def test_vllm_refit_non_collocated_update_weights(
     policy_cluster_separate,
-    generation_cluster_separate,
     tokenizer,
     test_input_data,
     async_engine,
+    tensor_parallel_size,
 ):
+    # Skip tensor_parallel_size == 2 until we have resources in CI
+    if tensor_parallel_size == 2:
+        pytest.skip(
+            "Test requires at least three GPUs to run with tensor_parallel_size == 2 on separate clusters."
+        )
+
+    generation_cluster_separate = get_generation_cluster_separate(tensor_parallel_size)
+
     if (
         policy_cluster_separate.num_gpus_per_node < 1
         or generation_cluster_separate.num_gpus_per_node < 1
@@ -1193,16 +1224,15 @@ async def test_vllm_refit_non_collocated_update_weights(
         )
 
     # Create Policy on its own cluster
-    hf_config = get_basic_hf_test_config(enable_dtensor=True)
-    hf_config["dtensor_cfg"]["tensor_parallel_size"] = 1
-    hf_config["generation"]["colocated"]["enabled"] = False
-    lm_policy = Policy(policy_cluster_separate, hf_config, tokenizer)
+    dtensor_config = deepcopy(basic_dtensor_test_config)
+    dtensor_config["generation"]["colocated"]["enabled"] = False
+    lm_policy = Policy(policy_cluster_separate, dtensor_config, tokenizer)
 
     # Create VllmGeneration policy on its own cluster
     vllm_config = deepcopy(basic_vllm_test_config)
     vllm_config = configure_generation_config(vllm_config, tokenizer, is_eval=True)
     vllm_config["vllm_cfg"]["async_engine"] = async_engine
-    vllm_config["vllm_cfg"]["tensor_parallel_size"] = 1
+    vllm_config["vllm_cfg"]["tensor_parallel_size"] = tensor_parallel_size
     vllm_config["colocated"]["enabled"] = False
     vllm_generation = VllmGeneration(generation_cluster_separate, vllm_config)
 
@@ -1211,6 +1241,10 @@ async def test_vllm_refit_non_collocated_update_weights(
     futures_train = lm_policy.init_collective(ip, port, world_size=2)
     futures_inference = vllm_generation.init_collective(ip, port, world_size=2)
     ray.get(futures_train + futures_inference)
+
+    # prepare refit info
+    state_dict_info = lm_policy.prepare_refit_info()
+    vllm_generation.prepare_refit_info(state_dict_info)
 
     print("refitting vllm policy...")
     refit_policy_generation(
@@ -1234,6 +1268,10 @@ async def test_vllm_refit_non_collocated_update_weights(
     # Clean up
     vllm_generation.shutdown()
     lm_policy.shutdown()
+    try:
+        generation_cluster_separate.shutdown()
+    except Exception as e:
+        print(f"Error during generation_cluster_separate shutdown: {e}")
 
 
 @pytest.mark.timeout(210)
@@ -1305,6 +1343,10 @@ def test_vllm_generation_with_megatron_training(
 
         print("Creating Megatron policy...")
         megatron_policy = Policy(cluster, megatron_config, test_tokenizer)
+
+        print("preparing refit info...")
+        state_dict_info = megatron_policy.prepare_refit_info()
+        vllm_policy.prepare_refit_info(state_dict_info)
 
         print("Refitting vLLM policy with Megatron weights...")
         refit_policy_generation(
@@ -1425,6 +1467,10 @@ def test_vllm_megatron_weight_update_memory(cluster, tokenizer):
     print("Creating Megatron policy...")
     megatron_policy = Policy(cluster, megatron_config, test_tokenizer)
 
+    print("preparing refit info...")
+    state_dict_info = megatron_policy.prepare_refit_info()
+    vllm_policy.prepare_refit_info(state_dict_info)
+
     print("Refitting vLLM policy with Megatron...")
     # Take it outside statistics to get clean peak memory during refit
     megatron_policy.offload_before_refit()
@@ -1528,6 +1574,10 @@ def test_vllm_megatron_pipeline_parallel(cluster, tokenizer):
         vllm_policy = VllmGeneration(cluster, vllm_config)
         vllm_policy.finish_generation()
 
+        print("preparing refit info...")
+        state_dict_info = megatron_policy.prepare_refit_info()
+        vllm_policy.prepare_refit_info(state_dict_info)
+
         print("Refitting vLLM with Megatron PP=2 weights...")
         refit_policy_generation(
             megatron_policy, vllm_policy, vllm_config["colocated"]["enabled"]
@@ -1558,3 +1608,58 @@ def test_vllm_megatron_pipeline_parallel(cluster, tokenizer):
             vllm_policy.shutdown()
         if megatron_policy:
             megatron_policy.shutdown()
+
+
+def test_vllm_megatron_weight_update_with_packing(cluster, test_input_data):
+    megatron_policy = None
+    vllm_generation = None
+
+    try:
+        # Enable packing during test
+        os.environ["NEMO_RL_MEGATRON_IPC_TENSOR_PACKING_THRESHOLD"] = "1"
+
+        # Both policies must use the same model (Qwen2.5-0.5B) for weight transfer compatibility
+        model_name = "Qwen/Qwen2.5-0.5B"
+        tokenizer = get_tokenizer({"name": model_name})
+
+        # Create Policy
+        megatron_config = get_basic_megatron_test_config(
+            tp=1, pp=1, precision="float32"
+        )
+        megatron_config["model_name"] = model_name
+        megatron_config["tokenizer"]["name"] = model_name
+        megatron_policy = Policy(cluster, megatron_config, tokenizer)
+
+        # Create VllmGeneration
+        vllm_config = deepcopy(basic_vllm_test_config)
+        vllm_config = configure_generation_config(vllm_config, tokenizer, is_eval=True)
+        vllm_config["model_name"] = model_name
+        vllm_config["tokenizer"]["name"] = model_name
+        vllm_generation = VllmGeneration(cluster, vllm_config)
+
+        # prepare refit info
+        state_dict_info = megatron_policy.prepare_refit_info()
+        vllm_generation.prepare_refit_info(state_dict_info)
+
+        print("refitting vllm policy...")
+        refit_policy_generation(
+            megatron_policy, vllm_generation, vllm_config["colocated"]["enabled"]
+        )
+
+        # test generate
+        outputs = vllm_generation.generate(test_input_data, greedy=True)
+        output_ids = outputs["output_ids"]
+        generated_texts = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
+        assert generated_texts == [
+            "Hello, my name is John. I am a",
+            "The capital of France is Paris. It is the",
+        ], "Output should be the same as the expected output"
+
+    finally:
+        # Restore the original value
+        os.environ.pop("NEMO_RL_MEGATRON_IPC_TENSOR_PACKING_THRESHOLD", None)
+        # Clean up
+        if megatron_policy:
+            megatron_policy.shutdown()
+        if vllm_generation:
+            vllm_generation.shutdown()

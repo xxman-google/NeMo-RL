@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
+import json
 import collections
 import os
 from typing import Optional, TypedDict
@@ -43,6 +45,7 @@ class EvalConfig(TypedDict):
     num_tests_per_prompt: int
     seed: int
     pass_k_value: int
+    save_path: str | None
 
 
 class MasterConfig(TypedDict):
@@ -237,8 +240,26 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
         dataloader: Data loader with evaluation samples.
         env: Environment that scores responses.
         master_config: Configuration settings.
-        logger: Logger for recording evaluation results.
     """
+    # Check if async engine is enabled and run appropriate version
+    if master_config["generation"]["vllm_cfg"]["async_engine"]:
+        asyncio.run(
+            _run_env_eval_impl(
+                vllm_generation, dataloader, env, master_config, use_async=True
+            )
+        )
+    else:
+        asyncio.run(
+            _run_env_eval_impl(
+                vllm_generation, dataloader, env, master_config, use_async=False
+            )
+        )
+
+
+async def _run_env_eval_impl(
+    vllm_generation, dataloader, env, master_config, use_async=False
+):
+    """Unified implementation for both sync and async evaluation."""
     # Extract for easier access
     generation_config = master_config["generation"]
     eval_config = master_config["eval"]
@@ -247,16 +268,9 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
     metric = eval_config["metric"]
     num_tests_per_prompt = eval_config["num_tests_per_prompt"]
     pass_k_value = eval_config["pass_k_value"]
-    metric_group_key = env_config.get("metric_group_key", None)
-    render_template = {
-        "math": vis_lib.MathRenderTemplate,
-        "mgsm": vis_lib.MathRenderTemplate,
-        "code": vis_lib.CodeRenderTemplate,
-        "english_multichoice": vis_lib.MathRenderTemplate,
-        "multilingual_multichoice": vis_lib.MathRenderTemplate,
-        "instruction_following": vis_lib.BaseRenderTemplate,
-        "simple_qa": vis_lib.BaseRenderTemplate,
-    }[env_config["verifier_type"]]()
+
+    # List to collect evaluation data for parquet file
+    evaluation_data = []
 
     # Run evaluation loop
     score = 0.0
@@ -280,9 +294,7 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
 
         # generate by vllm
         inputs = BatchedDataDict({"prompts": prompts})
-        outputs = vllm_generation.generate_text(inputs)
-        output_texts = outputs["texts"]
-        generation_lengths.extend(outputs["generation_lengths"])
+        outputs = await _generate_texts(vllm_generation, inputs, use_async)
 
         # append to message_log
         for idx, output in enumerate(output_texts):
@@ -300,20 +312,27 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
         ]
         env_return = ray.get(env.step.remote(to_env, batch["extra_env_info"]))
         rewards = env_return.rewards
-        for prompt, response, reward, observation in zip(
-            prompts,
-            output_texts,
-            rewards,
-            env_return.observations,
-        ):
-            html = render_template.render(
-                prompt=prompt,
-                response=response,
-                score=reward.item(),
-                correct_answer=observation.get("correct_answer", None),
-                extracted_answer=observation.get("extracted_answer", None),
+
+        # Collect data for JSON file
+        for i, (prompt, output, message_log, reward, extra_info) in enumerate(
+            zip(
+                prompts,
+                outputs,
+                batch["message_log"],
+                rewards.tolist(),
+                batch["extra_env_info"],
             )
-            htmls.append(html)
+        ):
+            evaluation_data.append(
+                {
+                    "prompt": prompt,
+                    "response": output,
+                    "reward": reward,
+                    "message_log": message_log,
+                    "extra_env_info": extra_info,
+                    "sample_index": len(evaluation_data),
+                }
+            )
 
         # update stats
         if metric == "pass@k":
@@ -337,20 +356,121 @@ def run_env_eval(vllm_generation, dataloader, env, master_config, logger):
     ray.get(env.shutdown.remote())
     vllm_generation.shutdown()
 
+    # Save evaluation data to JSON file if save_path is specified
+    save_path = eval_config.get("save_path")
+    if evaluation_data and save_path is not None:
+        _save_evaluation_data_to_json(evaluation_data, master_config, save_path)
+
     # Print results
+    _print_results(
+        master_config,
+        generation_config,
+        score,
+        len(dataloader.dataset),
+        metric,
+        pass_k_value,
+        num_tests_per_prompt,
+    )
+
+
+async def _generate_texts(vllm_generation, inputs, use_async):
+    """Generate texts using either sync or async method."""
+    if use_async:
+        # Use async generation - collect all results
+        results = []
+        async for idx, result in vllm_generation.generate_text_async(inputs):
+            results.append((idx, result["texts"][0]))
+
+        # Sort by index to maintain order
+        results.sort(key=lambda x: x[0])
+        return [text for _, text in results]
+    else:
+        # Use sync generation
+        return vllm_generation.generate_text(inputs)["texts"]
+
+
+def _save_evaluation_data_to_json(evaluation_data, master_config, save_path):
+    """Save evaluation data to a JSON file.
+
+    Args:
+        evaluation_data: List of evaluation samples
+        master_config: Configuration dictionary
+        save_path: Path to save evaluation results. Set to null to disable saving.
+                  Example: "results/eval_output" or "/path/to/evaluation_results"
+    """
+    # Extract configuration information
+    config_data = {
+        "model_name": master_config["generation"]["model_name"],
+        "dataset_name": master_config["data"]["dataset_name"],
+        "metric": master_config["eval"]["metric"],
+        "pass_k_value": master_config["eval"]["pass_k_value"],
+        "num_tests_per_prompt": master_config["eval"]["num_tests_per_prompt"],
+        "temperature": master_config["generation"]["temperature"],
+        "top_p": master_config["generation"]["top_p"],
+        "top_k": master_config["generation"]["top_k"],
+    }
+
+    # Create directory if it doesn't exist
+    save_dir = save_path
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir, exist_ok=True)
+
+    # Generate file paths within the directory
+    eval_data_path = os.path.join(save_dir, "evaluation_data.json")
+    config_path = os.path.join(save_dir, "config.json")
+
+    # Prepare the data to save
+    data_to_save = {"evaluation_data": evaluation_data}
+
+    # Save configuration to separate JSON file
+    with open(config_path, "w") as f:
+        json.dump(config_data, f, indent=2)
+    print(f"\n✓ Configuration saved to: {config_path}")
+
+    # Process data to make it JSON serializable
+    processed_data = []
+    for sample in evaluation_data:
+        processed_sample = sample.copy()
+        # Convert non-serializable objects to strings
+        processed_sample["message_log"] = str(sample["message_log"])
+        processed_sample["extra_env_info"] = str(sample["extra_env_info"])
+        processed_data.append(processed_sample)
+
+    # Update data to save with processed version
+    data_to_save["evaluation_data"] = processed_data
+
+    # Save to JSON file
+    with open(eval_data_path, "w") as f:
+        json.dump(data_to_save, f, indent=2)
+
+    print(f"\n✓ Evaluation data saved to: {eval_data_path}")
+    print(f"  Total samples: {len(evaluation_data)}")
+    print(f"  File size: {os.path.getsize(eval_data_path) / 1024 / 1024:.2f} MB")
+
+
+def _print_results(
+    master_config,
+    generation_config,
+    score,
+    dataset_size,
+    metric,
+    pass_k_value,
+    num_tests_per_prompt,
+):
+    """Print evaluation results."""
     dataset_name = os.path.basename(master_config["data"]["dataset_name"])
     model_name = os.path.basename(generation_config["model_name"])
     max_new_tokens = generation_config["vllm_cfg"]["max_model_len"]
     temperature = generation_config["temperature"]
     top_p = generation_config["top_p"]
     top_k = generation_config["top_k"]
-    average_score = score / len(dataloader.dataset)
+    average_score = score / dataset_size
 
     print("\n" + "=" * 60)
     print(f"{model_name=} {dataset_name=}")
     print(f"{max_new_tokens=} {temperature=} {top_p=} {top_k=}\n")
     print(f"{metric=} {pass_k_value=} {num_tests_per_prompt=}\n")
-    print(f"score={average_score:.4f} ({score}/{len(dataloader.dataset)})")
+    print(f"score={average_score:.4f} ({score}/{dataset_size})")
     print("=" * 60 + "\n")
     logger.log_histogram("generation length", generation_lengths, num_bins=10)
     max_samples_to_html = logger_config.get("max_samples_to_html", 30)

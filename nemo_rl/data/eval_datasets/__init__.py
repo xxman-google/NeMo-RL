@@ -28,36 +28,19 @@ from nemo_rl.data.eval_datasets.simpleqa import SimpleQADataset
 def load_eval_dataset(data_config):
     """Loads evaluation dataset."""
     dataset_name = data_config["dataset_name"]
-    if dataset_name == "mmlu":
-        base_dataset = MMLUDataset(
-            prompt_file=data_config["prompt_file"],
-            system_prompt_file=data_config["system_prompt_file"],
-        )
-    elif dataset_name == "mbpp":
-        base_dataset = MBPPDataset(
-            prompt_file=data_config["prompt_file"],
-            system_prompt_file=data_config["system_prompt_file"],
-        )
-    elif dataset_name == "mbpp_sanitized":
-        base_dataset = MBPPDataset(
-            variant="sanitized",
-            prompt_file=data_config["prompt_file"],
-            system_prompt_file=data_config["system_prompt_file"],
-        )
-    elif dataset_name == "mgsm":
-        base_dataset = MGSMDataset(
-            system_prompt_file=data_config["system_prompt_file"],
-        )
-    elif dataset_name == "humaneval":
-        base_dataset = HumanEvalDataset(
-            prompt_file=data_config["prompt_file"],
-            system_prompt_file=data_config["system_prompt_file"],
-        )
-    elif dataset_name == "ifeval":
-        base_dataset = IFEvalDataset(
-            prompt_file=data_config["prompt_file"],
-            system_prompt_file=data_config["system_prompt_file"],
-        )
+    if dataset_name.startswith("mmlu") and dataset_name != "mmlu_pro":
+        if dataset_name == "mmlu":
+            base_dataset = MMLUDataset(
+                prompt_file=data_config["prompt_file"],
+                system_prompt_file=data_config["system_prompt_file"],
+            )
+        else:
+            language = dataset_name.split("_")[1]
+            base_dataset = MMLUDataset(
+                language=language,
+                prompt_file=data_config["prompt_file"],
+                system_prompt_file=data_config["system_prompt_file"],
+            )
     elif dataset_name == "simpleqaeval":
         base_dataset = SimpleQADataset(
             prompt_file=data_config["prompt_file"],

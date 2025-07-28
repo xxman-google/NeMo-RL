@@ -42,8 +42,6 @@ simple_policy_config = {
     "logprob_batch_size": 1,
     "max_total_sequence_length": 1024,
     "precision": "float32",
-    "fsdp_offload_enabled": False,
-    "activation_checkpointing_enabled": False,
     "optimizer": {
         "name": "torch.optim.AdamW",
         "kwargs": {
@@ -54,7 +52,7 @@ simple_policy_config = {
         },
     },
     "dtensor_cfg": {
-        "enabled": False,
+        "enabled": True,
         "cpu_offload": False,
         "sequence_parallel": False,
         "activation_checkpointing": False,
@@ -63,6 +61,9 @@ simple_policy_config = {
         "custom_parallel_plan": None,
     },
     "dynamic_batching": {
+        "enabled": False,
+    },
+    "sequence_packing": {
         "enabled": False,
     },
     "max_grad_norm": 1.0,
