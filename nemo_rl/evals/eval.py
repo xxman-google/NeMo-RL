@@ -33,6 +33,7 @@ from nemo_rl.environments.math_environment import MathEnvConfig
 from nemo_rl.evals import visualization as vis_lib
 from nemo_rl.models.generation.interfaces import GenerationConfig
 from nemo_rl.models.generation.vllm import VllmGeneration
+from nemo_rl.models.policy import TokenizerConfig
 from nemo_rl.utils.logger import Logger, LoggerConfig
 
 # ===============================================================================
@@ -50,7 +51,8 @@ class EvalConfig(TypedDict):
 
 class MasterConfig(TypedDict):
     eval: EvalConfig
-    generate: GenerationConfig
+    generation: GenerationConfig  # Fixed: was 'generate'
+    tokenizer: TokenizerConfig  # Added missing tokenizer key
     data: MathDataConfig
     env: MathEnvConfig
     cluster: ClusterConfig
