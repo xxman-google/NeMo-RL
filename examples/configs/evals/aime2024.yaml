@@ -1,2 +1,5 @@
 # AIME2024 evaluation Configuration
 defaults: "eval.yaml"
+
+data:
+  prompt_file: "examples/prompts/cot.txt"
