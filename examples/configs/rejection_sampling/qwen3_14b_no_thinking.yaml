@@ -51,6 +51,7 @@ env:
 
 logger:
   log_dir: "logs"  # Base directory for all logs
+  output_dir: "${logger.log_dir}/${data.dataset_name}"
   num_ouput_shards: 1
   wandb_enabled: true # Make sure you do a ``wandb login [Your API key]'' before running
   tensorboard_enabled: false # Disable because it does not supprt HTML logging

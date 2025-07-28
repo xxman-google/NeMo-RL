@@ -192,11 +192,13 @@ def run_env_rejection_sampling(vllm_generation, dataloader, env, master_config, 
         )
 
 
-def write_to_parquet(dataset: Dataset, num_shards: int, output_dir: str):
+def write_to_parquet(
+    dataset: Dataset, num_shards: int, output_dir: str, basename: str = "train"
+):
     for i in tqdm.tqdm(range(num_shards), desc="Sharding"):
         shard = dataset.shard(num_shards=num_shards, index=i)
         output_path = os.path.join(
-            output_dir, f"train-{i:05d}-of-{num_shards:05d}.parquet"
+            output_dir, f"{basename}-{i:05d}-of-{num_shards:05d}.parquet"
         )
         print(f"Writing shard {i} to {output_path}...")
         shard.to_parquet(output_path)
@@ -306,7 +308,7 @@ async def _run_env_rejection_sampling_impl(
     write_to_parquet(
         Dataset.from_list(data),
         num_shards=logger_config["num_ouput_shards"],
-        output_dir=os.path.join(logger_config["log_dir"], dataset_name),
+        output_dir=logger_config["output_dir"],
     )
 
 
