@@ -1,0 +1,98 @@
+sft:
+  max_num_epochs: 1
+  max_num_steps: 5952
+  val_period: 100
+  val_batches: 32
+  val_global_batch_size: 8
+  val_micro_batch_size: 1
+  val_at_start: true
+  seed: 42
+checkpointing:
+  enabled: true
+  checkpoint_dir: "results/cirrus_sft_qwen2p5_3b_openr1_math"
+  metric_name: val_loss
+  higher_is_better: false
+  keep_top_k: null
+  save_period: 1000
+policy:
+  model_name: "Qwen/Qwen2.5-7B"
+  tokenizer:
+    name: "Qwen/Qwen2.5-7B-Instruct"
+    chat_template: "default"
+  train_global_batch_size: 4
+  train_micro_batch_size: 1
+  logprob_batch_size: 1
+  max_total_sequence_length: 32768
+  precision: bfloat16
+  fsdp_offload_enabled: false
+  activation_checkpointing_enabled: false
+  dtensor_cfg:
+    enabled: true
+    cpu_offload: false
+    sequence_parallel: true
+    activation_checkpointing: true
+    tensor_parallel_size: 2
+    context_parallel_size: 1
+    custom_parallel_plan: null
+
+  megatron_cfg:
+    enabled: false
+
+  dynamic_batching:
+    enabled: True
+    train_mb_tokens: ${mul:${policy.max_total_sequence_length}, ${policy.train_micro_batch_size}}
+    logprob_mb_tokens: ${mul:${policy.max_total_sequence_length}, ${policy.logprob_batch_size}}
+    sequence_length_round: 64
+  
+  sequence_packing:
+    enabled: False
+    train_mb_tokens: ${mul:${policy.max_total_sequence_length}, ${policy.train_micro_batch_size}}
+    logprob_mb_tokens: ${mul:${policy.max_total_sequence_length}, ${policy.logprob_batch_size}}
+    algorithm: "modified_first_fit_decreasing"
+    sequence_length_round: 64
+
+  make_sequence_length_divisible_by: ${policy.dtensor_cfg.tensor_parallel_size}
+  max_grad_norm: 1
+  optimizer:
+    name: torch.optim.AdamW
+    kwargs:
+      lr: 8.85e-06
+      weight_decay: 0.1
+      betas:
+        - 0.9
+        - 0.95
+      eps: 1e-06
+      foreach: false
+      fused: false
+  scheduler:
+    - name: "torch.optim.lr_scheduler.LinearLR"
+      kwargs:
+        start_factor: 0.01
+        end_factor: 1.0
+        total_iters: 100
+    - name: "torch.optim.lr_scheduler.CosineAnnealingLR"
+      kwargs:
+        T_max: 5752
+        eta_min: 8.85e-7
+    - milestones: [200]
+data:
+  max_input_seq_length: ${policy.max_total_sequence_length}
+  dataset_name: "openr1_math"
+  add_bos: true
+  add_eos: true
+  add_generation_prompt: false
+logger:
+  log_dir: "logs/cirrus_sft_qwen2p5_3b_32k_openr1_math"
+  wandb_enabled: true
+  tensorboard_enabled: false
+  monitor_gpus: true
+  mlflow_enabled: false  # Disable MLflow logging
+  wandb:
+    project: cirrus
+    name: "sft_qwen2p5_3b_32k_openr1_math"
+  gpu_monitoring:
+    collection_interval: 30
+    flush_interval: 30
+cluster:
+  gpus_per_node: 8
+  num_nodes: 1

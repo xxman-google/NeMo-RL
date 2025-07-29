@@ -119,6 +119,8 @@ def setup_data(tokenizer: AutoTokenizer, data_config: DataConfig):
             data_config["system_key"],
             data_config["system_prompt"],
         )
+    elif data_cls == "openr1_math":
+        data = hf_datasets.OpenR1MathDataset()
     else:
         raise ValueError(f"Unknown dataset class: {data_cls}")
     print(
