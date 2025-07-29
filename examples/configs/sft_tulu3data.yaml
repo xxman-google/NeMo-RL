@@ -14,7 +14,7 @@ sft:
 
 checkpointing:
   enabled: true
-  checkpoint_dir: "results/sft"
+  checkpoint_dir: "results/sft-seq_packing"
   metric_name: "val_loss"
   higher_is_better: false
   keep_top_k: 2
@@ -40,11 +40,14 @@ policy:
     context_parallel_size: 1
     custom_parallel_plan: null
 
+  megatron_cfg:
+    enabled: false
+
   dynamic_batching:
     enabled: false
 
   sequence_packing:
-    enabled: False
+    enabled: True
     train_mb_tokens: ${mul:${policy.max_total_sequence_length}, ${policy.train_micro_batch_size}}
     algorithm: "modified_first_fit_decreasing"
     sequence_length_round: 64
@@ -94,9 +97,9 @@ logger:
   monitor_gpus: false  # If true, will monitor GPU usage and log to wandb and/or tensorboard
   wandb:
     project: "tulu3-sft-dev"
-    name: "qwen2p5-7b-${data.dataset_name}"
+    name: "qwen2p5-7b-seq_packing-${data.dataset_name}"
   tensorboard:
-    log_dir: "tb_logs-qwen2p5-7b-${data.dataset_name}"
+    log_dir: "tb_logs-qwen2p5-7b-seq_packing-${data.dataset_name}"
   gpu_monitoring:
     collection_interval: 10  # How often to collect GPU usage metrics (in seconds)
     flush_interval: 10  # How often to flush GPU usage metrics to the loggers (in seconds)
