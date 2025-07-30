@@ -1,0 +1,92 @@
+sft:
+  max_num_epochs: 1
+  max_num_steps: 1000
+  val_period: 100
+  val_batches: 32
+  val_global_batch_size: 64
+  val_micro_batch_size: 1
+  val_at_start: false
+  seed: 42
+checkpointing:
+  enabled: true
+  checkpoint_dir: "results/cirrus_sft_qwen2p5_7b_tulu3"
+  metric_name: val_loss
+  higher_is_better: false
+  keep_top_k: null
+  save_period: 100
+policy:
+  model_name: "Qwen/Qwen3-8B-Base"
+  tokenizer:
+    name: "Qwen/Qwen3-8B"
+    chat_template: "default"
+  train_global_batch_size: 64
+  train_micro_batch_size: 1
+  max_total_sequence_length: 4096
+  precision: bfloat16
+  fsdp_offload_enabled: false
+  activation_checkpointing_enabled: false
+  dtensor_cfg:
+    enabled: true
+    cpu_offload: false
+    sequence_parallel: false
+    activation_checkpointing: true
+    tensor_parallel_size: 1
+    context_parallel_size: 1
+    custom_parallel_plan: null
+  dynamic_batching:
+    enabled: False
+  make_sequence_length_divisible_by: 1
+  max_grad_norm: 1
+  optimizer:
+    name: torch.optim.AdamW
+    kwargs:
+      lr: 5e-06
+      weight_decay: 0.1
+      betas:
+        - 0.9
+        - 0.95
+      eps: 1e-06
+      foreach: false
+      fused: false
+  scheduler:
+    - name: "torch.optim.lr_scheduler.LinearLR"
+      kwargs:
+        start_factor: 0.01
+        end_factor: 1.0
+        total_iters: 100
+    - name: "torch.optim.lr_scheduler.CosineAnnealingLR"
+      kwargs:
+        T_max: 1000
+        eta_min: 5e-7
+    - milestones: [100]
+data:
+  max_input_seq_length: 4096
+  dataset_name: "openai_format"
+  train_data_path:
+    - "/mnt/datasets/cirrus0.0/openr1_math_amc_aime_qwen3_8b_no_thinking/train-filtered-00000-of-00001.parquet"
+    - "/mnt/datasets/cirrus0.0/openr1_math_aops_forum_qwen3_8b_no_thinking/train-filtered-00000-of-00001.parquet"
+    - "/mnt/datasets/cirrus0.0/openr1_math_cn_contest_qwen3_8b_no_thinking/train-filtered-00000-of-00001.parquet"
+    - "/mnt/datasets/cirrus0.0/openr1_math_inequalities_qwen3_8b_no_thinking/train-filtered-00000-of-00001.parquet"
+    - "/mnt/datasets/cirrus0.0/openr1_math_number_theory_qwen3_8b_no_thinking/train-filtered-00000-of-00001.parquet"
+    - "/mnt/datasets/cirrus0.0/openr1_math_olympiads_qwen3_8b_no_thinking/train-filtered-00000-of-00001.parquet"
+    - "/mnt/datasets/cirrus0.0/openr1_math_olympiads_ref_qwen3_8b_no_thinking/train-filtered-00000-of-00001.parquet"
+  file_format: "parquet"
+  val_ratio: 0.02
+  chat_key: "messages"
+  add_bos: true
+  add_eos: true
+  add_generation_prompt: false
+logger:
+  log_dir: "logs/cirrus_sft_qwen2p5_7b_tulu3"
+  wandb_enabled: true
+  tensorboard_enabled: false
+  monitor_gpus: true
+  wandb:
+    project: cirrus
+    name: "sft_qwen2p5_7b_tulu3_22m_lr5e-6"
+  gpu_monitoring:
+    collection_interval: 30
+    flush_interval: 30
+cluster:
+  gpus_per_node: 8
+  num_nodes: 2
