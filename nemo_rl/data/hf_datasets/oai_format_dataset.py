@@ -44,12 +44,20 @@ class OpenAIFormatDataset:
         chat_key: str = "messages",
         system_key: str = None,
         system_prompt: str = None,
+        file_format: str = "json",
+        val_ratio: float = 0.05,
     ):
         self.chat_key = chat_key
         self.system_key = system_key
         self.system_prompt = system_prompt
-        train_original_dataset = load_dataset("json", data_files=train_ds_path)["train"]
-        val_original_dataset = load_dataset("json", data_files=val_ds_path)["train"]
+        if val_ds_path is None:
+            ds = load_dataset(file_format, data_files=train_ds_path)["train"]
+            ds_split = ds.train_test_split(test_size=val_ratio, seed=42)
+            train_original_dataset = ds_split.pop("train")
+            val_original_dataset = ds_split.pop("test")
+        else:
+            train_original_dataset = load_dataset(file_format, data_files=train_ds_path)["train"]
+            val_original_dataset = load_dataset(file_format, data_files=val_ds_path)["train"]
 
         formatted_train_dataset = train_original_dataset.map(self.add_messages_key)
         formatted_val_dataset = val_original_dataset.map(self.add_messages_key)
