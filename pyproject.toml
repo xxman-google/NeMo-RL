@@ -45,7 +45,7 @@ dependencies = [
     "nvtx",
     "matplotlib",
     "plotly",
-    "mlflow",,
+    "mlflow",
     "langdetect",
     "nltk>=3.9.1",
     "immutabledict",

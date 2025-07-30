@@ -122,7 +122,9 @@ def _construct_arc_agi_prompt(
     output = prompt
     output += f"'training_examples':\n{training_examples}\n\n"
     output += f"'test_input':\n{test_input}\n\n"
-    output += "The final output grid response should be formatted exactly as follows:\n\n"
+    output += (
+        "The final output grid response should be formatted exactly as follows:\n\n"
+    )
     output += "<output>\n[output grid]\n</output>\n"
     return output
 
@@ -234,7 +236,7 @@ def arc_agi_processor(
     )
     user_message["token_ids"] = tokenizer(message, return_tensors="pt")["input_ids"][0]
     user_message["content"] = message
-    message_log.append(user_message)
+    message_log.append(user_message)  # pyrefly: ignore
 
     length = sum(len(m["token_ids"]) for m in message_log)
     output: DatumSpec = {

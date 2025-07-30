@@ -25,8 +25,8 @@ import torch
 from math_verify.errors import TimeoutException
 from math_verify.metric import math_metric
 from math_verify.parser import ExprExtractionConfig, LatexExtractionConfig
-from swebench.harness import run_evaluation
 
+# from swebench.harness import run_evaluation
 from nemo_rl.data.interfaces import LLMMessageLogType
 from nemo_rl.distributed.batched_data_dict import BatchedDataDict
 from nemo_rl.distributed.virtual_cluster import PY_EXECUTABLES
@@ -63,9 +63,12 @@ def _mute_output():
 
 
 class MathEnvironmentMetadata(TypedDict):
-    ground_truth: Optional[str]
-    tests: Optional[str]
-    checker_info: Optional[dict[str, Any]]
+    ground_truth: str
+
+
+class MultilingualMathEnvironmentMetadata(TypedDict):
+    ground_truth: str
+    lang: str
 
 
 @ray.remote  # pragma: no cover
@@ -131,7 +134,9 @@ class MGSMVerifyWorker:
         return target == prediction
 
     def verify(
-        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
+        self,
+        pred_responses: list[str],
+        metadata_list: list[MultilingualMathEnvironmentMetadata],
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
@@ -207,7 +212,7 @@ class EnglishMultichoiceVerifyWorker:
             response = answer_parsing.normalize_response(response)
             extracted_answer = None
             match = re.search(
-                "(?i)(?:Answer\s*:|answer is)[ \t]*([A-Z])[.]*\s*$", response
+                r"(?i)(?:Answer\s*:|answer is)[ \t]*([A-Z])[.]*\s*$", response
             )
             # match = re.search("(?i)Answer\s*:[ \t]*([A-Z])\s*$", response)
             if match:
@@ -319,7 +324,7 @@ class ArcAgiVerifyWorker:
 
     def _extract_response_grid(self, s: str) -> Optional[list[list[int]]]:
         # Regex for a 2D grid of integers (optionally with whitespace)
-        pattern = r'<output>\s*(\[[^\]]*(?:\][^\[]*\[?[^\]]*)*)\s*</output>'
+        pattern = r"<output>\s*(\[[^\]]*(?:\][^\[]*\[?[^\]]*)*)\s*</output>"
         match = re.search(pattern, s, re.DOTALL)
         if not match:
             return None
