@@ -363,11 +363,7 @@ class SweBenchVerifyWorker:
         Returns:
             list[tuple[float, str, str]]. The rewards, correct answer, and extracted answer for each predicted response.
         """
-        print("********** METADATA: **********")
-        print(metadata_list)
-        print("          **********")
         results = []
-        i = 0
         for response, metadata in zip(pred_responses, metadata_list):
             if i >= 3:
                 break
@@ -382,7 +378,6 @@ class SweBenchVerifyWorker:
                 prediction,
                 dataset_name="SWE-bench_Verified",
             )
-            i += 1
 
 
 @ray.remote(max_restarts=-1, max_task_retries=-1)  # pragma: no cover
