@@ -348,43 +348,6 @@ class ArcAgiVerifyWorker:
         return results
 
 
-class SweBenchVerifyWorker:
-    """Response verifier worker for SweBench problems."""
-
-    def verify(
-        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
-    ) -> list[tuple[float, str, str]]:
-        """Run swebench evaluation on the model-generated patches.
-
-        Args:
-            pred_responses: list[str]. The predicted responses from the LLM.
-            metadata_list: list[MathEnvironmentMetadata]. The metadata containing ground truth and other info.
-
-        Returns:
-            list[tuple[float, str, str]]. The rewards, correct answer, and extracted answer for each predicted response.
-        """
-        print("********** METADATA: **********")
-        print(metadata_list)
-        print("          **********")
-        results = []
-        i = 0
-        for response, metadata in zip(pred_responses, metadata_list):
-            if i >= 3:
-                break
-            prediction = [
-                {
-                    "instance_id": metadata["instance_id"],
-                    "model": "gpt-4o",
-                    "prediction": response,
-                }
-            ]
-            result = run_evaluation(
-                prediction,
-                dataset_name="SWE-bench_Verified",
-            )
-            i += 1
-
-
 @ray.remote(max_restarts=-1, max_task_retries=-1)  # pragma: no cover
 class MathEnvironment(EnvironmentInterface):
     def __init__(self, cfg: MathEnvConfig):
