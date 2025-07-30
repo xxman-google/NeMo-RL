@@ -28,10 +28,12 @@ class SweBenchVerifiedOracleDataset:
         prompt_file: Optional[str] = None,
         system_prompt_file: Optional[str] = None,
     ):
-        ds = load_dataset("jcpagadora/SWE-bench_Verified__style-3__fs-oracle", split="test")
+        ds = load_dataset("jcpagadora/SWE-bench_Verified__style-3__fs-oracle", split="test",
+                          download_mode="force_redownload")
         self.rekeyed_ds = ds.map(self._rekey, remove_columns=ds.column_names)
+        self.rekeyed_ds = self.rekeyed_ds.select(range(10))
         self.task_spec = TaskDataSpec(
-            task_name="swe_bench_verified_oracle",
+            task_name="swebench_verified_oracle",
             prompt_file=prompt_file,
             system_prompt_file=system_prompt_file,
         )
@@ -39,7 +41,7 @@ class SweBenchVerifiedOracleDataset:
 
     def _rekey(self, data: dict[str, Any]):
         return {
-            "problem": data["text"],
+            "prompt": data["text"],
             "ground_truth": data["patch"],
-            "instance_id": data["instance_id"],
+            "instance": data,
         }

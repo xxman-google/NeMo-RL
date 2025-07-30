@@ -168,7 +168,7 @@ def load_eval_dataset(data_config):
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
-    elif dataset_name == "swe_bench_verified_oracle":
+    elif dataset_name == "swebench_verified_oracle":
         base_dataset = SweBenchVerifiedOracleDataset(
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],

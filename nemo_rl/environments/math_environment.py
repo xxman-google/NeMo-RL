@@ -14,6 +14,7 @@
 import ast
 import contextlib
 import io
+import json
 import logging
 import os
 import re
@@ -25,7 +26,13 @@ import torch
 from math_verify.errors import TimeoutException
 from math_verify.metric import math_metric
 from math_verify.parser import ExprExtractionConfig, LatexExtractionConfig
-from swebench.harness import run_evaluation
+from swebench.harness.run_evaluation import run_instances
+from swebench.harness.reporting import make_run_report
+from swebench.harness.constants import (
+    KEY_INSTANCE_ID,
+    KEY_MODEL,
+    KEY_PREDICTION,
+)
 
 from nemo_rl.distributed.batched_data_dict import BatchedDataDict
 from nemo_rl.distributed.virtual_cluster import PY_EXECUTABLES
@@ -348,6 +355,7 @@ class ArcAgiVerifyWorker:
         return results
 
 
+@ray.remote
 class SweBenchVerifyWorker:
     """Response verifier worker for SweBench problems."""
 
@@ -363,21 +371,65 @@ class SweBenchVerifyWorker:
         Returns:
             list[tuple[float, str, str]]. The rewards, correct answer, and extracted answer for each predicted response.
         """
-        results = []
+        print("*************** RUNNING EVALUATION: ***************")
+        predictions = {}
+        instances = []
+        model_name = "google/gemma-3-12b-it"  # TODO: Make this configurable
         for response, metadata in zip(pred_responses, metadata_list):
-            if i >= 3:
-                break
-            prediction = [
-                {
-                    "instance_id": metadata["instance_id"],
-                    "model": "gpt-4o",
-                    "prediction": response,
-                }
-            ]
-            result = run_evaluation(
-                prediction,
-                dataset_name="SWE-bench_Verified",
+            instance = metadata["instance"]
+            prediction = {
+                KEY_INSTANCE_ID: instance[KEY_INSTANCE_ID],
+                KEY_MODEL: model_name,
+                KEY_PREDICTION: response,
+                "golden_patch": instance["patch"],
+            }
+            
+            # *************** TEST WITH GOLDEN PREDICTION ***************
+            # prediction = {
+            #     KEY_INSTANCE_ID: instance[KEY_INSTANCE_ID],
+            #     KEY_MODEL: "gold",
+            #     KEY_PREDICTION: instance["patch"],
+            # }
+            # ***********************************************************
+            predictions[instance[KEY_INSTANCE_ID]] = prediction
+            instances.append(instance)
+
+
+        run_id = "swebench_verified_oracle_eval"
+        run_instances(
+            predictions=predictions,
+            instances=instances,
+            cache_level="env",
+            clean=False,
+            force_rebuild=False,
+            max_workers=1,
+            run_id=run_id,
+            timeout=600,
+        )
+
+        results = []
+        # Read results from instance results files.
+        eval_dir = f"logs/run_evaluation/{run_id}/{model_name}"
+        if not os.path.exists(eval_dir):
+            raise FileNotFoundError(f"Evaluation directory {eval_dir} does not exist.")
+        for instance_id in os.listdir(eval_dir):
+            instance_result_file = os.path.join(
+                eval_dir, instance_id, "report.json"
             )
+            golden_patch = predictions[instance_id]["golden_patch"]
+            model_patch = predictions[instance_id][KEY_PREDICTION]
+            if not os.path.exists(instance_result_file):
+                results.append((0.0, golden_patch, model_patch))
+            with open(instance_result_file, "r") as f:
+                instance_report = make_run_report(f.read())
+            score = self._get_score_from_report(instance_id, instance_report)
+            results.append((score, golden_patch, model_patch))
+        return results
+
+    def _get_score_from_report(self, instance_id: str, instance_report: str) -> float:
+        """Parses the report and returns whether the patch resolved the issue."""
+        instance_report = json.loads(instance_report)
+        return float(instance_report[instance_id]["resolved"])
 
 
 @ray.remote(max_restarts=-1, max_task_retries=-1)  # pragma: no cover

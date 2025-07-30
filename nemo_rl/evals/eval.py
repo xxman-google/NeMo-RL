@@ -262,12 +262,14 @@ async def _run_env_eval_impl(
     pass_k_value = eval_config["pass_k_value"]
     metric_group_key = env_config.get("metric_group_key", None)
     render_template = {
+        "arc_agi": vis_lib.BaseRenderTemplate,
         "math": vis_lib.MathRenderTemplate,
         "mgsm": vis_lib.MathRenderTemplate,
         "code": vis_lib.CodeRenderTemplate,
         "english_multichoice": vis_lib.MathRenderTemplate,
         "multilingual_multichoice": vis_lib.MathRenderTemplate,
         "instruction_following": vis_lib.BaseRenderTemplate,
+        "swebench_verified": vis_lib.CodeRenderTemplate,
     }[env_config["verifier_type"]]()
 
     # Run evaluation loop

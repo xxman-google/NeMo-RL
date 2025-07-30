@@ -200,7 +200,7 @@ def arc_agi_processor(
     """Process a datum dictionary (directly loaded from dataset) into a DatumSpec for ARC-AGI examples."""
     training_examples = datum_dict["training_examples"]
     test_input = datum_dict["test_input"]
-    ground_truth = datum_dict["expected_output"]
+    ground_truth = datum_dict["ground_truth"]
     extra_env_info = {"ground_truth": ground_truth}
 
     message_log = []
@@ -271,6 +271,6 @@ swe_bench_processor = functools.partial(
     question_key="prompt",
     extra_env_info_key_maps=[
         ("ground_truth", "ground_truth"),
-        ("instance_id", "instance_id"),
+        ("instance", "instance"),
     ],
 )
