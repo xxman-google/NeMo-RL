@@ -20,14 +20,12 @@ class DataConfig(TypedDict):
     prompt_file: NotRequired[str]
     system_prompt_file: NotRequired[str]
     dataset_name: str
-    val_dataset_name: NotRequired[str]
-    add_bos: NotRequired[bool]
-    add_eos: NotRequired[bool]
-    input_key: NotRequired[str]
-    output_key: NotRequired[str]
-    add_generation_prompt: NotRequired[bool]
-    add_system_prompt: NotRequired[bool]
-    split: NotRequired[str]
+    val_dataset_name: Optional[str]
+    add_bos: Optional[bool]
+    add_eos: Optional[bool]
+    input_key: Optional[str]
+    output_key: Optional[str]
+    file_format: Optional[str]
 
 
 class MathDataConfig(DataConfig):
