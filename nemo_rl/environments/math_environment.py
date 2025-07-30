@@ -25,6 +25,7 @@ import torch
 from math_verify.errors import TimeoutException
 from math_verify.metric import math_metric
 from math_verify.parser import ExprExtractionConfig, LatexExtractionConfig
+from swebench.harness import run_evaluation
 
 from nemo_rl.distributed.batched_data_dict import BatchedDataDict
 from nemo_rl.distributed.virtual_cluster import PY_EXECUTABLES
@@ -341,13 +342,40 @@ class ArcAgiVerifyWorker:
         """
         results = []
         for response, metadata in zip(pred_responses, metadata_list):
-            training_examples = metadata["training_examples"]
-            test_input = metadata["test_input"]
-            ground_truth = self._extract_grid(metadata["ground_truth"])
             extracted_answer = self._extract_grid(response)
-            score = 1.0 if extracted_answer == ground_truth else 0.0
-            results.append((score, ground_truth, extracted_answer))
+            score = 1.0 if extracted_answer == metadata["ground_truth"] else 0.0
+            results.append((score, metadata["ground_truth"], extracted_answer))
         return results
+
+
+class SweBenchVerifyWorker:
+    """Response verifier worker for SweBench problems."""
+
+    def verify(
+        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
+    ) -> list[tuple[float, str, str]]:
+        """Run swebench evaluation on the model-generated patches.
+
+        Args:
+            pred_responses: list[str]. The predicted responses from the LLM.
+            metadata_list: list[MathEnvironmentMetadata]. The metadata containing ground truth and other info.
+
+        Returns:
+            list[tuple[float, str, str]]. The rewards, correct answer, and extracted answer for each predicted response.
+        """
+        results = []
+        for response, metadata in zip(pred_responses, metadata_list):
+            prediction = [
+                {
+                    "instance_id": metadata["instance_id"],
+                    "model": "gpt-4o",
+                    "prediction": response,
+                }
+            ]
+            result = run_evaluation(
+                prediction,
+                dataset_name="SWE-bench_Verified",
+            )
 
 
 @ray.remote(max_restarts=-1, max_task_retries=-1)  # pragma: no cover

@@ -29,6 +29,7 @@ from nemo_rl.data.eval_datasets.mmlu import MMLUDataset
 from nemo_rl.data.eval_datasets.mmlu_pro import MMLUProDataset
 from nemo_rl.data.eval_datasets.numina_math import NuminaMathDataset
 from nemo_rl.data.eval_datasets.openr1_math import OpenR1MathDataset
+from nemo_rl.data.eval_datasets.swe_bench_verified_oracle import SweBenchVerifiedOracleDataset
 from nemo_rl.data.eval_datasets.tulu3_sft import Tulu3SftDataset
 
 
@@ -167,6 +168,11 @@ def load_eval_dataset(data_config):
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
+    elif dataset_name == "swe_bench_verified_oracle":
+        base_dataset = SweBenchVerifiedOracleDataset(
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
     else:
         raise ValueError(f"Unknown dataset {dataset_name}.")
     return base_dataset
@@ -175,6 +181,7 @@ def load_eval_dataset(data_config):
 __all__ = [
     "AIME2024Dataset",
     "AIME2025Dataset",
+    "ArcAgiDataset",
     "DeepScaleRDataset",
     "GPQADataset",
     "Gsm8kDataset",
@@ -189,5 +196,6 @@ __all__ = [
     "MMLUProDataset",
     "NuminaMathDataset",
     "OpenR1MathDataset",
+    "SweBenchVerifiedOracleDataset",
     "Tulu3SftDataset",
 ]
