@@ -50,6 +50,7 @@ dependencies = [
     "evaluate",
     "absl-py",
     "tqdm",
+    "swebench",
 ]
 
 [project.optional-dependencies]
