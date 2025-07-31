@@ -11,10 +11,12 @@ from nemo_rl.data.interfaces import TaskDataSpec
 class MBPPDataset:
     def __init__(
         self,
+        code_exe_dir: str,
         variant: Literal["full", "sanitized"] = "full",
         prompt_file: Optional[str] = None,
         system_prompt_file: Optional[str] = None,
     ):
+        self.code_exe_dir = code_exe_dir
         filename = "mbpp.jsonl" if variant == "full" else "sanitized-mbpp.json"
         file_path = f"https://raw.githubusercontent.com/google-research/google-research/refs/heads/master/mbpp/{filename}"
         ds = load_dataset("json", data_files=file_path, split="train")
@@ -30,7 +32,7 @@ class MBPPDataset:
             prompt_file=prompt_file,
             system_prompt_file=system_prompt_file,
         )
-        self.processor = processors.coding_processor
+        self.processor = processors.code_processor
 
     def _rekey_full(self, data: dict[str, Any]):
         tests = data["challenge_test_list"] + data["test_list"]
@@ -41,6 +43,7 @@ class MBPPDataset:
         return {
             "question": question,
             "tests": tests,
+            "code_exe_dir": self.code_exe_dir,
         }
 
     def _rekey_sanitized(self, data: dict[str, Any]):
@@ -54,4 +57,5 @@ class MBPPDataset:
         return {
             "question": question,
             "tests": tests,
+            "code_exe_dir": self.code_exe_dir,
         }

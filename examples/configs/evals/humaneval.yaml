@@ -1,15 +1,19 @@
-# Math evaluation Configuration
-defaults: "gpqa_eval.yaml"
+# HumanEval evaluation Configuration
+defaults: "eval.yaml"
 
 data:
   prompt_file: "examples/prompts/humaneval.txt"
   dataset_name: "humaneval"
+  code_exe_dir: "/tmp/logs"
 
 generation:
+  model_name: "Qwen/Qwen2.5-7B-Instruct"
   vllm_cfg:
     max_model_len: 4096
 
 env:
-  math:
-    verifier_type: "code"
-    verifier_metadata_key: "tests"
+  env_type: "code"
+  code:
+    num_workers: 8
+    terminate_on_evaluation: true
+    worker_type: "python_code_verify"

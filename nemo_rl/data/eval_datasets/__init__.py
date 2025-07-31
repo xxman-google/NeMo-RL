@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from nemo_rl.data.eval_datasets.arc_agi import ArcAgiDataset
 from nemo_rl.data.eval_datasets.aime2024 import AIME2024Dataset
 from nemo_rl.data.eval_datasets.aime2025 import AIME2025Dataset
+from nemo_rl.data.eval_datasets.arc_agi import ArcAgiDataset
 from nemo_rl.data.eval_datasets.deepscaler import DeepScaleRDataset
 from nemo_rl.data.eval_datasets.gpqa import GPQADataset
 from nemo_rl.data.eval_datasets.gsm8k import Gsm8kDataset
@@ -55,11 +55,13 @@ def load_eval_dataset(data_config):
         )
     elif dataset_name == "mbpp":
         base_dataset = MBPPDataset(
+            code_exe_dir=data_config["code_exe_dir"],
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
     elif dataset_name == "mbpp_sanitized":
         base_dataset = MBPPDataset(
+            code_exe_dir=data_config["code_exe_dir"],
             variant="sanitized",
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
@@ -70,6 +72,7 @@ def load_eval_dataset(data_config):
         )
     elif dataset_name == "humaneval":
         base_dataset = HumanEvalDataset(
+            code_exe_dir=data_config["code_exe_dir"],
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
