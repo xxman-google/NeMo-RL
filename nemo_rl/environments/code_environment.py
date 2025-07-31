@@ -39,6 +39,7 @@ class CodeEnvConfig(TypedDict):
     # if you want to execute multiple rounds of code, set this to False
     # and wrap CodeEnvironment in another environment that terminates the generation
     terminate_on_evaluation: bool
+    worker_type: str
 
 
 class CodeEnvMetadata(TypedDict):
@@ -46,7 +47,11 @@ class CodeEnvMetadata(TypedDict):
     working_dir: str  # Working directory for file operations
 
 
-@ray.remote  # pragma: no cover
+class CodeVerifierMetadata(TypedDict):
+    tests: str
+    working_dir: str  # Working directory for file operations
+
+
 class CodeExecutionWorker:
     """Helper class to process individual code execution steps."""
 
@@ -186,6 +191,52 @@ class CodeExecutionWorker:
 
 
 @ray.remote  # pragma: no cover
+class CodeExecutionRayWorker(CodeExecutionWorker):
+    pass
+
+
+@ray.remote
+class PythonCodeVerifyRayWorker(CodeExecutionWorker):
+    def execute(
+        self, message_batch: str, metadata_batch: List[CodeVerifierMetadata]
+    ) -> str:
+        """Execute code in a sandboxed environment."""
+        results = []
+        terminateds = []
+        pattern = re.compile(r"```python\n(.*?)```", re.DOTALL)
+
+        for message, metadata in zip(message_batch, metadata_batch):
+            matches = pattern.findall(message)
+            if not matches:
+                results.append("")
+                terminateds.append(False)
+                continue
+            code = matches[0]
+            eval_code = "\n".join([code, metadata["tests"]])
+
+            result = None
+            terminated = False
+            with self.chdir(metadata["working_dir"]):
+                try:
+                    # isolate the code in a sandbox
+                    exec(eval_code, self.sandbox)
+                    terminated = True
+                except Exception as err:
+                    result = err
+
+            result = self.format_result(result, code)
+            results.append(result)
+            terminateds.append(terminated)
+
+        observations = [
+            {"role": "environment", "content": result} for result in results
+        ]
+        metadata_batch = self.sanitize(metadata_batch)
+
+        return observations, terminateds, metadata_batch
+
+
+@ray.remote  # pragma: no cover
 class CodeEnvironment(EnvironmentInterface):
     """Code execution environment that maintains state between steps."""
 
@@ -193,8 +244,13 @@ class CodeEnvironment(EnvironmentInterface):
         self.cfg = cfg
         self.num_workers = cfg["num_workers"]
         self.terminate_on_evaluation = cfg["terminate_on_evaluation"]
+        worker_type = cfg.get("worker_type", "python_code_verify")
+        worker_cls = {
+            "code_exe": CodeExecutionRayWorker,
+            "python_code_verify": PythonCodeVerifyRayWorker,
+        }[worker_type]
         self.workers = [
-            CodeExecutionWorker.options(
+            worker_cls.options(
                 runtime_env={"py_executable": PY_EXECUTABLES.SYSTEM}
             ).remote()
             for _ in range(self.num_workers)
@@ -234,8 +290,7 @@ class CodeEnvironment(EnvironmentInterface):
             terminated_tensor = torch.tensor(terminateds, dtype=torch.bool)
         else:
             terminated_tensor = torch.zeros(len(terminateds), dtype=torch.bool)
-        rewards_tensor = torch.zeros_like(terminated_tensor, dtype=torch.float32)
-
+        rewards_tensor = terminated_tensor.to(dtype=torch.float32)
         next_stop_strings = [["</code>"]] * len(message_log_batch)
 
         return EnvironmentReturn(

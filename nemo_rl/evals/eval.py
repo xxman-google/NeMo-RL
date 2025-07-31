@@ -13,8 +13,8 @@
 # limitations under the License.
 
 import asyncio
-import json
 import collections
+import json
 import os
 from typing import Optional, TypedDict
 
@@ -29,6 +29,7 @@ from nemo_rl.data.datasets import AllTaskProcessedDataset, eval_collate_fn
 from nemo_rl.data.llm_message_utils import get_keys_from_message_log
 from nemo_rl.distributed.batched_data_dict import BatchedDataDict
 from nemo_rl.distributed.virtual_cluster import ClusterConfig, RayVirtualCluster
+from nemo_rl.environments.code_environment import CodeEnvConfig
 from nemo_rl.environments.math_environment import MathEnvConfig
 from nemo_rl.evals import visualization as vis_lib
 from nemo_rl.models.generation.interfaces import GenerationConfig
@@ -54,7 +55,7 @@ class MasterConfig(TypedDict):
     generation: GenerationConfig  # Fixed: was 'generate'
     tokenizer: TokenizerConfig  # Added missing tokenizer key
     data: MathDataConfig
-    env: MathEnvConfig
+    env: CodeEnvConfig | MathEnvConfig
     cluster: ClusterConfig
     logger: LoggerConfig
 
@@ -259,7 +260,8 @@ async def _run_env_eval_impl(
     # Extract for easier access
     generation_config = master_config["generation"]
     eval_config = master_config["eval"]
-    env_config = master_config["env"]["math"]
+    env_type = master_config["env"].get("env_type", "math")
+    env_config = master_config["env"].get(env_type)
     logger_config = master_config["logger"]
     metric = eval_config["metric"]
     num_tests_per_prompt = eval_config["num_tests_per_prompt"]
@@ -272,11 +274,11 @@ async def _run_env_eval_impl(
         "arc_agi": vis_lib.BaseRenderTemplate,
         "math": vis_lib.MathRenderTemplate,
         "mgsm": vis_lib.MathRenderTemplate,
-        "code": vis_lib.CodeRenderTemplate,
+        "python_code_verify": vis_lib.CodeRenderTemplate,
         "english_multichoice": vis_lib.MathRenderTemplate,
         "multilingual_multichoice": vis_lib.MathRenderTemplate,
         "instruction_following": vis_lib.BaseRenderTemplate,
-    }[env_config["verifier_type"]]()
+    }[env_config["worker_type"]]()
 
     # Run evaluation loop
     score = 0.0

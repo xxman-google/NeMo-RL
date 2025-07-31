@@ -15,11 +15,9 @@ import ast
 import contextlib
 import io
 import logging
-import os
 import re
 from typing import Any, Optional, TypedDict
 
-# import evaluate as hf_evaluate
 import ray
 import torch
 from math_verify.errors import TimeoutException
@@ -42,14 +40,11 @@ from nemo_rl.evals import answer_parsing
 
 # from nemo_rl.evals.ifeval import instructions_registry
 
-# This is needed for running code evaluation
-os.environ["HF_ALLOW_CODE_EVAL"] = "1"
-
 
 class MathEnvConfig(TypedDict):
     num_workers: int
     stop_strings: Optional[list[str]]  # Default stop strings for this env
-    verifier_type: Optional[str]
+    worker_type: Optional[str]
 
 
 @contextlib.contextmanager
@@ -225,42 +220,6 @@ class EnglishMultichoiceVerifyWorker:
 
 
 # @ray.remote
-# class CodeVerifyWorker:
-#     def __init__(self) -> None:
-#         self._pass_at_k = hf_evaluate.load("code_eval")
-
-#     def _find_code(self, response: str) -> str:
-#         pattern = re.compile(r"```python\n(.*?)```", re.DOTALL)
-#         matches = pattern.findall(response)
-#         extracted_answer = matches[0] if len(matches) >= 1 else response
-#         return extracted_answer
-
-#     def verify(
-#         self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
-#     ) -> list[tuple[float, str, str]]:
-#         """Verify the correctness of the predicted responses against the ground truth.
-
-#         Args:
-#             pred_responses: list[str]. The predicted responses from the LLM.
-#             tests_list: list[str]. The unit tests.
-
-#         Returns:
-#             list[tuple[float, str, str]]. The rewards, unit tests, and extracted code segment for each predicted response.
-#         """
-#         outputs = []
-#         for response, metadata in zip(pred_responses, metadata_list):
-#             tests = metadata["tests"]
-#             code = self._find_code(response)
-#             predictions = [[code]]
-#             results = self._pass_at_k.compute(
-#                 references=[tests], predictions=predictions, k=[1]
-#             )
-#             score = float(results[0]["pass@1"] == 1.0)
-#             outputs.append((score, tests, code))
-#         return outputs
-
-
-# @ray.remote
 # class IFVerifyWorker:
 #     """Response verifier worker for instruction following problems."""
 
@@ -360,19 +319,18 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
         self.cfg = cfg
         self.num_workers = cfg["num_workers"]
         # TODO: split out this environment since it's doing more than just math
-        verifier_type = cfg.get("verifier_type", "math")
-        assert isinstance(verifier_type, str), (
-            f"{verifier_type=} must be a string but was {type(verifier_type)}"
+        worker_type = cfg.get("worker_type", "math")
+        assert isinstance(worker_type, str), (
+            f"{worker_type=} must be a string but was {type(worker_type)}"
         )
         worker_cls = {
-            # "code": CodeVerifyWorker,
             "english_multichoice": EnglishMultichoiceVerifyWorker,
             # "instruction_following": IFVerifyWorker,
             "math": MathVerifyWorker,
             "mgsm": MGSMVerifyWorker,
             "multilingual_multichoice": MultilingualMultichoiceVerifyWorker,
             "arc_agi": ArcAgiVerifyWorker,
-        }[verifier_type]
+        }[worker_type]
         self.workers = [
             worker_cls.options(  # type: ignore # (decorated with @ray.remote)
                 runtime_env={"py_executable": PY_EXECUTABLES.SYSTEM}
