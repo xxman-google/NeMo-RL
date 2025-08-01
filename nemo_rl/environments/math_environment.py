@@ -94,7 +94,8 @@ class MathVerifyWorker:
         """
         results = []
         for response, metadata in zip(pred_responses, metadata_list):
-            ground_truth = metadata["ground_truth"]
+            ground_truth = str(metadata["ground_truth"])
+            extracted_answer = None
             try:
                 ground_truth_parsable = "\\boxed{" + ground_truth + "}"
                 with _mute_output():
@@ -108,10 +109,10 @@ class MathVerifyWorker:
                     # to catch it.
                     except (Exception, TimeoutException):
                         ret_score = 0.0
-                        extracted_answer = None
 
                 results.append((float(ret_score), ground_truth, extracted_answer))
-            except Exception:
+            except Exception as e:
+                print(e)
                 results.append((0.0, ground_truth, extracted_answer))
         return results
 
