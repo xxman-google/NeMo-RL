@@ -30,6 +30,9 @@ from nemo_rl.data.eval_datasets.mmlu import MMLUDataset
 from nemo_rl.data.eval_datasets.mmlu_pro import MMLUProDataset
 from nemo_rl.data.eval_datasets.numina_math import NuminaMathDataset
 from nemo_rl.data.eval_datasets.openr1_math import OpenR1MathDataset
+from nemo_rl.data.eval_datasets.openr1_verifiable_code import (
+    OpenR1VerifiableCodeDataset,
+)
 from nemo_rl.data.eval_datasets.tulu3_sft import Tulu3SftDataset
 
 
@@ -171,6 +174,12 @@ def load_eval_dataset(data_config):
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
+    elif dataset_name == "openr1_verifiable_code":
+        base_dataset = OpenR1VerifiableCodeDataset(
+            code_exe_dir=data_config["code_exe_dir"],
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
     elif dataset_name == "arc_agi":
         base_dataset = ArcAgiDataset(
             prompt_file=data_config["prompt_file"],
@@ -199,5 +208,6 @@ __all__ = [
     "MMLUProDataset",
     "NuminaMathDataset",
     "OpenR1MathDataset",
+    "OpenR1VerifiableCodeDataset",
     "Tulu3SftDataset",
 ]
