@@ -6,7 +6,7 @@ data:
 
 generation:
   vllm_cfg:
-    max_model_len: 65536
+    max_model_len: 131072
     gpu_memory_utilization: 0.9
     tensor_parallel_size: 1
 

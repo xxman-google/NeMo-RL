@@ -371,10 +371,9 @@ class SweBenchVerifyWorker:
         Returns:
             list[tuple[float, str, str]]. The rewards, correct answer, and extracted answer for each predicted response.
         """
-        print("*************** RUNNING EVALUATION: ***************")
         predictions = {}
         instances = []
-        model_name = "google/gemma-3-12b-it"  # TODO: Make this configurable
+        model_name = "model_name"  # TODO: Placeholder for the model name, should be set appropriately.
         for response, metadata in zip(pred_responses, metadata_list):
             instance = metadata["instance"]
             prediction = {
@@ -383,17 +382,8 @@ class SweBenchVerifyWorker:
                 KEY_PREDICTION: response,
                 "golden_patch": instance["patch"],
             }
-            
-            # *************** TEST WITH GOLDEN PREDICTION ***************
-            # prediction = {
-            #     KEY_INSTANCE_ID: instance[KEY_INSTANCE_ID],
-            #     KEY_MODEL: "gold",
-            #     KEY_PREDICTION: instance["patch"],
-            # }
-            # ***********************************************************
             predictions[instance[KEY_INSTANCE_ID]] = prediction
             instances.append(instance)
-
 
         run_id = "swebench_verified_oracle_eval"
         run_instances(
@@ -412,18 +402,21 @@ class SweBenchVerifyWorker:
         eval_dir = f"logs/run_evaluation/{run_id}/{model_name}"
         if not os.path.exists(eval_dir):
             raise FileNotFoundError(f"Evaluation directory {eval_dir} does not exist.")
-        for instance_id in os.listdir(eval_dir):
+        for instance_id, prediction in predictions.items():
             instance_result_file = os.path.join(
                 eval_dir, instance_id, "report.json"
             )
-            golden_patch = predictions[instance_id]["golden_patch"]
-            model_patch = predictions[instance_id][KEY_PREDICTION]
             if not os.path.exists(instance_result_file):
-                results.append((0.0, golden_patch, model_patch))
+                continue
             with open(instance_result_file, "r") as f:
-                instance_report = make_run_report(f.read())
+                instance_report = f.read()
             score = self._get_score_from_report(instance_id, instance_report)
+            golden_patch = prediction["golden_patch"]
+            model_patch = prediction[KEY_PREDICTION]
             results.append((score, golden_patch, model_patch))
+            if score == 1.0:
+                with open(f"{eval_dir}/verified_issues.txt", "a") as f:
+                    f.write(f"{instance_id}: {model_patch}\n")
         return results
 
     def _get_score_from_report(self, instance_id: str, instance_report: str) -> float:

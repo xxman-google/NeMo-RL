@@ -31,7 +31,7 @@ class SweBenchVerifiedOracleDataset:
         ds = load_dataset("jcpagadora/SWE-bench_Verified__style-3__fs-oracle", split="test",
                           download_mode="force_redownload")
         self.rekeyed_ds = ds.map(self._rekey, remove_columns=ds.column_names)
-        self.rekeyed_ds = self.rekeyed_ds.select(range(10))
+        self.rekeyed_ds = self.rekeyed_ds.filter(self._filter)
         self.task_spec = TaskDataSpec(
             task_name="swebench_verified_oracle",
             prompt_file=prompt_file,
@@ -45,3 +45,7 @@ class SweBenchVerifiedOracleDataset:
             "ground_truth": data["patch"],
             "instance": data,
         }
+
+    def _filter(self, data: dict[str, Any]) -> bool:
+        """Filter function to remove instances with empty ground truth."""
+        return len(data["prompt"]) <= 131072

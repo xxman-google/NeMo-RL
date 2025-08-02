@@ -269,7 +269,7 @@ async def _run_env_eval_impl(
         "english_multichoice": vis_lib.MathRenderTemplate,
         "multilingual_multichoice": vis_lib.MathRenderTemplate,
         "instruction_following": vis_lib.BaseRenderTemplate,
-        "swebench_verified": vis_lib.CodeRenderTemplate,
+        "swebench_verified": vis_lib.BaseRenderTemplate,
     }[env_config["verifier_type"]]()
 
     # Run evaluation loop
