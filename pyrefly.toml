@@ -49,6 +49,7 @@ project-includes = [
     "nemo_rl/data/eval_datasets/math.py",
     "nemo_rl/data/eval_datasets/mmlu.py",
     "nemo_rl/data/eval_datasets/mmlu_pro.py",
+    "nemo_rl/data/eval_datasets/openr1_verifiable_code.py",
     "nemo_rl/data/hf_datasets/__init__.py",
     "nemo_rl/data/hf_datasets/chat_templates.py",
     "nemo_rl/data/hf_datasets/deepscaler.py",

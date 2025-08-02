@@ -16,4 +16,4 @@ env:
   code:
     num_workers: 8
     terminate_on_evaluation: true
-    worker_type: "python_code_verify"
+    worker_type: "python_unit_test_verify"
