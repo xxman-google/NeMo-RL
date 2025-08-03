@@ -13,10 +13,14 @@
 # limitations under the License.
 import ast
 import builtins
+import contextlib
+import io
 import os
 import re
+import signal
+import sys
 from collections.abc import Mapping, Sequence
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stdout
 from copy import copy
 from io import IOBase
 from pprint import pformat
@@ -47,20 +51,43 @@ class CodeEnvMetadata(TypedDict):
     working_dir: str  # Working directory for file operations
 
 
-class CodeVerifierMetadata(TypedDict):
+class UnitTestVerifierMetadata(TypedDict):
     tests: str
     working_dir: str  # Working directory for file operations
+
+
+class StdoutVerifierMetadata(TypedDict):
+    tests: List[Dict[str, str]]  # each element stores the input and output of each test
+    working_dir: str  # Working directory for file operations
+
+
+class TimeoutException(Exception):
+    pass
+
+
+@contextlib.contextmanager
+def time_limit(seconds: float):
+    def signal_handler(signum, frame):
+        raise TimeoutException("Timed out!")
+
+    signal.setitimer(signal.ITIMER_REAL, seconds)
+    signal.signal(signal.SIGALRM, signal_handler)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
 
 
 class CodeExecutionWorker:
     """Helper class to process individual code execution steps."""
 
-    def __init__(self):
+    def __init__(self, timeout: float = 3.0):
         # Create sandbox with safe builtins
         builtin_dict = {k: getattr(builtins, k) for k in dir(builtins)}
         builtin_dict["open"] = self.safe_open
         builtin_dict["__import__"] = self.safe_import
         self.sandbox = {"__builtins__": builtin_dict}
+        self.timeout = timeout
 
     def sanitize(self, obj: Any) -> Any:
         # TODO: better handling of unpicklable objects: custom __getstate__ and __setstate__
@@ -105,10 +132,11 @@ class CodeExecutionWorker:
 
     def execute(
         self, message_batch: str, metadata_batch: List[CodeEnvMetadata]
-    ) -> Tuple[List[Dict[str, str]], List[bool], List[Any]]:
+    ) -> Tuple[List[float], List[Dict[str, str]], List[bool], List[Any]]:
         """Execute code in a sandboxed environment."""
         results = []
         terminateds = []
+        rewards = []
 
         for message, metadata in zip(message_batch, metadata_batch):
             match = re.search(r"<code>(.*)</code>(.*)", message, re.DOTALL)
@@ -131,27 +159,34 @@ class CodeExecutionWorker:
 
             result = None
             terminated = False
+            reward = 0.0
             with self.chdir(metadata["working_dir"]):
                 try:
                     # isolate the code in a sandbox
                     # capture local variables in metadata["context"]
-                    exec(exec_code, self.sandbox, metadata["context"])
+                    with time_limit(self.timeout):
+                        exec(exec_code, self.sandbox, metadata["context"])
                     if eval_code:
                         result = eval(eval_code, self.sandbox, metadata["context"])
                         terminated = True
+                        reward = 1.0
+                except TimeoutException as err:
+                    print("Timeout!")
+                    result = err
                 except Exception as err:
                     result = err
 
             result = self.format_result(result, code, lookahead)
             results.append(result)
             terminateds.append(terminated)
+            rewards.append(reward)
 
         observations = [
             {"role": "environment", "content": result} for result in results
         ]
         metadata_batch = self.sanitize(metadata_batch)
 
-        return observations, terminateds, metadata_batch
+        return rewards, observations, terminateds, metadata_batch
 
     @contextmanager
     def chdir(self, dir: str):
@@ -178,7 +213,7 @@ class CodeExecutionWorker:
         risky_modules = {
             "os",
             "shutil",  # erase filesystem
-            "sys",
+            # "sys",
             "signal",  # exit the current program
             "socket",  # network communication
             "subprocess",
@@ -198,13 +233,14 @@ class CodeExecutionRayWorker(CodeExecutionWorker):
 
 
 @ray.remote
-class PythonCodeVerifyRayWorker(CodeExecutionWorker):
+class PythonUnitTestVerifyRayWorker(CodeExecutionWorker):
     def execute(
-        self, message_batch: str, metadata_batch: List[CodeVerifierMetadata]
-    ) -> str:
+        self, message_batch: str, metadata_batch: List[UnitTestVerifierMetadata]
+    ) -> Tuple[List[float], List[Dict[str, str]], List[bool], List[Any]]:
         """Execute code in a sandboxed environment."""
         results = []
         terminateds = []
+        rewards = []
         pattern = re.compile(r"```python\n(.*?)```", re.DOTALL)
 
         for message, metadata in zip(message_batch, metadata_batch):
@@ -218,14 +254,78 @@ class PythonCodeVerifyRayWorker(CodeExecutionWorker):
 
             result = None
             terminated = False
+            reward = 0.0
             with self.chdir(metadata["working_dir"]):
                 try:
                     # isolate the code in a sandbox
-                    exec(eval_code, self.sandbox)
+                    with time_limit(self.timeout):
+                        exec(eval_code, self.sandbox)
+                    reward = 1.0
                     terminated = True
+                except TimeoutException as err:
+                    print("Timeout!")
+                    result = err
                 except Exception as err:
                     result = err
 
+            result = self.format_result(result, code)
+            results.append(result)
+            terminateds.append(terminated)
+            rewards.append(reward)
+
+        observations = [
+            {"role": "environment", "content": result} for result in results
+        ]
+        metadata_batch = self.sanitize(metadata_batch)
+
+        return rewards, observations, terminateds, metadata_batch
+
+
+@ray.remote
+class PythonStdoutVerifyRayWorker(CodeExecutionWorker):
+    def execute(
+        self, message_batch: str, metadata_batch: List[StdoutVerifierMetadata]
+    ) -> Tuple[List[float], List[Dict[str, Any]], List[bool], List[Any]]:
+        """Execute code in a sandboxed environment."""
+        results = []
+        terminateds = []
+        rewards = []
+        pattern = re.compile(r"```python\n(.*?)```", re.DOTALL)
+
+        for message, metadata in zip(message_batch, metadata_batch):
+            matches = pattern.findall(message)
+            if not matches:
+                results.append("")
+                terminateds.append(False)
+                continue
+            code = matches[0]
+
+            result = None
+            terminated = False
+            success = True
+            with self.chdir(metadata["working_dir"]):
+                try:
+                    for tests in metadata["tests"]:
+                        sys.stdin = io.StringIO(tests["input"])
+                        buffer = io.StringIO()
+                        with time_limit(self.timeout):
+                            with redirect_stdout(buffer):
+                                exec(code, self.sandbox | {"__name__": "__main__"})
+                        output = buffer.getvalue().strip()
+                        success &= output == tests["output"].strip()
+                    terminated = True
+                    # print("success: ", success)
+                except TimeoutException as err:
+                    result = err
+                    success = False
+                    print("Timeout!")
+                except Exception as err:
+                    result = err
+                    print("exception: ", result)
+                    success = False
+                finally:
+                    sys.stdin = sys.__stdin__
+            rewards.append(float(success))
             result = self.format_result(result, code)
             results.append(result)
             terminateds.append(terminated)
@@ -235,7 +335,7 @@ class PythonCodeVerifyRayWorker(CodeExecutionWorker):
         ]
         metadata_batch = self.sanitize(metadata_batch)
 
-        return observations, terminateds, metadata_batch
+        return rewards, observations, terminateds, metadata_batch
 
 
 @ray.remote  # pragma: no cover
@@ -246,10 +346,11 @@ class CodeEnvironment(EnvironmentInterface):
         self.cfg = cfg
         self.num_workers = cfg["num_workers"]
         self.terminate_on_evaluation = cfg["terminate_on_evaluation"]
-        worker_type = cfg.get("worker_type", "python_code_verify")
+        worker_type = cfg.get("worker_type", "python_unit_test_verify")
         worker_cls = {
             "code_exe": CodeExecutionRayWorker,
-            "python_code_verify": PythonCodeVerifyRayWorker,
+            "python_unit_test_verify": PythonUnitTestVerifyRayWorker,
+            "python_stdout_verify": PythonStdoutVerifyRayWorker,
         }[worker_type]
         self.workers = [
             worker_cls.options(
@@ -282,8 +383,10 @@ class CodeEnvironment(EnvironmentInterface):
         observations = []
         terminateds = []
         new_metadata_batch = []
+        rewards = []
 
-        for obs, term, meta in results:
+        for rwds, obs, term, meta in results:
+            rewards += rwds
             observations += obs
             terminateds += term
             new_metadata_batch += meta
@@ -292,7 +395,7 @@ class CodeEnvironment(EnvironmentInterface):
             terminated_tensor = torch.tensor(terminateds, dtype=torch.bool)
         else:
             terminated_tensor = torch.zeros(len(terminateds), dtype=torch.bool)
-        rewards_tensor = terminated_tensor.to(dtype=torch.float32)
+        rewards_tensor = torch.tensor(rewards, dtype=torch.float32)
         next_stop_strings = [["</code>"]] * len(message_log_batch)
 
         return EnvironmentReturn(
