@@ -112,6 +112,8 @@ def code_processor(
         "tests": datum_dict["tests"],
         "working_dir": datum_dict["code_exe_dir"],
     }
+    if datum_dict.get("base_imports"):
+        extra_env_info["base_imports"] = datum_dict["base_imports"]
     message_log: LLMMessageLogType = []
 
     # system prompt

@@ -1,10 +1,11 @@
-# OpenR1 verifiable coding evaluation Configuration
+# LiveCodeBench evaluation Configuration
 defaults: "eval.yaml"
 
 data:
-  prompt_file: "examples/prompts/openr1_verifiable_code.txt"
-  dataset_name: "openr1_verifiable_code"
+  dataset_name: "livecodebench"
   code_exe_dir: "/tmp/logs"
+  version: "release_v1"
+  test_type: "functional"
 
 generation:
   temperature: 0.7
@@ -18,4 +19,5 @@ env:
   code:
     num_workers: 8
     terminate_on_evaluation: true
-    worker_type: "python_stdout_verify"
+    worker_type: "python_unit_test_verify"
+    timeout: 10.0

@@ -44,6 +44,7 @@ class CodeEnvConfig(TypedDict):
     # and wrap CodeEnvironment in another environment that terminates the generation
     terminate_on_evaluation: bool
     worker_type: str
+    timeout: float
 
 
 class CodeEnvMetadata(TypedDict):
@@ -250,7 +251,8 @@ class PythonUnitTestVerifyRayWorker(CodeExecutionWorker):
                 terminateds.append(False)
                 continue
             code = matches[0]
-            eval_code = "\n".join([code, metadata["tests"]])
+            eval_code = "\n".join([metadata["base_imports"], code, metadata["tests"]])
+            # print("eval_code: ", eval_code)
 
             result = None
             terminated = False
@@ -266,6 +268,7 @@ class PythonUnitTestVerifyRayWorker(CodeExecutionWorker):
                     print("Timeout!")
                     result = err
                 except Exception as err:
+                    print(err)
                     result = err
 
             result = self.format_result(result, code)
@@ -355,7 +358,7 @@ class CodeEnvironment(EnvironmentInterface):
         self.workers = [
             worker_cls.options(
                 runtime_env={"py_executable": PY_EXECUTABLES.SYSTEM}
-            ).remote()
+            ).remote(timeout=cfg["timeout"])
             for _ in range(self.num_workers)
         ]
 
