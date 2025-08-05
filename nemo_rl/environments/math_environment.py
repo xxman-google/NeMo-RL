@@ -323,13 +323,13 @@ class EnglishMultichoiceVerifyWorker:
 class ArcAgiVerifyWorker:
     """Response verifier worker for ARC-AGI problems."""
 
-    def _extract_grid(s: str) -> Optional[list[list[int]]]:
-        # Regex for a 2x2 grid of integers (optionally with whitespace)
-        pattern = r'\[\s*(\[\s*\d+(?:\s*,\s*\d+)*\s*\]\s*,?\s*)+\]'
+    def _extract_response_grid(self, s: str) -> Optional[list[list[int]]]:
+        # Regex for a 2D grid of integers (optionally with whitespace)
+        pattern = r"<output>\s*(\[[^\]]*(?:\][^\[]*\[?[^\]]*)*)\s*</output>"
         match = re.search(pattern, s, re.DOTALL)
         if not match:
             return None
-        grid_str = match.group(0)
+        grid_str = match.group(1)
         try:
             return ast.literal_eval(grid_str)
         except (SyntaxError, ValueError):
@@ -349,7 +349,7 @@ class ArcAgiVerifyWorker:
         """
         results = []
         for response, metadata in zip(pred_responses, metadata_list):
-            extracted_answer = self._extract_grid(response)
+            extracted_answer = self._extract_response_grid(response)
             score = 1.0 if extracted_answer == metadata["ground_truth"] else 0.0
             results.append((score, metadata["ground_truth"], extracted_answer))
         return results
@@ -392,7 +392,7 @@ class SweBenchVerifyWorker:
             cache_level="env",
             clean=False,
             force_rebuild=False,
-            max_workers=1,
+            max_workers=4,
             run_id=run_id,
             timeout=600,
         )
@@ -402,6 +402,7 @@ class SweBenchVerifyWorker:
         eval_dir = f"logs/run_evaluation/{run_id}/{model_name}"
         if not os.path.exists(eval_dir):
             raise FileNotFoundError(f"Evaluation directory {eval_dir} does not exist.")
+        verified_issues = []
         for instance_id, prediction in predictions.items():
             instance_result_file = os.path.join(
                 eval_dir, instance_id, "report.json"
@@ -415,8 +416,9 @@ class SweBenchVerifyWorker:
             model_patch = prediction[KEY_PREDICTION]
             results.append((score, golden_patch, model_patch))
             if score == 1.0:
-                with open(f"{eval_dir}/verified_issues.txt", "a") as f:
-                    f.write(f"{instance_id}: {model_patch}\n")
+                verified_issues.append(instance_id)
+        with open(f"{eval_dir}/verified_issues.txt", "w") as f:
+            f.write(f"{instance_id}: {model_patch}\n\n")
         return results
 
     def _get_score_from_report(self, instance_id: str, instance_report: str) -> float:

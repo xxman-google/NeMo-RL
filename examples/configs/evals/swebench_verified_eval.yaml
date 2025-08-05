@@ -6,15 +6,14 @@ data:
 
 generation:
   vllm_cfg:
-    max_model_len: 131072
+    max_model_len: 262144
     gpu_memory_utilization: 0.9
-    tensor_parallel_size: 1
+    tensor_parallel_size: 2
 
 env:
   math:
-    verifier_type: "swebench_verified"
-    verifier_metadata_key: "ground_truth"
+    worker_type: "swebench_verified"
 
 cluster:
-  gpus_per_node: 4
+  gpus_per_node: 8
   num_nodes: 1

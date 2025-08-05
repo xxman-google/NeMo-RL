@@ -22,6 +22,11 @@ from nemo_rl.data import processors
 from nemo_rl.data.interfaces import TaskDataSpec
 
 
+_MAX_PROMPT_LENGTH = 262144  # Maximum length of the prompt in characters
+_FILTER = False  # Whether to filter instances based on prompt length
+_TRUNCATE = True  # Whether to truncate prompts that exceed the maximum length
+
+
 class SweBenchVerifiedOracleDataset:
     def __init__(
         self,
@@ -31,7 +36,12 @@ class SweBenchVerifiedOracleDataset:
         ds = load_dataset("jcpagadora/SWE-bench_Verified__style-3__fs-oracle", split="test",
                           download_mode="force_redownload")
         self.rekeyed_ds = ds.map(self._rekey, remove_columns=ds.column_names)
-        self.rekeyed_ds = self.rekeyed_ds.filter(self._filter)
+        if _FILTER:
+            print(f"Filtering out instances with prompt len > {_MAX_PROMPT_LENGTH} characters.")
+            self.rekeyed_ds = self.rekeyed_ds.filter(self._filter)
+        if _TRUNCATE:
+            print(f"Truncating instances with prompt len > {_MAX_PROMPT_LENGTH} characters.")
+            self.rekeyed_ds = self.rekeyed_ds.map(self._truncate)
         self.task_spec = TaskDataSpec(
             task_name="swebench_verified_oracle",
             prompt_file=prompt_file,
@@ -48,4 +58,10 @@ class SweBenchVerifiedOracleDataset:
 
     def _filter(self, data: dict[str, Any]) -> bool:
         """Filter function to remove instances with empty ground truth."""
-        return len(data["prompt"]) <= 131072
+        return len(data["prompt"]) <= _MAX_PROMPT_LENGTH
+
+    def _truncate(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Truncate the prompt to a maximum length."""
+        if len(data["prompt"]) > _MAX_PROMPT_LENGTH:
+            data["prompt"] = data["prompt"][:_MAX_PROMPT_LENGTH]
+        return data
