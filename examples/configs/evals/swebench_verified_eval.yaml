@@ -12,7 +12,7 @@ generation:
 
 env:
   math:
-    verifier_type: "swebench_verified"
+    worker_type: "swebench_verified"
     verifier_metadata_key: "ground_truth"
 
 cluster:
