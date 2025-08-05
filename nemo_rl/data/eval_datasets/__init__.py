@@ -21,6 +21,7 @@ from nemo_rl.data.eval_datasets.gpqa import GPQADataset
 from nemo_rl.data.eval_datasets.gsm8k import Gsm8kDataset
 from nemo_rl.data.eval_datasets.humaneval import HumanEvalDataset
 from nemo_rl.data.eval_datasets.ifeval import IFEvalDataset
+from nemo_rl.data.eval_datasets.livecodebench import LiveCodeBenchDataset
 from nemo_rl.data.eval_datasets.local_math_dataset import LocalMathDataset
 from nemo_rl.data.eval_datasets.math import MathDataset
 from nemo_rl.data.eval_datasets.math_train import MathTrainDataset
@@ -77,6 +78,14 @@ def load_eval_dataset(data_config):
     elif dataset_name == "humaneval":
         base_dataset = HumanEvalDataset(
             code_exe_dir=data_config["code_exe_dir"],
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
+    elif dataset_name == "livecodebench":
+        base_dataset = LiveCodeBenchDataset(
+            code_exe_dir=data_config["code_exe_dir"],
+            version=data_config["version"],
+            test_type=data_config["test_type"],
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
@@ -199,6 +208,7 @@ __all__ = [
     "Gsm8kDataset",
     "HumanEvalDataset",
     "IFEvalDataset",
+    "LiveCodeBenchDataset",
     "LocalMathDataset",
     "MathDataset",
     "MathTrainDataset",
