@@ -99,6 +99,76 @@ def data_processor(
     return output
 
 
+def code_processor(
+    datum_dict: dict[str, Any],
+    task_data_spec: TaskDataSpec,
+    tokenizer: TokenizerType,
+    max_seq_length: int,
+    idx: int,
+) -> DatumSpec:
+    """Process a datum dictionary (directly loaded from dataset) into a DatumSpec for the Code Environment."""
+    problem = datum_dict["question"]
+    extra_env_info = {
+        "tests": datum_dict["tests"],
+        "working_dir": datum_dict["code_exe_dir"],
+    }
+    if datum_dict.get("base_imports"):
+        extra_env_info["base_imports"] = datum_dict["base_imports"]
+    message_log: LLMMessageLogType = []
+
+    # system prompt
+    if task_data_spec.system_prompt:
+        sys_prompt: dict[str, str | torch.Tensor] = {
+            "role": "system",
+            "content": task_data_spec.system_prompt,
+        }
+        sys = tokenizer.apply_chat_template(
+            [cast(dict[str, str], sys_prompt)],
+            tokenize=False,
+            add_generation_prompt=False,
+            add_special_tokens=False,
+        )
+        sys_prompt["token_ids"] = tokenizer(sys, return_tensors="pt")["input_ids"][0]
+        message_log.append(sys_prompt)
+
+    # user prompt
+    if task_data_spec.prompt:
+        problem = task_data_spec.prompt.format(problem)
+    user_message = {"role": "user", "content": problem}
+    message = tokenizer.apply_chat_template(
+        [user_message],
+        tokenize=False,
+        add_generation_prompt=True,
+        add_special_tokens=False,
+        enable_thinking=task_data_spec.enable_thinking,
+    )
+    user_message["token_ids"] = tokenizer(message, return_tensors="pt")["input_ids"][0]
+    user_message["content"] = message
+    message_log.append(user_message)
+
+    length = sum(len(m["token_ids"]) for m in message_log)
+
+    loss_multiplier = 1.0
+    if length > max_seq_length:
+        # make smaller and mask out
+        for indiv_message in message_log:
+            indiv_message["token_ids"] = indiv_message["token_ids"][
+                : min(4, max_seq_length // len(message_log))
+            ]
+        loss_multiplier = 0.0
+
+    output: DatumSpec = {
+        "message_log": message_log,
+        "length": length,
+        "extra_env_info": extra_env_info,
+        "loss_multiplier": loss_multiplier,
+        "idx": idx,
+    }
+    if "task_name" in datum_dict:
+        output["task_name"] = datum_dict["task_name"]
+    return output
+
+
 def _construct_multichoice_prompt(
     prompt: str, question: str, options: dict[str, str]
 ) -> str:
@@ -122,7 +192,9 @@ def _construct_arc_agi_prompt(
     output = prompt
     output += f"'training_examples':\n{training_examples}\n\n"
     output += f"'test_input':\n{test_input}\n\n"
-    output += "The final output grid response should be formatted exactly as follows:\n\n"
+    output += (
+        "The final output grid response should be formatted exactly as follows:\n\n"
+    )
     output += "<output>\n[output grid]\n</output>\n"
     return output
 
@@ -234,7 +306,7 @@ def arc_agi_processor(
     )
     user_message["token_ids"] = tokenizer(message, return_tensors="pt")["input_ids"][0]
     user_message["content"] = message
-    message_log.append(user_message)
+    message_log.append(user_message)  # pyrefly: ignore
 
     length = sum(len(m["token_ids"]) for m in message_log)
     output: DatumSpec = {
@@ -255,11 +327,6 @@ math_rejection_sampling_processor = functools.partial(
         ("expected_answer", "ground_truth"),
         ("problem", "problem"),
     ],
-)
-coding_processor = functools.partial(
-    data_processor,
-    question_key="question",
-    extra_env_info_key_maps=[("tests", "tests")],
 )
 if_processor = functools.partial(
     data_processor,

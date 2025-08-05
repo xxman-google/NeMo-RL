@@ -32,6 +32,7 @@ from transformers.integrations.accelerate import init_empty_weights
 import nemo_rl.models.megatron.converters.deepseek as deepseek_converter
 import nemo_rl.models.megatron.converters.llama as llama_converter
 import nemo_rl.models.megatron.converters.qwen2 as qwen2_converter
+import nemo_rl.models.megatron.converters.qwen3 as qwen3_converter
 
 _GROUP_TO_RANKS_CACHE = {}
 
@@ -57,7 +58,7 @@ def get_local_expert_num(s):
     return number
 
 
-def get_global_layer_num(s, cfg):
+def get_global_layer_num(s, cfg) -> int:
     """Assumes layer number is preceeded by 'layers.'.
 
     Assumes pipeline model parallel size is set.
@@ -65,6 +66,7 @@ def get_global_layer_num(s, cfg):
     This function converts the local layer number to the global layer number.
     """
     local_layer_num = get_local_layer_num(s)
+    assert local_layer_num is not None, f"Local layer number is None for {s}"
     pp_rank = parallel_state.get_pipeline_model_parallel_rank()
     pp_size = parallel_state.get_pipeline_model_parallel_world_size()
 
@@ -277,15 +279,33 @@ class MegatronToHFConverter:
         if config.model_type == "qwen2":
             self.export_mapping = qwen2_converter.get_export_mapping(megatron_model)
             self.export_transforms = qwen2_converter.get_export_transforms(config)
-            self.get_source_fn = lambda source_state_dict, _: _ModelState(
-                source_state_dict
-            )
+
+            def get_source_fn(
+                source_state_dict: dict[str, Any], source_config: dict[str, Any]
+            ) -> _ModelState:
+                return _ModelState(source_state_dict)
+
+            self.get_source_fn = get_source_fn
+        elif config.model_type in ("qwen3", "qwen3_moe"):
+            self.export_mapping = qwen3_converter.get_export_mapping(config)
+            self.export_transforms = qwen3_converter.get_export_transforms(config)
+
+            def get_source_fn(
+                source_state_dict: dict[str, Any], source_config: dict[str, Any]
+            ) -> _ModelState:
+                return _ModelState(source_state_dict)
+
+            self.get_source_fn = get_source_fn
         elif config.model_type == "llama":
             self.export_mapping = llama_converter.get_export_mapping()
             self.export_transforms = llama_converter.get_export_transforms(config)
-            self.get_source_fn = lambda source_state_dict, _: _ModelState(
-                source_state_dict
-            )
+
+            def get_source_fn(
+                source_state_dict: dict[str, Any], source_config: dict[str, Any]
+            ) -> _ModelState:
+                return _ModelState(source_state_dict)
+
+            self.get_source_fn = get_source_fn
         elif config.model_type in ("deepseek_v2", "deepseek_v3"):
             self.export_mapping = deepseek_converter.get_export_mapping(
                 source=global_keys_map,

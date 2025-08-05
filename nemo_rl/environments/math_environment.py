@@ -16,11 +16,9 @@ import contextlib
 import io
 import json
 import logging
-import os
 import re
 from typing import Any, Optional, TypedDict
 
-# import evaluate as hf_evaluate
 import ray
 import torch
 from math_verify.errors import TimeoutException
@@ -34,6 +32,7 @@ from swebench.harness.constants import (
     KEY_PREDICTION,
 )
 
+from nemo_rl.data.interfaces import LLMMessageLogType
 from nemo_rl.distributed.batched_data_dict import BatchedDataDict
 from nemo_rl.distributed.virtual_cluster import PY_EXECUTABLES
 from nemo_rl.environments.interfaces import (
@@ -48,14 +47,11 @@ from nemo_rl.evals import answer_parsing
 
 # from nemo_rl.evals.ifeval import instructions_registry
 
-# This is needed for running code evaluation
-os.environ["HF_ALLOW_CODE_EVAL"] = "1"
-
 
 class MathEnvConfig(TypedDict):
     num_workers: int
     stop_strings: Optional[list[str]]  # Default stop strings for this env
-    verifier_type: Optional[str]
+    worker_type: Optional[str]
 
 
 @contextlib.contextmanager
@@ -69,9 +65,12 @@ def _mute_output():
 
 
 class MathEnvironmentMetadata(TypedDict):
-    ground_truth: Optional[str]
-    tests: Optional[str]
-    checker_info: Optional[dict[str, Any]]
+    ground_truth: str
+
+
+class MultilingualMathEnvironmentMetadata(TypedDict):
+    ground_truth: str
+    lang: str
 
 
 @ray.remote  # pragma: no cover
@@ -103,7 +102,8 @@ class MathVerifyWorker:
         """
         results = []
         for response, metadata in zip(pred_responses, metadata_list):
-            ground_truth = metadata["ground_truth"]
+            ground_truth = str(metadata["ground_truth"])
+            extracted_answer = None
             try:
                 ground_truth_parsable = "\\boxed{" + ground_truth + "}"
                 with _mute_output():
@@ -117,10 +117,10 @@ class MathVerifyWorker:
                     # to catch it.
                     except (Exception, TimeoutException):
                         ret_score = 0.0
-                        extracted_answer = None
 
                 results.append((float(ret_score), ground_truth, extracted_answer))
-            except Exception:
+            except Exception as e:
+                print(e)
                 results.append((0.0, ground_truth, extracted_answer))
         return results
 
@@ -137,7 +137,9 @@ class MGSMVerifyWorker:
         return target == prediction
 
     def verify(
-        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
+        self,
+        pred_responses: list[str],
+        metadata_list: list[MultilingualMathEnvironmentMetadata],
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
@@ -213,7 +215,7 @@ class EnglishMultichoiceVerifyWorker:
             response = answer_parsing.normalize_response(response)
             extracted_answer = None
             match = re.search(
-                "(?i)(?:Answer\s*:|answer is)[ \t]*([A-Z])[.]*\s*$", response
+                r"(?i)(?:Answer\s*:|answer is)[ \t]*([A-Z])[.]*\s*$", response
             )
             # match = re.search("(?i)Answer\s*:[ \t]*([A-Z])\s*$", response)
             if match:
@@ -223,42 +225,6 @@ class EnglishMultichoiceVerifyWorker:
             score = 1.0 if extracted_answer == ground_truth else 0.0
             results.append((score, ground_truth, extracted_answer))
         return results
-
-
-# @ray.remote
-# class CodeVerifyWorker:
-#     def __init__(self) -> None:
-#         self._pass_at_k = hf_evaluate.load("code_eval")
-
-#     def _find_code(self, response: str) -> str:
-#         pattern = re.compile(r"```python\n(.*?)```", re.DOTALL)
-#         matches = pattern.findall(response)
-#         extracted_answer = matches[0] if len(matches) >= 1 else response
-#         return extracted_answer
-
-#     def verify(
-#         self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
-#     ) -> list[tuple[float, str, str]]:
-#         """Verify the correctness of the predicted responses against the ground truth.
-
-#         Args:
-#             pred_responses: list[str]. The predicted responses from the LLM.
-#             tests_list: list[str]. The unit tests.
-
-#         Returns:
-#             list[tuple[float, str, str]]. The rewards, unit tests, and extracted code segment for each predicted response.
-#         """
-#         outputs = []
-#         for response, metadata in zip(pred_responses, metadata_list):
-#             tests = metadata["tests"]
-#             code = self._find_code(response)
-#             predictions = [[code]]
-#             results = self._pass_at_k.compute(
-#                 references=[tests], predictions=predictions, k=[1]
-#             )
-#             score = float(results[0]["pass@1"] == 1.0)
-#             outputs.append((score, tests, code))
-#         return outputs
 
 
 # @ray.remote
@@ -323,13 +289,13 @@ class EnglishMultichoiceVerifyWorker:
 class ArcAgiVerifyWorker:
     """Response verifier worker for ARC-AGI problems."""
 
-    def _extract_grid(s: str) -> Optional[list[list[int]]]:
-        # Regex for a 2x2 grid of integers (optionally with whitespace)
-        pattern = r'\[\s*(\[\s*\d+(?:\s*,\s*\d+)*\s*\]\s*,?\s*)+\]'
+    def _extract_response_grid(self, s: str) -> Optional[list[list[int]]]:
+        # Regex for a 2D grid of integers (optionally with whitespace)
+        pattern = r"<output>\s*(\[[^\]]*(?:\][^\[]*\[?[^\]]*)*)\s*</output>"
         match = re.search(pattern, s, re.DOTALL)
         if not match:
             return None
-        grid_str = match.group(0)
+        grid_str = match.group(1)
         try:
             return ast.literal_eval(grid_str)
         except (SyntaxError, ValueError):
@@ -349,7 +315,7 @@ class ArcAgiVerifyWorker:
         """
         results = []
         for response, metadata in zip(pred_responses, metadata_list):
-            extracted_answer = self._extract_grid(response)
+            extracted_answer = self._extract_response_grid(response)
             score = 1.0 if extracted_answer == metadata["ground_truth"] else 0.0
             results.append((score, metadata["ground_truth"], extracted_answer))
         return results
@@ -424,15 +390,18 @@ class SweBenchVerifyWorker:
         instance_report = json.loads(instance_report)
         return float(instance_report[instance_id]["resolved"])
 
-
+      
 @ray.remote(max_restarts=-1, max_task_retries=-1)  # pragma: no cover
-class MathEnvironment(EnvironmentInterface):
+class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
     def __init__(self, cfg: MathEnvConfig):
         self.cfg = cfg
         self.num_workers = cfg["num_workers"]
-        verifier_type = cfg.get("verifier_type", "math")
+        # TODO: split out this environment since it's doing more than just math
+        worker_type = cfg.get("worker_type", "math")
+        assert isinstance(worker_type, str), (
+            f"{worker_type=} must be a string but was {type(worker_type)}"
+        )
         worker_cls = {
-            # "code": CodeVerifyWorker,
             "english_multichoice": EnglishMultichoiceVerifyWorker,
             # "instruction_following": IFVerifyWorker,
             "math": MathVerifyWorker,
@@ -440,7 +409,7 @@ class MathEnvironment(EnvironmentInterface):
             "multilingual_multichoice": MultilingualMultichoiceVerifyWorker,
             "arc_agi": ArcAgiVerifyWorker,
             "swebench_verified": SweBenchVerifyWorker,
-        }[verifier_type]
+        }[worker_type]
         self.workers = [
             worker_cls.options(  # type: ignore # (decorated with @ray.remote)
                 runtime_env={"py_executable": PY_EXECUTABLES.SYSTEM}
@@ -453,11 +422,11 @@ class MathEnvironment(EnvironmentInterface):
         for worker in self.workers:
             ray.kill(worker)
 
-    def step(  # type: ignore[override]
+    def step(
         self,
-        message_log_batch: list[list[dict[str, str]]],
+        message_log_batch: list[LLMMessageLogType],
         metadata: list[MathEnvironmentMetadata],
-    ) -> EnvironmentReturn:
+    ) -> EnvironmentReturn[MathEnvironmentMetadata]:
         """Runs a step in the math environment.
 
         Args:
@@ -477,7 +446,7 @@ class MathEnvironment(EnvironmentInterface):
         assistant_response_batch = []
         for conversation in message_log_batch:
             assistant_responses = [
-                interaction["content"]
+                str(interaction["content"])
                 for interaction in conversation
                 if interaction["role"] == "assistant"
             ]

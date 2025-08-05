@@ -10,5 +10,4 @@ data:
 
 env:
   math:
-    verifier_type: "math"
-    verifier_metadata_key: "ground_truth"
+    worker_type: "math"
