@@ -250,7 +250,7 @@ class PythonUnitTestVerifyRayWorker(CodeExecutionWorker):
                 results.append("")
                 terminateds.append(False)
                 continue
-            code = matches[0]
+            code = matches[-1]
             eval_code = "\n".join([metadata["base_imports"], code, metadata["tests"]])
             # print("eval_code: ", eval_code)
 
@@ -301,7 +301,7 @@ class PythonStdoutVerifyRayWorker(CodeExecutionWorker):
                 results.append("")
                 terminateds.append(False)
                 continue
-            code = matches[0]
+            code = matches[-1]
 
             result = None
             terminated = False

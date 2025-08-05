@@ -4,7 +4,7 @@ defaults: "eval.yaml"
 data:
   dataset_name: "livecodebench"
   code_exe_dir: "/tmp/logs"
-  version: "release_v1"
+  version: "release_v5"
   test_type: "stdin"
 
 generation:
