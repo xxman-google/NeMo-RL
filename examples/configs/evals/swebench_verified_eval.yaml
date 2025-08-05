@@ -13,7 +13,6 @@ generation:
 env:
   math:
     worker_type: "swebench_verified"
-    verifier_metadata_key: "ground_truth"
 
 cluster:
   gpus_per_node: 4
