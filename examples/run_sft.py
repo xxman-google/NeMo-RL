@@ -121,6 +121,11 @@ def setup_data(tokenizer: AutoTokenizer, data_config: DataConfig):
             data_config["system_key"],
             data_config["system_prompt"],
         )
+    elif data_cls == "dataset_mixture":
+        data = hf_datasets.DatasetMixture(
+            mixture=data_config["mixture"],
+            val_size=data_config.get("val_size", 0.05),
+        )
     else:
         raise ValueError(f"Unknown dataset class: {data_cls}")
     print(

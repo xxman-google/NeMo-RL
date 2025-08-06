@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from nemo_rl.data.hf_datasets.chat_templates import COMMON_CHAT_TEMPLATES
+from nemo_rl.data.hf_datasets.dataset_mixture import DatasetMixture
 from nemo_rl.data.hf_datasets.dpo import DPODataset
 from nemo_rl.data.hf_datasets.helpsteer3 import HelpSteer3Dataset
 from nemo_rl.data.hf_datasets.oai_format_dataset import OpenAIFormatDataset
@@ -26,6 +27,7 @@ from nemo_rl.data.hf_datasets.tulu3sft import Tulu3SftDataset
 
 __all__ = [
     "DPODataset",
+    "DatasetMixture",
     "HelpSteer3Dataset",
     "OasstDataset",
     "OpenAIFormatDataset",
