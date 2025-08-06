@@ -35,6 +35,8 @@ policy:
     custom_parallel_plan: null
   dynamic_batching:
     enabled: False
+  sequence_packing:
+    enabled: False
   make_sequence_length_divisible_by: 1
   max_grad_norm: 1
   optimizer:
@@ -69,6 +71,7 @@ logger:
   log_dir: "logs/cirrus_sft_qwen2p5_14b_tulu3"
   wandb_enabled: true
   tensorboard_enabled: false
+  mlflow_enabled: false
   monitor_gpus: true
   wandb:
     project: cirrus
