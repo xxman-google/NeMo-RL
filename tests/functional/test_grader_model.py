@@ -1,3 +1,4 @@
+import os
 import re
 from nemo_rl.evals import grader_model
 
@@ -13,7 +14,10 @@ def main():
         predicted_answer=predicted_answer,
     )
 
-    gpt_grader = grader_model.GptGraderModel(model="gpt-4o", system_message=grader_model.OPENAI_SYSTEM_MESSAGE_CHATGPT)
+    gpt_grader = grader_model.GptGraderModel(
+        model="gpt-4o",
+        api_key=os.getenv("GRADER_API_KEY"),
+        system_message=grader_model.OPENAI_SYSTEM_MESSAGE_CHATGPT)
     prompt_messages = [gpt_grader._pack_message(content=grader_prompt, role="user")]
     grader_response = gpt_grader(prompt_messages)
     grading_response = grader_response.response_text

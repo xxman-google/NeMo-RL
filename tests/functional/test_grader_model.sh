@@ -5,6 +5,7 @@
 # Grading response: A
 # Grade: A
 
+export GRADER_API_KEY="your_api_key"
 # pip install openai
-export OPENAI_API_KEY="your_openai_api_key_here"
-python -m tests.functional.test_grader_model
+# python -m tests.functional.test_grader_model
+uv run -v tests/functional/test_grader_model.py

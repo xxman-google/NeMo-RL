@@ -2,6 +2,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+import os
 import openai
 from openai import OpenAI
 
@@ -127,14 +128,12 @@ class GptGraderModel(GraderModel):
     def __init__(
         self,
         model: str = "gpt-4o",
+        api_key: str | None = None,
         system_message: str | None = None,
         temperature: float = 0.5,
         max_tokens: int = 1024,
     ):
-        self.api_key_name = "OPENAI_API_KEY"
-         # using api_key=os.environ.get("OPENAI_API_KEY") 
-         # please set "export OPENAI_API_KEY=sk-xxxxxxx" in your environment
-        self.client = OpenAI()
+        self.client = OpenAI(api_key=api_key)
         self.model = model
         self.system_message = system_message
         self.temperature = temperature

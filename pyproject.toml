@@ -52,6 +52,7 @@ dependencies = [
     "evaluate",
     "absl-py",
     "tqdm",
+    "openai>=1.0",
 ]
 
 [project.optional-dependencies]
