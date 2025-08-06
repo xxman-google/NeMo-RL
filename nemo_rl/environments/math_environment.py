@@ -67,7 +67,7 @@ class MultilingualMathEnvironmentMetadata(TypedDict):
 
 @ray.remote  # pragma: no cover
 class MathVerifyWorker:
-    def __init__(self) -> None:
+    def __init__(self, cfg: MathEnvConfig) -> None:
         logging.getLogger("math_verify").setLevel(logging.CRITICAL)
 
         # Use Latex and plain math extraction from predictions
@@ -119,6 +119,9 @@ class MathVerifyWorker:
 
 @ray.remote  # pragma: no cover
 class MGSMVerifyWorker:
+    def __init__(self, cfg: MathEnvConfig) -> None:
+        pass
+
     def _score_mgsm(self, target: str, prediction: str) -> bool:
         if "." in prediction:
             prediction = prediction.rstrip("0").rstrip(".")
@@ -155,6 +158,9 @@ class MGSMVerifyWorker:
 
 @ray.remote  # pragma: no cover
 class MultilingualMultichoiceVerifyWorker:
+    def __init__(self, cfg: MathEnvConfig) -> None:
+        pass
+
     def verify(
         self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
@@ -189,6 +195,9 @@ class MultilingualMultichoiceVerifyWorker:
 
 @ray.remote  # pragma: no cover
 class EnglishMultichoiceVerifyWorker:
+    def __init__(self, cfg: MathEnvConfig) -> None:
+        pass
+
     def verify(
         self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
@@ -281,6 +290,9 @@ class EnglishMultichoiceVerifyWorker:
 class ArcAgiVerifyWorker:
     """Response verifier worker for ARC-AGI problems."""
 
+    def __init__(self, cfg: MathEnvConfig) -> None:
+        pass
+
     def _extract_response_grid(self, s: str) -> Optional[list[list[int]]]:
         # Regex for a 2D grid of integers (optionally with whitespace)
         pattern = r"<output>\s*(\[[^\]]*(?:\][^\[]*\[?[^\]]*)*)\s*</output>"
@@ -334,7 +346,7 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
         self.workers = [
             worker_cls.options(  # type: ignore # (decorated with @ray.remote)
                 runtime_env={"py_executable": PY_EXECUTABLES.SYSTEM}
-            ).remote()
+            ).remote(cfg=self.cfg)
             for _ in range(self.num_workers)
         ]
 
