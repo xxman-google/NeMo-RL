@@ -64,7 +64,7 @@ class DatasetMixture:
 
         combined_dataset = concatenate_datasets(datasets)
         # shuffle by default inside train_test_split()
-        split_ds = ds.train_test_split(test_size=val_size, seed=seed)
+        split_ds = combined_dataset.train_test_split(test_size=val_size, seed=seed)
         self.formatted_ds = {
             "train": split_ds.pop("train"),
             "validation": split_ds.pop("test"),
