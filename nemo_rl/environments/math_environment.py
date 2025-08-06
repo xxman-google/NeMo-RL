@@ -15,6 +15,7 @@ import ast
 import contextlib
 import io
 import logging
+import os
 import re
 from typing import Any, Optional, TypedDict
 
@@ -36,6 +37,7 @@ from nemo_rl.environments.metrics import (
 )
 from nemo_rl.environments.utils import chunk_list_to_workers
 from nemo_rl.evals import answer_parsing
+from nemo_rl.evals.grader_model import GptGraderModel, OPENAI_SYSTEM_MESSAGE_CHATGPT, QA_GRADER_TEMPLATE
 
 # from nemo_rl.evals.ifeval import instructions_registry
 
@@ -44,6 +46,11 @@ class MathEnvConfig(TypedDict):
     num_workers: int
     stop_strings: Optional[list[str]]  # Default stop strings for this env
     worker_type: Optional[str]
+    grader_model_name: Optional[str]  # Model to use for grading, e.g., "gpt-4o"
+    grader_api_key: Optional[str]  # API key
+    grader_system_message: Optional[str]  # System message for the grader model
+    grader_temperature: Optional[float]  # Temperature for the grader model
+    grader_max_tokens: Optional[int]  # Max tokens for the grader model
 
 
 @contextlib.contextmanager
@@ -117,6 +124,58 @@ class MathVerifyWorker:
                 results.append((0.0, ground_truth, extracted_answer))
         return results
 
+
+@ray.remote  # pragma: no cover
+class QAVerifyWorker:
+    def __init__(self, cfg: MathEnvConfig) -> None:
+        self.grader_model = GptGraderModel(
+            model=cfg.get("grader_model", "gpt-4o"),
+            api_key=cfg.get("grader_api_key", os.getenv("OPENAI_API_KEY")),
+            system_message=cfg.get("grader_system_message",OPENAI_SYSTEM_MESSAGE_CHATGPT),
+            temperature=cfg.get("grader_temperature", 0.5),
+            max_tokens=cfg.get("grader_max_tokens", 1024),
+        )
+    
+    def _grade_sample(self, question: str, ground_truth: str, predicted_answer: str) -> str:
+        grader_prompt = QA_GRADER_TEMPLATE.format(
+            question=question,
+            target=ground_truth,
+            predicted_answer=predicted_answer,
+        )
+        prompt_messages = [
+            self.grader_model._pack_message(content=grader_prompt, role="user")
+        ]
+        grader_response = self.grader_model(prompt_messages)
+        grading_response = grader_response.response_text
+        # Extract the grading letter (A, B, C) from the response
+        match = re.search(r"(A|B|C)", grading_response)
+        return match.group(0) if match else "C"  # Default to "NOT_ATTEMPTED" if no match
+        
+    def verify(
+        self, pred_data: list[dict[str, str]], metadata_list: list[MathEnvironmentMetadata]
+    ) -> list[tuple[float, str, str]]:
+        """Verify the correctness of the predicted responses against the ground truth.
+
+        Args:
+            pred_data: list[dict[str, str]]. The predicted data including prompt and response from the LLM.
+            ground_truths: list[str]. The ground truth responses.
+
+        Returns:
+            list[tuple[float, str, str]]. The rewards, correct answer, and the extracted answer for each predicted response.
+        """
+        results = []
+        for data, metadata in zip(pred_data, metadata_list):
+            question = data["prompt"]
+            model_response = data["response"]
+            ground_truth = str(metadata["ground_truth"])
+            grade_letter = self._grade_sample(question, ground_truth, model_response)
+            is_correct = grade_letter == "A"
+            is_incorrect = grade_letter == "B"
+            is_not_attempted = grade_letter == "C"
+            score = is_correct
+            results.append((score, ground_truth, data["response"]))
+        return results
+        
 
 @ray.remote  # pragma: no cover
 class MGSMVerifyWorker:
@@ -342,12 +401,13 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
             f"{worker_type=} must be a string but was {type(worker_type)}"
         )
         worker_cls = {
+            "arc_agi": ArcAgiVerifyWorker,
             "english_multichoice": EnglishMultichoiceVerifyWorker,
             # "instruction_following": IFVerifyWorker,
             "math": MathVerifyWorker,
             "mgsm": MGSMVerifyWorker,
             "multilingual_multichoice": MultilingualMultichoiceVerifyWorker,
-            "arc_agi": ArcAgiVerifyWorker,
+            "qa": QAVerifyWorker,
         }[worker_type]
         self.workers = [
             worker_cls.options(  # type: ignore # (decorated with @ray.remote)
