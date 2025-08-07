@@ -7,7 +7,7 @@ data:
   code_exe_dir: "/tmp/logs"
 
 generation:
-  model_name: "Qwen/Qwen3-235B-A22B"
+  model_name: "Qwen/Qwen2.5-7B-Instruct"
   vllm_cfg:
     max_model_len: 4096
 

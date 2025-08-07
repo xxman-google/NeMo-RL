@@ -1,12 +1,20 @@
 # SimpleQA Evaluation Configuration
-# Reference run: https://wandb.ai/yiyiwei-google/eval/runs/zi9mw4ay
+# Reference run: 
+
+# uv run -v examples/run_eval.py --config examples/configs/evals/simpleqa.yaml cluster.gpus_per_node=8
+# Qwen/Qwen2.5-7B-Instruct: https://wandb.ai/yiyiwei-google/eval/runs/ry068d1x
+
+# uv run -v examples/run_eval.py --config examples/configs/evals/simpleqa.yaml cluster.gpus_per_node=8
+# Qwen/Qwen3-235B-A22B: ttps://wandb.ai/yiyiwei-google/eval/runs/ifzu45is (failed)
+
 defaults: "eval.yaml"
 
 generation:
+#  model_name: "Qwen/Qwen3-235B-A22B"
   model_name: "Qwen/Qwen2.5-7B-Instruct"
 
 data:
-#  prompt_file: "examples/prompts/gpqa.txt"
+#  prompt_file: "examples/prompts/"
   dataset_name: "simpleqa"
 
 env:
