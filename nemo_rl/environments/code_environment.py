@@ -251,7 +251,12 @@ class PythonUnitTestVerifyRayWorker(CodeExecutionWorker):
                 terminateds.append(False)
                 continue
             code = matches[-1]
-            eval_code = "\n".join([metadata["base_imports"], code, metadata["tests"]])
+            if "base_imports" in metadata:
+                eval_code = "\n".join(
+                    [metadata["base_imports"], code, metadata["tests"]]
+                )
+            else:
+                eval_code = "\n".join([code, metadata["tests"]])
             # print("eval_code: ", eval_code)
 
             result = None
