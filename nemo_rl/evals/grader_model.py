@@ -6,6 +6,7 @@ import os
 import openai
 from openai import OpenAI
 import google.generativeai as genai
+from google.api_core import exceptions as google_api_exceptions
 
 OPENAI_SYSTEM_MESSAGE_API = "You are a helpful assistant."
 OPENAI_SYSTEM_MESSAGE_CHATGPT = (
@@ -115,6 +116,10 @@ class GraderModel:
     Base class for defining a grader model for grading process.
     """
 
+    @staticmethod
+    def pack_message(role: str, content: Any) -> Message:
+        return {"role": str(role), "content": content}
+
     def __call__(
         self, 
         message_list: MessageList,
@@ -132,7 +137,7 @@ class GptGraderModel(GraderModel):
         api_key: str | None = None,
         system_message: str | None = None,
         temperature: float = 0.5,
-        max_tokens: int = 1024,
+        max_tokens: int = 4096,
     ):
         self.client = OpenAI(api_key=api_key)
         self.model = model
@@ -159,13 +164,10 @@ class GptGraderModel(GraderModel):
     def _handle_text(self, text: str):
         return {"type": "text", "text": text}
 
-    def _pack_message(self, role: str, content: Any):
-        return {"role": str(role), "content": content}
-
     def __call__(self, message_list: MessageList) -> GraderResponse:
         if self.system_message:
             message_list = [
-                self._pack_message("system", self.system_message)
+                self.pack_message("system", self.system_message)
             ] + message_list
         trial = 0
         while True:
@@ -215,7 +217,7 @@ class GeminiGraderModel(GraderModel):
         api_key: str | None = None,
         system_message: str | None = None,
         temperature: float = 0.5,
-        max_tokens: int = 1024,
+        max_tokens: int = 4096,
     ):
         genai.configure(api_key=api_key)
         self.client = genai.GenerativeModel(
