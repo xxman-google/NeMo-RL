@@ -1,0 +1,19 @@
+# SimpleQA Evaluation Configuration
+# Reference run: https://wandb.ai/yiyiwei-google/eval/runs/zi9mw4ay
+defaults: "eval.yaml"
+
+generation:
+  model_name: "Qwen/Qwen2.5-7B-Instruct"
+
+data:
+#  prompt_file: "examples/prompts/gpqa.txt"
+  dataset_name: "simpleqa"
+
+env:
+  math:
+    worker_type: "simpleqa"
+    grader_model_name: "gpt-4o"
+    grader_api_key: "your_openai_api_key"
+#    grader_system_message: 
+#    grader_temperature:
+#    grader_max_tokens: 

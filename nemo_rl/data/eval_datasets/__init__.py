@@ -31,6 +31,7 @@ from nemo_rl.data.eval_datasets.mmlu import MMLUDataset
 from nemo_rl.data.eval_datasets.mmlu_pro import MMLUProDataset
 from nemo_rl.data.eval_datasets.numina_math import NuminaMathDataset
 from nemo_rl.data.eval_datasets.openr1_math import OpenR1MathDataset
+from nemo_rl.data.eval_datasets.simpleqa import SimpleQADataset
 from nemo_rl.data.eval_datasets.openr1_verifiable_code import (
     OpenR1VerifiableCodeDataset,
 )
@@ -152,6 +153,11 @@ def load_eval_dataset(data_config):
     elif dataset_name == "math500":
         base_dataset = MathDataset(
             variant="math_500_test",
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
+    elif dataset_name == "simpleqa":
+        base_dataset = SimpleQADataset(
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )

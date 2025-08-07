@@ -407,7 +407,7 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
             "math": MathVerifyWorker,
             "mgsm": MGSMVerifyWorker,
             "multilingual_multichoice": MultilingualMultichoiceVerifyWorker,
-            "qa": QAVerifyWorker,
+            "simpleqa": QAVerifyWorker,
         }[worker_type]
         self.workers = [
             worker_cls.options(  # type: ignore # (decorated with @ray.remote)
