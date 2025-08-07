@@ -55,6 +55,7 @@ logger:
   num_ouput_shards: 1
   wandb_enabled: true # Make sure you do a ``wandb login [Your API key]'' before running
   tensorboard_enabled: false # Disable because it does not supprt HTML logging
+  mlflow_enabled: false
   monitor_gpus: true  # If true, will monitor GPU usage and log to wandb and/or tensorboard
   wandb:
     project: "rejection_sampling"
