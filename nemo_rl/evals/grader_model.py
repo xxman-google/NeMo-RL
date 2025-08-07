@@ -5,6 +5,7 @@ from typing import Any
 import os
 import openai
 from openai import OpenAI
+import google.generativeai as genai
 
 OPENAI_SYSTEM_MESSAGE_API = "You are a helpful assistant."
 OPENAI_SYSTEM_MESSAGE_CHATGPT = (
@@ -201,3 +202,84 @@ class GptGraderModel(GraderModel):
                 time.sleep(exception_backoff)
                 trial += 1
             # unknown error shall throw exception
+            
+            
+class GeminiGraderModel(GraderModel):
+    """
+    Sample from gemini API
+    """
+
+    def __init__(
+        self,
+        model: str = "gemini-2.5-flash",
+        api_key: str | None = None,
+        system_message: str | None = None,
+        temperature: float = 0.5,
+        max_tokens: int = 1024,
+    ):
+        genai.configure(api_key=api_key)
+        self.client = genai.GenerativeModel(
+            model_name=model,
+            system_instruction=system_message,
+        )
+        self.generation_config = genai.types.GenerationConfig(
+            temperature=temperature,
+            max_output_tokens=max_tokens,
+        )
+
+    def _convert_messages_to_gemini_format(self, message_list: MessageList) -> list[str]:
+        """Converts message content to a simple list of strings for Gemini."""
+        gemini_contents = []
+        for message in message_list:
+            # Assuming content is always a string for this text-only grader
+            if isinstance(message["content"], str):
+                gemini_contents.append(message["content"])
+        return gemini_contents
+    
+    def __call__(self, message_list: MessageList) -> GraderResponse:
+        """
+        Makes a call to the Gemini API with the provided messages.
+        """
+        # Convert the message list to the format Gemini expects (a list of contents)
+        contents = self._convert_messages_to_gemini_format(message_list)
+        
+        trial = 0
+        while True:
+            try:
+                response = self.client.generate_content(
+                    contents=contents,
+                    generation_config=self.generation_config,
+                )
+                
+                content = response.text
+                usage = response.usage_metadata
+                
+                return GraderResponse(
+                    response_text=content,
+                    response_metadata={
+                        "usage": {
+                            "prompt_token_count": usage.prompt_token_count,
+                            "candidates_token_count": usage.candidates_token_count,
+                            "total_token_count": usage.total_token_count,
+                        }
+                    },
+                    actual_queried_message_list=message_list,
+                )
+            except (
+                google_api_exceptions.ResourceExhausted,
+                google_api_exceptions.InternalServerError,
+                google_api_exceptions.ServiceUnavailable,
+            ) as e:
+                exception_backoff = 2 ** trial
+                print(f"[Retry {trial}] API Error Occurred: {type(e).__name__}: {e}")
+                print(f"Waiting for {exception_backoff} seconds before retrying.")
+                time.sleep(exception_backoff)
+                trial += 1
+            except Exception as e:
+                # For other unexpected errors (e.g., invalid argument, bad API key)
+                print(f"An unexpected error occurred: {type(e).__name__}: {e}")
+                return GraderResponse(
+                    response_text=f"No response (error: {e}).",
+                    response_metadata={"usage": None},
+                    actual_queried_message_list=message_list,
+                )
