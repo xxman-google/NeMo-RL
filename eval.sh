@@ -6,6 +6,21 @@ if [ "$#" -ne 2 ]; then
     exit 1
 fi
 
+enable_thinking=false
+if $enable_thinking; then
+  max_model_len=38912
+  temperature=0.6
+  top_p=0.95
+  num_tests_per_prompt=1
+else
+  max_model_len=8192
+  temperature=0.7
+  top_p=0.8
+  num_tests_per_prompt=1
+fi
+
+top_k=20
+
 ckpt_path=$1
 exp_name=$2
 hf_ckpt_path=$ckpt_path/hf
