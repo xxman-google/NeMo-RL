@@ -1,0 +1,10 @@
+# Math evaluation Configuration
+defaults: "gpqa.yaml"
+
+data:
+  prompt_file: "examples/prompts/cot.txt"
+  dataset_name: "ifeval"
+
+env:
+  math:
+    worker_type: "instruction_following"

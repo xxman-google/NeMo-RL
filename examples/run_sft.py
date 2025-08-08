@@ -98,6 +98,8 @@ def setup_data(tokenizer: AutoTokenizer, data_config: DataConfig):
         data = hf_datasets.OasstDataset(output_dir="/tmp/open_assistant")
     elif data_cls == "squad":
         data = hf_datasets.SquadDataset()
+    elif data_cls == "tulu3sft":
+        data = hf_datasets.Tulu3SftDataset()
     elif data_cls == "prompt_response_dataset":
         data = hf_datasets.PromptResponseDataset(
             data_config["train_data_path"],
@@ -121,6 +123,11 @@ def setup_data(tokenizer: AutoTokenizer, data_config: DataConfig):
         )
     elif data_cls == "tulu3_sft_mixture":
         data = hf_datasets.Tulu3SftMixtureDataset(train_sample_ratio=0.8)
+    elif data_cls == "dataset_mixture":
+        data = hf_datasets.DatasetMixture(
+            mixture=data_config["mixture"],
+            val_size=data_config.get("val_size", 0.05),
+        )
     else:
         raise ValueError(f"Unknown dataset class: {data_cls}")
     print(

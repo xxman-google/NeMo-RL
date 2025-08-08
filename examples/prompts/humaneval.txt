@@ -1,0 +1,7 @@
+Read the following function signature and docstring, and fully implement the function described. Your response should only contain the code for this function. Please wrap the code in a markdown code block, like this:
+```python
+# your code here
+```
+
+{}
+

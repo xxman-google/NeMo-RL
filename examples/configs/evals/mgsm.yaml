@@ -1,0 +1,15 @@
+# Math evaluation Configuration
+defaults: "gpqa.yaml"
+
+data:
+  prompt_file: null
+  dataset_name: "mgsm"
+
+generation:
+  vllm_cfg:
+    max_model_len: 4096
+
+env:
+  math:
+    worker_type: "mgsm"
+    metric_group_key: "lang"

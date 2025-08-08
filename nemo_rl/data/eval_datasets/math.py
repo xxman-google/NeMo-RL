@@ -40,7 +40,7 @@ class MathDataset:
             prompt_file=prompt_file,
             system_prompt_file=system_prompt_file,
         )
-        self.processor = processors.math_data_processor
+        self.processor = processors.data_processor
 
     def _rekey(self, data: dict[str, Any]):
         return {

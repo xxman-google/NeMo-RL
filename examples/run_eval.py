@@ -29,6 +29,7 @@ from nemo_rl.distributed.ray_actor_environment_registry import (
     get_actor_python_env,
 )
 from nemo_rl.distributed.virtual_cluster import init_ray
+from nemo_rl.environments.code_environment import CodeEnvironment
 from nemo_rl.environments.math_environment import MathEnvironment
 from nemo_rl.evals.eval import MasterConfig, run_env_eval, setup
 from nemo_rl.models.generation import configure_generation_config
@@ -53,21 +54,33 @@ def parse_args():
     return args, overrides
 
 
-def setup_data(tokenizer: AutoTokenizer, data_config, env_configs):
+def setup_data(tokenizer: AutoTokenizer, data_config, env_configs, enable_thinking):
     print("Setting up data...")
 
     # load dataset
     base_dataset = load_eval_dataset(data_config)
     rekeyed_ds = base_dataset.rekeyed_ds
+    env_type = env_configs.get("env_type", "math")
+    if env_type == "math":
+        env = MathEnvironment.options(
+            runtime_env={
+                "py_executable": get_actor_python_env(
+                    "nemo_rl.environments.math_environment.MathEnvironment"
+                )
+            }
+        ).remote(env_configs["math"])
+    elif env_type == "code":
+        env = CodeEnvironment.options(
+            runtime_env={
+                "py_executable": get_actor_python_env(
+                    "nemo_rl.environments.code_environment.CodeEnvironment"
+                )
+            }
+        ).remote(env_configs["code"])
+    else:
+        raise ValueError(f"Unknown env_type: f{env_type}.")
 
-    env = MathEnvironment.options(
-        runtime_env={
-            "py_executable": get_actor_python_env(
-                "nemo_rl.environments.math_environment.MathEnvironment"
-            )
-        }
-    ).remote(env_configs["math"])
-
+    base_dataset.task_spec.enable_thinking = enable_thinking
     dataset = AllTaskProcessedDataset(
         dataset=rekeyed_ds,
         tokenizer=tokenizer,
@@ -109,6 +122,7 @@ def main():
 
     # Setup tokenizer
     tokenizer = get_tokenizer(config["tokenizer"])
+    enable_thinking = config["generation"].get("enable_thinking", False)
     config["generation"] = configure_generation_config(
         config["generation"], tokenizer, is_eval=True
     )
@@ -118,13 +132,14 @@ def main():
         dataset,
         env,
         tokenizer,
-    ) = setup_data(tokenizer, config["data"], config["env"])
+    ) = setup_data(tokenizer, config["data"], config["env"], enable_thinking)
 
     # Setup
     (
         vllm_generation,
         dataloader,
         master_config,
+        logger,
     ) = setup(config, tokenizer, dataset)
 
     # Run evaluation
@@ -133,6 +148,7 @@ def main():
         dataloader,
         env,
         master_config,
+        logger,
     )
 
 

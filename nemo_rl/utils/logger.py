@@ -76,6 +76,7 @@ class LoggerConfig(TypedDict):
     mlflow: NotRequired[MLflowConfig]
     monitor_gpus: bool
     gpu_monitoring: GPUMonitoringConfig
+    num_val_samples_to_print: int
 
 
 class LoggerInterface(ABC):
@@ -95,6 +96,23 @@ class LoggerInterface(ABC):
     @abstractmethod
     def log_hyperparams(self, params: Mapping[str, Any]) -> None:
         """Log dictionary of hyperparameters."""
+        pass
+
+    @abstractmethod
+    def log_html(self, name: str, html: str) -> None:
+        """Log HTML."""
+        pass
+
+    @abstractmethod
+    def log_histogram(
+        self, name: str, values: list[int | float], num_bins: int
+    ) -> None:
+        """Log histogram."""
+        pass
+
+    @abstractmethod
+    def log_table(self, name: str, columns: list[str], data: list[list[Any]]) -> None:
+        """Log table."""
         pass
 
 
@@ -142,6 +160,31 @@ class TensorboardLogger(LoggerInterface):
             step: Global step value
         """
         self.writer.add_figure(name, figure, step)
+
+    def log_html(self, name: str, html: str) -> None:
+        """Log HTML to Tensorboard.
+
+        Args:
+            name: Data identifier
+            html: HTML data
+        """
+        self.writer.add_text(name, html)
+
+    def log_histogram(
+        self, name: str, values: list[int | float], num_bins: int
+    ) -> None:
+        """Log histogram data to Tensorboard.
+
+        Args:
+            name: Data identifier
+            values: Data values
+            num_bins: Number of histogram bins
+        """
+        self.writer.add_histogram(name, values, max_bins=num_bins)
+
+    def log_table(self, name: str, columns: list[str], data: list[list[Any]]) -> None:
+        """Log table data to Tensorboard. Not supported."""
+        print("Table logging not supported in Tensorboard.")
 
 
 class WandbLogger(LoggerInterface):
@@ -322,6 +365,46 @@ class WandbLogger(LoggerInterface):
         """
         self.run.log({name: figure}, step=step)
 
+    def log_html(self, name: str, html: str) -> None:
+        """Log HTML to wandb.
+
+        Args:
+            name: Data identifier
+            html: HTML data
+        """
+        self.run.log({name: wandb.Html(html)})
+
+    def log_histogram(
+        self, name: str, values: list[int | float], num_bins: int
+    ) -> None:
+        """Log histogram data to Tensorboard.
+
+        Args:
+            name: Data identifier
+            values: Data values
+            num_bins: Number of histogram bins
+        """
+        data = [[v] for v in values]
+        table = wandb.Table(data=data, columns=[name])
+        self.run.log(
+            {
+                f"{name}_histogram": wandb.plot.histogram(
+                    table, name, title=f"{name} distribution"
+                )
+            }
+        )
+
+    def log_table(self, name: str, columns: list[str], data: list[list[Any]]) -> None:
+        """Log table data to wandb.
+
+        Args:
+            name: Data identifier
+            columns: Column names
+            data: A 2D list of table values
+        """
+        table = wandb.Table(data=data, columns=columns)
+        self.run.log({name: table})
+
 
 class GpuMetricSnapshot(TypedDict):
     step: int
@@ -359,6 +442,7 @@ class RayGpuMonitorLogger:
         self.is_running = False
         self.collection_thread: Optional[threading.Thread] = None
         self.lock = threading.Lock()
+        self.start_time: float = float("-inf")
 
     def start(self) -> None:
         """Start the GPU monitoring thread."""
@@ -924,6 +1008,23 @@ class Logger(LoggerInterface):
             logger.log_plot(fig, step, name)
 
         plt.close(fig)
+
+    def log_html(self, name: str, html: str) -> None:
+        """Log HTML data."""
+        for logger in self.loggers:
+            logger.log_html(name, html)
+
+    def log_histogram(
+        self, name: str, values: list[int | float], num_bins: int
+    ) -> None:
+        """Log histogram data."""
+        for logger in self.loggers:
+            logger.log_histogram(name, values, num_bins)
+
+    def log_table(self, name: str, columns: list[str], data: list[list[Any]]) -> None:
+        """Log table data."""
+        for logger in self.loggers:
+            logger.log_table(name, columns, data)
 
     def __del__(self) -> None:
         """Clean up resources when the logger is destroyed."""

@@ -1,0 +1,83 @@
+sft:
+  max_num_epochs: 1
+  max_num_steps: 872
+  val_period: 100
+  val_batches: 32
+  val_global_batch_size: 64
+  val_micro_batch_size: 2
+  val_at_start: true
+  seed: 42
+checkpointing:
+  enabled: true
+  checkpoint_dir: "results/cirrus_sft_qwen2p5_7b_tulu3"
+  metric_name: val_loss
+  higher_is_better: false
+  save_period: 500
+  keep_top_k: null
+policy:
+  model_name: "Qwen/Qwen2.5-7B"
+  tokenizer:
+    name: "Qwen/Qwen2.5-7B-Instruct"
+    chat_template: "default"
+  train_global_batch_size: 128
+  train_micro_batch_size: 4
+  max_total_sequence_length: 2048
+  precision: bfloat16
+
+  dtensor_cfg:
+    enabled: true
+    cpu_offload: false
+    sequence_parallel: false
+    activation_checkpointing: true
+    tensor_parallel_size: 1
+    context_parallel_size: 1
+    custom_parallel_plan: null
+  dynamic_batching:
+    enabled: False
+  sequence_packing:
+    enabled: False
+  make_sequence_length_divisible_by: 1
+  max_grad_norm: 1
+  optimizer:
+    name: torch.optim.AdamW
+    kwargs:
+      lr: 7e-06
+      weight_decay: 0.1
+      betas:
+        - 0.9
+        - 0.95
+      eps: 1e-06
+      foreach: false
+      fused: false
+  scheduler:
+    - name: "torch.optim.lr_scheduler.LinearLR"
+      kwargs:
+        start_factor: 0.01
+        end_factor: 1.0
+        total_iters: 100
+    - name: "torch.optim.lr_scheduler.CosineAnnealingLR"
+      kwargs:
+        T_max: 772
+        eta_min: 7e-7
+    - milestones: [100]
+data:
+  max_input_seq_length: 2048
+  dataset_name: "tulu3sft"
+  add_bos: true
+  add_eos: true
+  add_generation_prompt: false
+logger:
+  log_dir: "logs/cirrus_sft_qwen2p5_7b_tulu3"
+  wandb_enabled: true
+  tensorboard_enabled: false
+  mlflow_enabled: false
+  monitor_gpus: true
+  wandb:
+    project: cirrus
+    name: sft_qwen2p5_7b_tulu3_44m
+  gpu_monitoring:
+    collection_interval: 30
+    flush_interval: 30
+cluster:
+  gpus_per_node: 8
+  num_nodes: 4

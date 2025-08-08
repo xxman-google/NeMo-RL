@@ -14,7 +14,7 @@
 import os
 import warnings
 from pathlib import Path
-from typing import Optional, TypedDict
+from typing import NotRequired, Optional, TypedDict, cast
 
 import numpy as np
 import torch
@@ -47,7 +47,7 @@ class SFTSaveState(TypedDict):
     epoch: int  # Track current epoch
     step: int  # Track step within current epoch
     total_steps: int  # Track total number of steps across all epochs
-    val_loss: float
+    val_loss: NotRequired[float]  # Optional field - may not be present during training
     consumed_samples: int
 
 
@@ -94,10 +94,10 @@ def setup(
     StatefulDataLoader,
     StatefulDataLoader,
     NLLLoss,
-    MasterConfig,
     Logger,
-    TaskDataSpec,
+    CheckpointManager,
     SFTSaveState,
+    MasterConfig,
 ]:
     """Main entry point for running SFT algorithm.
 
@@ -124,8 +124,8 @@ def setup(
     # ==========================
     checkpointer = CheckpointManager(master_config["checkpointing"])
     last_checkpoint_path = checkpointer.get_latest_checkpoint_path()
-    sft_save_state: Optional[SFTSaveState] = checkpointer.load_training_info(
-        last_checkpoint_path
+    sft_save_state: Optional[SFTSaveState] = cast(
+        Optional[SFTSaveState], checkpointer.load_training_info(last_checkpoint_path)
     )
 
     # ==========================
@@ -322,8 +322,8 @@ def sft_train(
     logger,
     sft_task_spec,
     checkpointer,
-    sft_save_state,
-):
+    sft_save_state: SFTSaveState,
+) -> None:
     # Run basic sft training
     timer = Timer()
 
@@ -363,6 +363,7 @@ def sft_train(
         logger.log_metrics(validation_timings, total_steps, prefix="timing/validation")
 
     policy.prepare_for_training()
+    total_valid_toks = 0
 
     while (
         current_epoch < max_num_epochs
@@ -498,6 +499,8 @@ def sft_train(
                     metrics[k] = np.mean(v).item()
                 else:
                     metrics[k] = np.sum(v).item()
+            total_valid_toks += metrics["global_valid_toks"]
+            metrics["total_valid_toks (M)"] = total_valid_toks * 1e-6
             timing_metrics = timer.get_timing_metrics(reduction_op="sum")
 
             print("\n📊 Training Results:")
@@ -514,7 +517,7 @@ def sft_train(
                 if k != "total_step_time":
                     percent = (v / total_time * 100) if total_time > 0 else 0
                     print(f"  • {k}: {v:.2f}s ({percent:.1f}%)")
-
+            timing_metrics["toks_per_sec"] = metrics["global_valid_toks"] / total_time
             logger.log_metrics(metrics, total_steps + 1, prefix="train")
             logger.log_metrics(timing_metrics, total_steps + 1, prefix="timing/train")
 

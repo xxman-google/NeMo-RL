@@ -1,0 +1,84 @@
+# reference run: https://wandb.ai/gmayanksharan-google/cirrus/runs/m6s3jig3?nw=nwuserxxman
+sft:
+  max_num_epochs: 1
+  max_num_steps: 5952
+  val_period: 100
+  val_batches: 32
+  val_global_batch_size: 128
+  val_micro_batch_size: 4
+  val_at_start: true
+  seed: 42
+checkpointing:
+  enabled: true
+  checkpoint_dir: "results/cirrus_sft_qwen2p5_14b_tulu3"
+  metric_name: val_loss
+  higher_is_better: false
+  keep_top_k: null
+  save_period: 1000
+policy:
+  model_name: "Qwen/Qwen2.5-14B"
+  tokenizer:
+    name: "Qwen/Qwen2.5-14B-Instruct"
+    chat_template: "default"
+  train_global_batch_size: 128
+  train_micro_batch_size: 2
+  max_total_sequence_length: 2048
+  precision: bfloat16
+
+  dtensor_cfg:
+    enabled: true
+    cpu_offload: false
+    sequence_parallel: false
+    activation_checkpointing: true
+    tensor_parallel_size: 1
+    context_parallel_size: 1
+    custom_parallel_plan: null
+  dynamic_batching:
+    enabled: False
+  sequence_packing:
+    enabled: False
+  make_sequence_length_divisible_by: 1
+  max_grad_norm: 1
+  optimizer:
+    name: torch.optim.AdamW
+    kwargs:
+      lr: 8.85e-06
+      weight_decay: 0.1
+      betas:
+        - 0.9
+        - 0.95
+      eps: 1e-06
+      foreach: false
+      fused: false
+  scheduler:
+    - name: "torch.optim.lr_scheduler.LinearLR"
+      kwargs:
+        start_factor: 0.01
+        end_factor: 1.0
+        total_iters: 100
+    - name: "torch.optim.lr_scheduler.CosineAnnealingLR"
+      kwargs:
+        T_max: 5752
+        eta_min: 8.85e-7
+    - milestones: [200]
+data:
+  max_input_seq_length: ${policy.max_total_sequence_length}
+  dataset_name: "tulu3sft"
+  add_bos: true
+  add_eos: true
+  add_generation_prompt: false
+logger:
+  log_dir: "logs/cirrus_sft_qwen2p5_14b_tulu3"
+  wandb_enabled: true
+  tensorboard_enabled: false
+  mlflow_enabled: false
+  monitor_gpus: true
+  wandb:
+    project: cirrus
+    name: "sft_qwen2p5_14b_tulu3_238m"
+  gpu_monitoring:
+    collection_interval: 30
+    flush_interval: 30
+cluster:
+  gpus_per_node: 8
+  num_nodes: 4

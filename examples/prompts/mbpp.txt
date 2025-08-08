@@ -1,0 +1,7 @@
+Generate the Python code for the following problem. Please wrap the code in a markdown code block, like this:
+```python
+# your code here
+```
+
+{}
+

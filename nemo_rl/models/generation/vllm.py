@@ -65,6 +65,7 @@ class VllmSpecificArgs(TypedDict):
     async_engine: bool
     load_format: NotRequired[str]
     precision: NotRequired[str]
+    enforce_eager: NotRequired[bool]
 
 
 class VllmConfig(GenerationConfig):
@@ -429,6 +430,7 @@ class VllmGenerationWorker:
             stop_token_ids=self.cfg["stop_token_ids"],
             stop=stop_strings,
             include_stop_str_in_output=True,
+            skip_special_tokens=self.cfg.get("skip_special_tokens", True),
         )
 
     def generate(
@@ -828,9 +830,7 @@ class VllmGenerationWorker:
         if self.cfg.get("stop_strings", None):
             stop_strings.update(self.cfg["stop_strings"])
 
-        stop_strings: list[str] | None = (
-            list(stop_strings) if len(stop_strings) > 0 else None
-        )
+        stop_strings = list(stop_strings) if len(stop_strings) > 0 else None
 
         # Read generation parameters from config
         top_k = self.cfg["top_k"] if self.cfg["top_k"] is not None else -1
@@ -842,6 +842,7 @@ class VllmGenerationWorker:
             stop_token_ids=self.cfg["stop_token_ids"],
             stop=stop_strings,
             include_stop_str_in_output=True,  # returning stop strings like hf
+            skip_special_tokens=self.cfg.get("skip_special_tokens", True),
         )
 
         # Generate outputs
@@ -850,10 +851,11 @@ class VllmGenerationWorker:
         )
         outputs = self.llm.generate(data["prompts"], sampling_params)
         texts = [output.outputs[0].text for output in outputs]
+        generation_lengths = [len(output.outputs[0].token_ids) for output in outputs]
 
         # Convert to BatchedDataDict
         return_data: BatchedDataDict[GenerationOutputSpec] = BatchedDataDict(
-            {"texts": texts}
+            {"texts": texts, "generation_lengths": generation_lengths}
         )
         return return_data
 
@@ -911,6 +913,7 @@ class VllmGenerationWorker:
                 stop_token_ids=self.cfg["stop_token_ids"],
                 stop=final_stop_strings,
                 include_stop_str_in_output=True,  # returning stop strings like hf
+                skip_special_tokens=self.cfg.get("skip_special_tokens", True),
             )
 
             request_id = str(uuid.uuid4())
@@ -932,10 +935,11 @@ class VllmGenerationWorker:
 
             # Extract the generated text
             generated_text = final_request_output.outputs[0].text
+            generation_length = len(final_request_output.outputs[0].token_ids)
 
             # Create result in BatchedDataDict format
             result_batch = BatchedDataDict[GenerationOutputSpec](
-                {"texts": [generated_text]}
+                {"texts": [generated_text], "generation_lengths": [generation_length]}
             )
 
             return (prompt_idx, result_batch)

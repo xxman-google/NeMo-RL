@@ -1,0 +1,70 @@
+# Rejection sampling configuration for Qwen3 14B model (no-thinking mode)
+
+rejection_sampling:
+  num_tests_per_prompt: 10 # every prompt will be tested num_tests_per_prompt times and use the average score as the final score
+  metric: "pass@1,5,10"
+  seed: 42
+
+generation:
+  backend: "vllm" # only vllm is supported for evaluation
+  max_new_tokens: ${generation.vllm_cfg.max_model_len}
+  temperature: 0.7
+  top_p: 0.8
+  top_k: 20
+  num_prompts_per_step: -1 # -1 means pass all prompts at once
+  model_name: "Qwen/Qwen3-14B"
+  stop_token_ids: null
+  stop_strings: null
+  vllm_cfg:
+    async_engine: false
+    precision: "bfloat16"
+    tensor_parallel_size: 1
+    pipeline_parallel_size: 1
+    gpu_memory_utilization: 0.9
+    max_model_len: 38912
+    enforce_eager: False
+  colocated:
+    # true: generation shares training GPUs
+    # false: uses dedicated generation resources
+    enabled: true
+    # only relevant when enabled is false
+    resources:
+      gpus_per_node: null # Decides num gpus to be dedicated to generation when there is one node in the cluster i.e cluster.num_nodes == 1
+      num_nodes: null # Decides number of nodes to be dedicated to generation
+
+
+tokenizer:
+  name: ${generation.model_name} ## specify if you'd like to use a tokenizer different from the model's default
+  chat_template: "default"
+
+data:
+  max_input_seq_length: ${generation.vllm_cfg.max_model_len} # useless since we directly use prompts in evaluation
+  prompt_file: "examples/prompts/cot.txt"
+  system_prompt_file: null
+  dataset_name: "numina_math"
+
+env:
+  math:
+    num_workers: 8
+    verifier_type: "math"
+    verifier_metadata_key: "ground_truth"
+
+logger:
+  log_dir: "logs"  # Base directory for all logs
+  output_dir: "${logger.log_dir}/${data.dataset_name}"
+  num_ouput_shards: 1
+  wandb_enabled: true # Make sure you do a ``wandb login [Your API key]'' before running
+  tensorboard_enabled: false # Disable because it does not supprt HTML logging
+  mlflow_enabled: false
+  monitor_gpus: true  # If true, will monitor GPU usage and log to wandb and/or tensorboard
+  wandb:
+    project: "rejection_sampling"
+    name: "${generation.model_name}-${data.dataset_name}"
+  gpu_monitoring:
+    collection_interval: 10  # How often to collect GPU usage metrics (in seconds)
+    flush_interval: 10  # How often to flush GPU usage metrics to the loggers (in seconds)
+
+
+cluster:
+  gpus_per_node: 8
+  num_nodes: 1

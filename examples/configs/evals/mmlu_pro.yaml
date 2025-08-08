@@ -1,10 +1,5 @@
-# GPQA evaluation Configuration
-defaults: "eval.yaml"
-
-generation:
-  model_name: "Qwen/Qwen2.5-7B-Instruct"
-  vllm_cfg:
-    max_model_len: 3072
+# Math evaluation Configuration
+defaults: "gpqa.yaml"
 
 data:
   prompt_file: "examples/prompts/mmlu_pro.txt"
@@ -12,4 +7,5 @@ data:
 
 env:
   math:
-    verifier_type: "english_multichoice"
+    worker_type: "english_multichoice"
+    metric_group_key: "subject"

@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+from collections import defaultdict
 from typing import Any, Iterable, Optional
 
 import torch
+from torch.multiprocessing.reductions import rebuild_cuda_tensor
 
 try:
     import vllm  # noqa: F401
@@ -87,7 +89,9 @@ class VllmInternalWorkerExtension:
         pg = StatelessProcessGroup.create(
             host=ip, port=port, rank=rank, world_size=world_size
         )
-        self.model_update_group = PyNcclCommunicator(pg, device=self.device)
+        self.model_update_group = PyNcclCommunicator(  # pyrefly: ignore[implicitly-defined-attribute]  This class does not define __init__ so assignments like this should be ignored
+            pg, device=self.device
+        )
 
     def report_device_id(self) -> str:
         from nemo_rl.utils.nvml import get_device_uuid
@@ -107,7 +111,7 @@ class VllmInternalWorkerExtension:
             colocated inference: state_dict_info is a dict of {tensor_name: (shape, dtype, numel)}
             non-colocated inference: not implemented yet
         """
-        self.state_dict_info = state_dict_info
+        self.state_dict_info = state_dict_info  # pyrefly: ignore[implicitly-defined-attribute]  This class does not define __init__ so assignments like this should be ignored
 
     def update_weights_from_global_ipc_handles(self, global_device_ipc_handles):
         """Update weights from global IPC handles.
@@ -134,7 +138,7 @@ class VllmInternalWorkerExtension:
         try:
             is_tensor_packed = local_device_ipc_handles[0]
             if is_tensor_packed:
-                _, all_handles, tensor_metadata = local_device_ipc_handles
+                _, all_handles, list_keys = local_device_ipc_handles
             else:
                 _, name_and_handle_list = local_device_ipc_handles
 
@@ -150,33 +154,40 @@ class VllmInternalWorkerExtension:
                 # Extract packed tensor from IPC handle
                 dtype_to_packed_tensor = {}
                 for dtype, tensor_handle in all_handles:
-                    func, args = tensor_handle
+                    func = rebuild_cuda_tensor
+                    args = tensor_handle[0]
                     list_args = list(args)
                     list_args[6] = device_id
                     tensor = func(*list_args)
                     dtype_to_packed_tensor[dtype] = tensor
 
-                # Unpack tensor to weights. Here we only return a view of the tensor to avoid
-                # using extra memory.
-                for key, metadata in tensor_metadata.items():
-                    # dtype for the 1st and 2nd steps may be different (e.g. e_score_correction_bias)
-                    if isinstance(metadata, tuple):
-                        # use dtype of current step
-                        offset, dtype = metadata
-                        shape, _, size = self.state_dict_info[key]
-                        # update record
-                        self.state_dict_info[key] = (shape, dtype, size)
-                    else:
-                        offset = metadata
-                        shape, dtype, size = self.state_dict_info[key]
-                    tensor = dtype_to_packed_tensor[dtype][offset : offset + size].view(
-                        *shape
+                weights = []
+                dtype_to_offset = defaultdict(lambda: 0)
+                for key in list_keys:
+                    shape, dtype, size = self.state_dict_info[key]
+                    weights.append(
+                        (
+                            key,
+                            dtype_to_packed_tensor[dtype][
+                                dtype_to_offset[dtype] : dtype_to_offset[dtype] + size
+                            ].view(*shape),
+                        )
                     )
-                    weights.append((key, tensor))
+                    dtype_to_offset[dtype] += size
+
+                expected_sizes = {
+                    dtype: tensor.numel()
+                    for dtype, tensor in dtype_to_packed_tensor.items()
+                }
+                assert dtype_to_offset == expected_sizes, (
+                    f"Packed tensor size mismatch: expected sizes from keys list {expected_sizes} != actual packed tensor sizes {dtype_to_offset}. "
+                    f"This indicates the keys list order doesn't match the order used when packing tensors."
+                )
             else:
                 # Process each handle to get the tensor
                 for name, handle in name_and_handle_list:
-                    func, args = handle
+                    func = rebuild_cuda_tensor
+                    args = handle[0]
                     list_args = list(args)
                     list_args[6] = device_id
                     tensor = func(*list_args)
