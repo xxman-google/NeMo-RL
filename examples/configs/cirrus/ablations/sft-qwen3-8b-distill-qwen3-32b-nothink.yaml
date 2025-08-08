@@ -1,4 +1,4 @@
-# https://wandb.ai/gmayanksharan-google/cirrus/runs/niso2tcs
+# https://wandb.ai/gmayanksharan-google/cirrus/runs/n7fn2d66
 
 sft:
   max_num_epochs: 1
@@ -65,13 +65,13 @@ data:
   max_input_seq_length: 4096
   dataset_name: "openai_format"
   train_data_path:
-    - "/mnt/datasets/cirrus0.0/openr1_math_amc_aime_qwen3_8b_no_thinking/train-filtered-00000-of-00001.parquet"
-    - "/mnt/datasets/cirrus0.0/openr1_math_aops_forum_qwen3_8b_no_thinking/train-filtered-00000-of-00001.parquet"
-    - "/mnt/datasets/cirrus0.0/openr1_math_cn_contest_qwen3_8b_no_thinking/train-filtered-00000-of-00001.parquet"
-    - "/mnt/datasets/cirrus0.0/openr1_math_inequalities_qwen3_8b_no_thinking/train-filtered-00000-of-00001.parquet"
-    - "/mnt/datasets/cirrus0.0/openr1_math_number_theory_qwen3_8b_no_thinking/train-filtered-00000-of-00001.parquet"
-    - "/mnt/datasets/cirrus0.0/openr1_math_olympiads_qwen3_8b_no_thinking/train-filtered-00000-of-00001.parquet"
-    - "/mnt/datasets/cirrus0.0/openr1_math_olympiads_ref_qwen3_8b_no_thinking/train-filtered-00000-of-00001.parquet"
+    - "/mnt/datasets/cirrus0.0/openr1_math_amc_aime_qwen3_32b_no_thinking/train-filtered-00000-of-00001.parquet"
+    - "/mnt/datasets/cirrus0.0/openr1_math_aops_forum_qwen3_32b_no_thinking/train-filtered-00000-of-00001.parquet"
+    - "/mnt/datasets/cirrus0.0/openr1_math_cn_contest_qwen3_32b_no_thinking/train-filtered-00000-of-00001.parquet"
+    - "/mnt/datasets/cirrus0.0/openr1_math_inequalities_qwen3_32b_no_thinking/train-filtered-00000-of-00001.parquet"
+    - "/mnt/datasets/cirrus0.0/openr1_math_number_theory_qwen3_32b_no_thinking/train-filtered-00000-of-00001.parquet"
+    - "/mnt/datasets/cirrus0.0/openr1_math_olympiads_qwen3_32b_no_thinking/train-filtered-00000-of-00001.parquet"
+    - "/mnt/datasets/cirrus0.0/openr1_math_olympiads_ref_qwen3_32b_no_thinking/train-filtered-00000-of-00001.parquet"
   file_format: "parquet"
   val_ratio: 0.02
   chat_key: "messages"

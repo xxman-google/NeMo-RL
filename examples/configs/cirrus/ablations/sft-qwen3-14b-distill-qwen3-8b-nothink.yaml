@@ -1,4 +1,4 @@
-# https://wandb.ai/gmayanksharan-google/cirrus/runs/niso2tcs
+# https://wandb.ai/gmayanksharan-google/cirrus/runs/6guj3g7p
 
 sft:
   max_num_epochs: 1
@@ -17,9 +17,9 @@ checkpointing:
   keep_top_k: null
   save_period: 100
 policy:
-  model_name: "Qwen/Qwen3-8B-Base"
+  model_name: "Qwen/Qwen3-14B-Base"
   tokenizer:
-    name: "Qwen/Qwen3-8B"
+    name: "Qwen/Qwen3-14B"
     chat_template: "default"
   train_global_batch_size: 64
   train_micro_batch_size: 1
