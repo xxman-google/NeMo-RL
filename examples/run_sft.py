@@ -31,6 +31,8 @@ from nemo_rl.distributed.virtual_cluster import init_ray
 from nemo_rl.utils.config import load_config, parse_hydra_overrides
 from nemo_rl.utils.logger import get_next_experiment_dir
 
+OmegaConf.register_new_resolver("mul", lambda a, b: a * b)
+
 
 def parse_args():
     """Parse command line arguments."""
@@ -120,6 +122,11 @@ def setup_data(tokenizer: AutoTokenizer, data_config: DataConfig):
             data_config.get("system_prompt"),
             data_config.get("file_format", "json"),
             data_config.get("val_ratio", 0.05)
+        )
+    elif data_cls == "dataset_mixture":
+        data = hf_datasets.DatasetMixture(
+            mixture=data_config["mixture"],
+            val_size=data_config.get("val_size", 0.05),
         )
     else:
         raise ValueError(f"Unknown dataset class: {data_cls}")

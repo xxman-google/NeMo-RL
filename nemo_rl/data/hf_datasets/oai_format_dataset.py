@@ -42,8 +42,8 @@ class OpenAIFormatDataset:
         train_ds_path: str,
         val_ds_path: str,
         chat_key: str = "messages",
-        system_key: str = None,
-        system_prompt: str = None,
+        system_key: str | None = None,
+        system_prompt: str | None = None,
         file_format: str = "json",
         val_ratio: float = 0.05,
     ):
@@ -76,7 +76,7 @@ class OpenAIFormatDataset:
         example: dict[str, Any],
     ) -> dict[str, list[dict[str, Any]]]:
         messages = [message for message in example[self.chat_key]]
-        if self.system_key in example:
+        if self.system_key is not None and self.system_key in example:
             messages = [
                 {"role": "system", "content": example[self.system_key]}
             ] + messages

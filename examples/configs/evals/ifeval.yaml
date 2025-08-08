@@ -7,5 +7,4 @@ data:
 
 env:
   math:
-    verifier_type: "instruction_following"
-    verifier_metadata_key: "checker_info"
+    worker_type: "instruction_following"

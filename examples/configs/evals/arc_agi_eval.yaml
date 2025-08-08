@@ -7,9 +7,8 @@ data:
 
 generation:
   vllm_cfg:
-    max_model_len: 4096
+    max_model_len: 32768
 
 env:
   math:
-    verifier_type: "arc_agi"
-    verifier_metadata_key: "ground_truth"
+    worker_type: "arc_agi"

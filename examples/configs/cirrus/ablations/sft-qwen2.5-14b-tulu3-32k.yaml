@@ -23,8 +23,7 @@ policy:
   train_micro_batch_size: 1
   max_total_sequence_length: 32768
   precision: bfloat16
-  fsdp_offload_enabled: false
-  activation_checkpointing_enabled: false
+
   dtensor_cfg:
     enabled: true
     cpu_offload: false
@@ -34,6 +33,8 @@ policy:
     context_parallel_size: 1
     custom_parallel_plan: null
   dynamic_batching:
+    enabled: False
+  sequence_packing:
     enabled: False
   make_sequence_length_divisible_by: 8
   max_grad_norm: 1
@@ -69,6 +70,7 @@ logger:
   log_dir: "logs/cirrus_sft_qwen2p5_14b_tulu3"
   wandb_enabled: true
   tensorboard_enabled: false
+  mlflow_enabled: false
   monitor_gpus: true
   wandb:
     project: cirrus
