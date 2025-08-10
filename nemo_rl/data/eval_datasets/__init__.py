@@ -185,6 +185,7 @@ def load_eval_dataset(data_config):
         )
     elif dataset_name == "openr1_verifiable_code":
         base_dataset = OpenR1VerifiableCodeDataset(
+            source=data_config["source"],
             code_exe_dir=data_config["code_exe_dir"],
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
