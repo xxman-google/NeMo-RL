@@ -33,7 +33,6 @@ from nemo_rl.distributed.batched_data_dict import BatchedDataDict
 from nemo_rl.distributed.virtual_cluster import ClusterConfig, RayVirtualCluster
 from nemo_rl.environments.math_environment import MathEnvConfig
 from nemo_rl.evals import eval as eval_lib
-from nemo_rl.evals import visualization as vis_lib
 from nemo_rl.models.generation.interfaces import GenerationConfig
 from nemo_rl.models.generation.vllm import VllmGeneration
 from nemo_rl.utils.logger import Logger, LoggerConfig
@@ -218,23 +217,15 @@ async def _run_env_rejection_sampling_impl(
     # Extract for easier access
     generation_config = master_config["generation"]
     rejection_sampling_config = master_config["rejection_sampling"]
-    env_config = master_config["env"]["math"]
     metric = rejection_sampling_config["metric"]
     ks = parse_pass_at_k_values(metric)
     logger_config = master_config["logger"]
-    dataset_name = master_config["data"]["dataset_name"]
     num_tests_per_prompt = rejection_sampling_config["num_tests_per_prompt"]
     assert num_tests_per_prompt >= max(ks), (
         "num_tests_per_prompt must be greater than or equal to pass_k_value for pass@k metric"
     )
-    render_template = {
-        "math": vis_lib.MathRenderTemplate,
-        "code": vis_lib.CodeRenderTemplate,
-        "instruction_following": vis_lib.BaseRenderTemplate,
-    }[env_config["verifier_type"]]()
 
     # Run rejection sampling loop
-    htmls = []
     generation_lengths = []
     data = []
     scores = {f"pass@{k}": 0 for k in ks}
