@@ -109,6 +109,7 @@ def code_processor(
     """Process a datum dictionary (directly loaded from dataset) into a DatumSpec for the Code Environment."""
     problem = datum_dict["question"]
     extra_env_info = {
+        "problem": problem,
         "tests": datum_dict["tests"],
         "working_dir": datum_dict["code_exe_dir"],
     }
