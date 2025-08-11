@@ -28,12 +28,11 @@ from nemo_rl.distributed.virtual_cluster import RayVirtualCluster
 from nemo_rl.models.generation import configure_generation_config
 from nemo_rl.models.policy import PolicyConfig
 from nemo_rl.models.policy.lm_policy import Policy
-from tests.unit.conftest import TEST_ASSETS
 from tests.unit.test_utils import SimpleLoss
 
 
 def create_megatron_test_config(
-    model_name: str = TEST_ASSETS.TINY_LLAMA_MODEL_PATH,
+    model_name: str,
     tp: int = 1,
     pp: int = 1,
     precision: str = "float32",
@@ -60,11 +59,21 @@ def create_megatron_test_config(
             "top_k": None,
             "stop_token_ids": None,
             "stop_strings": None,
+            "colocated": {
+                "enabled": True,
+                "resources": {
+                    "gpus_per_node": None,
+                    "num_nodes": None,
+                },
+            },
         },
         "dtensor_cfg": {
             "enabled": False,  # Disabled for Megatron tests
         },
         "dynamic_batching": {
+            "enabled": False,  # Start with simple batching
+        },
+        "sequence_packing": {
             "enabled": False,  # Start with simple batching
         },
         "megatron_cfg": {
@@ -142,7 +151,7 @@ def gc_collect():
 
 
 @pytest.fixture
-def policy_setup(request):
+def policy_setup(request, tiny_llama_model_path):
     """Setup and teardown for policy tests - creates a virtual cluster and policy."""
     # Get parameters from request
     if hasattr(request, "param") and request.param is not None:
@@ -167,7 +176,7 @@ def policy_setup(request):
             max_colocated_worker_groups=1,
         )
 
-        config = create_megatron_test_config(tp=tp, pp=pp)
+        config = create_megatron_test_config(tiny_llama_model_path, tp=tp, pp=pp)
         tokenizer = get_tokenizer(config["tokenizer"])
         config["generation"] = configure_generation_config(
             config["generation"], tokenizer
@@ -189,17 +198,20 @@ def policy_setup(request):
 @pytest.fixture
 def training_setup(request):
     """Setup and teardown specifically for training tests."""
-    # Parse parameters: (num_gpus, tp, pp, model_name, config_updates)
+    # Parse parameters: (num_gpus, tp, pp, model_fixture_name, config_updates)
     if hasattr(request, "param") and request.param is not None:
-        num_gpus, tp, pp, model_name, config_updates = request.param
+        num_gpus, tp, pp, model_fixture_name, config_updates = request.param
     else:
-        num_gpus, tp, pp, model_name, config_updates = (
+        num_gpus, tp, pp, model_fixture_name, config_updates = (
             2,
             1,
             1,
-            TEST_ASSETS.TINY_LLAMA_MODEL_PATH,
+            "tiny_llama_model_path",
             {},
         )
+
+    # Get the actual model path from the requested fixture
+    model_name = request.getfixturevalue(model_fixture_name)
 
     policy = None
     cluster = None
@@ -307,24 +319,25 @@ def training_setup(request):
             cluster.shutdown()
 
 
+@pytest.mark.hf_gated
 @pytest.mark.timeout(300)
 @pytest.mark.parametrize(
     "training_setup",
     [
-        # (num_gpus, tp, pp, model_name, config_updates)
-        (2, 1, 1, TEST_ASSETS.TINY_LLAMA_MODEL_PATH, {}),
-        (2, 2, 1, TEST_ASSETS.TINY_LLAMA_MODEL_PATH, {}),
-        (2, 1, 1, TEST_ASSETS.TINY_QWEN2_MODEL_PATH, {}),
-        (2, 2, 1, TEST_ASSETS.TINY_QWEN2_MODEL_PATH, {}),
-        (2, 1, 1, TEST_ASSETS.TINY_LLAMA_MODEL_PATH, {"precision": "bfloat16"}),
+        # (num_gpus, tp, pp, model_fixture_name, config_updates)
+        (2, 1, 1, "tiny_llama_model_path", {}),
+        (2, 2, 1, "tiny_llama_model_path", {}),
+        (2, 1, 1, "tiny_qwen2_model_path", {}),
+        (2, 2, 1, "tiny_qwen2_model_path", {}),
+        (2, 1, 1, "tiny_llama_model_path", {"precision": "bfloat16"}),
         (
             2,
             1,
             1,
-            TEST_ASSETS.TINY_LLAMA_MODEL_PATH,
+            "tiny_llama_model_path",
             {"activation_checkpointing": True},
         ),
-        (2, 2, 1, TEST_ASSETS.TINY_LLAMA_MODEL_PATH, {"sequence_parallel": True}),
+        (2, 2, 1, "tiny_llama_model_path", {"sequence_parallel": True}),
     ],
     indirect=True,
     ids=[
@@ -376,7 +389,7 @@ def test_megatron_policy_training(training_setup):
 
 
 @pytest.fixture
-def generation_setup(request):
+def generation_setup(request, tiny_llama_model_path):
     """Setup and teardown specifically for generation tests."""
     # Parse parameters: (num_gpus, tp, pp, generation_backend)
     if hasattr(request, "param") and request.param is not None:
@@ -405,6 +418,7 @@ def generation_setup(request):
         )
 
         config = create_megatron_test_config(
+            tiny_llama_model_path,
             tp=tp,
             pp=pp,
             generation_backend=generation_backend,
@@ -526,11 +540,14 @@ def test_megatron_policy_generation(generation_setup):
 @pytest.fixture
 def logprob_setup(request):
     """Setup and teardown specifically for logprob tests."""
-    # Parse parameters: (num_gpus, tp, pp, model_name)
+    # Parse parameters: (num_gpus, tp, pp, model_fixture_name)
     if hasattr(request, "param") and request.param is not None:
-        num_gpus, tp, pp, model_name = request.param
+        num_gpus, tp, pp, model_fixture_name = request.param
     else:
-        num_gpus, tp, pp, model_name = 2, 1, 1, TEST_ASSETS.TINY_LLAMA_MODEL_PATH
+        num_gpus, tp, pp, model_fixture_name = 2, 1, 1, "tiny_llama_model_path"
+
+    # Get the actual model path from the requested fixture
+    model_name = request.getfixturevalue(model_fixture_name)
 
     policy = None
     cluster = None
@@ -606,14 +623,15 @@ def logprob_setup(request):
 
 
 @pytest.mark.timeout(180)
+@pytest.mark.hf_gated
 @pytest.mark.parametrize(
     "logprob_setup",
     [
-        # (num_gpus, tp, pp, model_name)
-        (2, 1, 1, TEST_ASSETS.TINY_LLAMA_MODEL_PATH),
-        (2, 2, 1, TEST_ASSETS.TINY_LLAMA_MODEL_PATH),
-        (2, 1, 1, TEST_ASSETS.TINY_QWEN2_MODEL_PATH),
-        (2, 2, 1, TEST_ASSETS.TINY_QWEN2_MODEL_PATH),
+        # (num_gpus, tp, pp, model_fixture_name)
+        (2, 1, 1, "tiny_llama_model_path"),
+        (2, 2, 1, "tiny_llama_model_path"),
+        (2, 1, 1, "tiny_qwen2_model_path"),
+        (2, 2, 1, "tiny_qwen2_model_path"),
     ],
     indirect=True,
     ids=["2gpu_dp2_llama", "2gpu_tp2_llama", "2gpu_dp2_qwen2", "2gpu_tp2_qwen2"],
@@ -646,7 +664,8 @@ def test_megatron_policy_logprobs(logprob_setup):
 
 
 @pytest.mark.timeout(240)
-def test_megatron_loss_independent_of_microbatch_size():
+@pytest.mark.hf_gated
+def test_megatron_loss_independent_of_microbatch_size(tiny_llama_model_path):
     """Test that changing microbatch size while keeping global batch size constant does not affect loss values."""
     num_gpus = 2
     global_batch_size = 8
@@ -687,7 +706,7 @@ def test_megatron_loss_independent_of_microbatch_size():
         max_colocated_worker_groups=1,
     )
 
-    config1 = create_megatron_test_config()
+    config1 = create_megatron_test_config(tiny_llama_model_path)
     config1["train_micro_batch_size"] = 1
     tokenizer = get_tokenizer(config1["tokenizer"])
     config1["generation"] = configure_generation_config(
@@ -735,7 +754,7 @@ def test_megatron_loss_independent_of_microbatch_size():
         max_colocated_worker_groups=1,
     )
 
-    config2 = create_megatron_test_config()
+    config2 = create_megatron_test_config(tiny_llama_model_path)
     config2["train_micro_batch_size"] = 2
     config2["generation"] = configure_generation_config(
         config2["generation"], tokenizer
@@ -764,7 +783,8 @@ def test_megatron_loss_independent_of_microbatch_size():
 
 
 @pytest.mark.timeout(300)
-def test_megatron_reference_policy_functionality():
+@pytest.mark.hf_gated
+def test_megatron_reference_policy_functionality(tiny_llama_model_path):
     """Test Megatron reference policy functionality."""
     num_gpus = 2
 
@@ -776,9 +796,9 @@ def test_megatron_reference_policy_functionality():
         max_colocated_worker_groups=1,
     )
 
-    config = create_megatron_test_config()
-    config["megatron_cfg"]["optimizer"]["lr"] = 1e-3  # Increase from 5e-6 to 1e-3
-    config["megatron_cfg"]["optimizer"]["min_lr"] = 1e-4  # Increase min_lr as well
+    config = create_megatron_test_config(tiny_llama_model_path)
+    config["megatron_cfg"]["optimizer"]["lr"] = 1e-2  # Increase from 5e-6 to 1e-2
+    config["megatron_cfg"]["optimizer"]["min_lr"] = 1e-3  # Increase min_lr as well
 
     tokenizer = get_tokenizer(config["tokenizer"])
     config["generation"] = configure_generation_config(config["generation"], tokenizer)
@@ -884,6 +904,7 @@ def test_megatron_reference_policy_functionality():
 
 
 @pytest.mark.timeout(400)
+@pytest.mark.hf_gated
 @pytest.mark.parametrize(
     "num_gpus,tp,pp",
     [
@@ -893,12 +914,14 @@ def test_megatron_reference_policy_functionality():
     ],
     ids=["2gpu_dp2_save_restore", "2gpu_pp2_save_restore", "2gpu_tp2_save_restore"],
 )
-def test_megatron_checkpoint_save_kill_and_restore(num_gpus, tp, pp):
+def test_megatron_checkpoint_save_kill_and_restore(
+    num_gpus, tp, pp, tiny_llama_model_path
+):
     """Test full checkpoint save/restore cycle: save -> kill worker -> restart -> verify restore."""
     from copy import deepcopy
 
     # Use tiny model for faster testing
-    model_name = TEST_ASSETS.TINY_LLAMA_MODEL_PATH
+    model_name = tiny_llama_model_path
     tokenizer = get_tokenizer({"name": model_name})
 
     with tempfile.TemporaryDirectory(prefix="megatron_save_restore_") as temp_dir:
@@ -1136,7 +1159,8 @@ def test_megatron_checkpoint_save_kill_and_restore(num_gpus, tp, pp):
 
 
 @pytest.mark.timeout(300)
-def test_megatron_dpo_training():
+@pytest.mark.hf_gated
+def test_megatron_dpo_training(tiny_llama_model_path):
     """Test DPO training with Megatron backend."""
     num_gpus = 2
     batch_size = 8
@@ -1174,7 +1198,7 @@ def test_megatron_dpo_training():
         max_colocated_worker_groups=1,
     )
 
-    config = create_megatron_test_config()
+    config = create_megatron_test_config(tiny_llama_model_path)
     tokenizer = get_tokenizer(config["tokenizer"])
 
     policy = Policy(
@@ -1232,7 +1256,8 @@ def test_megatron_dpo_training():
 
 
 @pytest.mark.timeout(300)
-def test_megatron_sft_training():
+@pytest.mark.hf_gated
+def test_megatron_sft_training(tiny_llama_model_path):
     """Test SFT training with Megatron backend."""
     num_gpus = 2
     batch_size = 8
@@ -1267,7 +1292,7 @@ def test_megatron_sft_training():
         max_colocated_worker_groups=1,
     )
 
-    config = create_megatron_test_config()
+    config = create_megatron_test_config(tiny_llama_model_path)
     tokenizer = get_tokenizer(config["tokenizer"])
 
     policy = Policy(
@@ -1311,3 +1336,423 @@ def test_megatron_sft_training():
     finally:
         policy.shutdown()
         cluster.shutdown()
+
+
+@pytest.mark.hf_gated
+@pytest.mark.timeout(300)
+def test_megatron_context_parallel_logprob_agreement(tiny_llama_model_path):
+    """Test that CP and non-CP models produce identical logprobs with sequence packing enabled."""
+    num_gpus = 2
+    batch_size = 4
+    seq_len = 64
+    vocab_size = 32000
+
+    # Create test data with varying sequence lengths to test sequence packing
+    torch.manual_seed(42)  # Fixed seed for reproducibility
+    input_ids = torch.arange(seq_len * batch_size, device="cuda").reshape(
+        batch_size, seq_len
+    )
+    # Create varied sequence lengths for more realistic sequence packing test
+    input_lengths = torch.tensor([31, 21, 29, 56], dtype=torch.int32)
+    attention_mask = torch.zeros(batch_size, seq_len)
+    for i, length in enumerate(input_lengths):
+        attention_mask[i, :length] = 1
+
+    data = BatchedDataDict(
+        {
+            "input_ids": input_ids,
+            "input_lengths": input_lengths,
+            "attention_mask": attention_mask,
+        }
+    )
+
+    # Test 1: Non-CP model (context_parallel_size=1) with sequence packing
+    print(
+        "=== Testing Non-CP model (context_parallel_size=1) with sequence packing ==="
+    )
+    cluster_no_cp = RayVirtualCluster(
+        name="test-no-cp-packing",
+        bundle_ct_per_node_list=[num_gpus],
+        use_gpus=True,
+        num_gpus_per_node=num_gpus,
+        max_colocated_worker_groups=1,
+    )
+
+    config_no_cp = create_megatron_test_config(
+        tiny_llama_model_path, tp=1, pp=1, precision="bfloat16"
+    )
+    # Ensure context parallel is disabled
+    config_no_cp["megatron_cfg"]["context_parallel_size"] = 1
+
+    # Enable sequence packing
+    config_no_cp["sequence_packing"] = {
+        "enabled": True,
+        "train_mb_tokens": seq_len,
+        "logprob_mb_tokens": seq_len,
+        "algorithm": "modified_first_fit_decreasing",
+    }
+
+    tokenizer = get_tokenizer(config_no_cp["tokenizer"])
+    config_no_cp["generation"] = configure_generation_config(
+        config_no_cp["generation"], tokenizer
+    )
+
+    policy_no_cp = Policy(
+        cluster=cluster_no_cp,
+        config=config_no_cp,
+        tokenizer=tokenizer,
+        init_reference_model=False,
+    )
+
+    # Get logprobs from non-CP model with sequence packing
+    policy_no_cp.prepare_for_lp_inference()
+    logprobs_no_cp = policy_no_cp.get_logprobs(data)["logprobs"]
+    logprobs_no_cp = logprobs_no_cp * attention_mask
+    print(f"Non-CP logprobs shape: {logprobs_no_cp.shape}")
+    print(f"Non-CP logprobs sample: {logprobs_no_cp[0, :5]}")
+
+    # Cleanup non-CP resources
+    policy_no_cp.shutdown()
+
+    config_no_cp_no_packing = config_no_cp.copy()
+    config_no_cp_no_packing["sequence_packing"] = {
+        "enabled": False,
+    }
+    policy_no_cp_no_packing = Policy(
+        cluster=cluster_no_cp,
+        config=config_no_cp_no_packing,
+        tokenizer=tokenizer,
+        init_reference_model=False,
+    )
+    # Get logprobs from non-CP model with sequence packing
+    policy_no_cp_no_packing.prepare_for_lp_inference()
+    logprobs_no_cp_no_packing = policy_no_cp_no_packing.get_logprobs(data)["logprobs"]
+    logprobs_no_cp_no_packing = logprobs_no_cp_no_packing * attention_mask
+    print(f"Non-CP logprobs no packing shape: {logprobs_no_cp_no_packing.shape}")
+    print(f"Non-CP logprobs no packing sample: {logprobs_no_cp_no_packing[0, :5]}")
+
+    cluster_no_cp.shutdown()
+
+    # Verify logprobs match between CP and non-CP models with sequence packing
+    print("=== Comparing logprobs ===")
+
+    # Check shapes match
+    print(f"diff packing {logprobs_no_cp - logprobs_no_cp_no_packing}")
+    assert logprobs_no_cp.shape == logprobs_no_cp_no_packing.shape, (
+        f"Logprob shapes should match: {logprobs_no_cp.shape} vs {logprobs_no_cp_no_packing.shape}"
+    )
+    (
+        torch.testing.assert_close(
+            logprobs_no_cp, logprobs_no_cp_no_packing, rtol=1e-3, atol=1e-3
+        ),
+        (
+            "Logprobs should match between non-CP and non-CP models with sequence packing"
+        ),
+    )
+
+    # Test 2: CP model (context_parallel_size=2) with sequence packing
+    print("=== Testing CP model (context_parallel_size=2) with sequence packing ===")
+    cluster_cp = RayVirtualCluster(
+        name="test-cp-packing",
+        bundle_ct_per_node_list=[num_gpus],
+        use_gpus=True,
+        num_gpus_per_node=num_gpus,
+        max_colocated_worker_groups=1,
+    )
+
+    config_cp = create_megatron_test_config(
+        tiny_llama_model_path, tp=1, pp=1, precision="bfloat16"
+    )
+    # Enable context parallel
+    config_cp["megatron_cfg"]["context_parallel_size"] = 2
+
+    # Enable sequence packing
+    config_cp["sequence_packing"] = {
+        "enabled": True,
+        "train_mb_tokens": seq_len,
+        "logprob_mb_tokens": seq_len,
+        "algorithm": "modified_first_fit_decreasing",
+    }
+
+    config_cp["generation"] = configure_generation_config(
+        config_cp["generation"], tokenizer
+    )
+
+    policy_cp = Policy(
+        cluster=cluster_cp,
+        config=config_cp,
+        tokenizer=tokenizer,
+        init_reference_model=False,
+    )
+
+    # Get logprobs from CP model with sequence packing
+    policy_cp.prepare_for_lp_inference()
+    logprobs_cp = policy_cp.get_logprobs(data)["logprobs"]
+    print(f"CP logprobs shape: {logprobs_cp.shape}")
+    print(f"CP logprobs sample: {logprobs_cp[0, :5]}")
+
+    # Cleanup CP resources
+    policy_cp.shutdown()
+    cluster_cp.shutdown()
+
+    # Verify logprobs match between CP and non-CP models with sequence packing
+    print("=== Comparing logprobs ===")
+
+    # Check shapes match
+    assert logprobs_no_cp.shape == logprobs_cp.shape, (
+        f"Logprob shapes should match: {logprobs_no_cp.shape} vs {logprobs_cp.shape}"
+    )
+
+    # Check that neither contains NaN or Inf
+    assert not torch.isnan(logprobs_no_cp).any(), (
+        "Non-CP logprobs should not contain NaN"
+    )
+    assert not torch.isinf(logprobs_no_cp).any(), (
+        "Non-CP logprobs should not contain Inf"
+    )
+    assert not torch.isnan(logprobs_cp).any(), "CP logprobs should not contain NaN"
+    assert not torch.isinf(logprobs_cp).any(), "CP logprobs should not contain Inf"
+
+    # Check that first token logprobs are zero (by convention)
+    assert torch.all(logprobs_no_cp[:, 0] == 0), (
+        "First token logprobs should be zero (non-CP)"
+    )
+    assert torch.all(logprobs_cp[:, 0] == 0), "First token logprobs should be zero (CP)"
+
+    # Compare logprobs with tight tolerance
+    logprobs_cp = logprobs_cp * attention_mask
+    print(f"diff {logprobs_no_cp_no_packing - logprobs_cp}")
+    max_diff = torch.max(torch.abs(logprobs_no_cp_no_packing - logprobs_cp)).item()
+    mean_diff = torch.mean(torch.abs(logprobs_no_cp_no_packing - logprobs_cp)).item()
+    print(f"Max difference: {max_diff}")
+    print(f"Mean difference: {mean_diff}")
+
+    # Assert logprobs are identical (or very close due to floating point)
+    torch.testing.assert_close(
+        logprobs_no_cp_no_packing,
+        logprobs_cp,
+        rtol=1e-3,
+        atol=1e-2,
+        msg="CP and non-CP models should produce identical logprobs with sequence packing",
+    )
+
+    print(
+        "✓ SUCCESS: CP and non-CP models produce identical logprobs with sequence packing"
+    )
+
+
+@pytest.mark.hf_gated
+@pytest.mark.timeout(300)
+def test_megatron_context_parallel_training_agreement(tiny_llama_model_path):
+    """Test that CP and non-CP models produce consistent training results with ClippedPG loss and sequence packing."""
+    num_gpus = 2
+    batch_size = 2
+    seq_len = 64
+    vocab_size = 32000
+
+    # Create test data with varying sequence lengths to test sequence packing
+    torch.manual_seed(42)  # Fixed seed for reproducibility
+    input_ids = torch.arange(seq_len * batch_size, device="cuda").reshape(
+        batch_size, seq_len
+    )
+
+    # Create varied sequence lengths for more realistic sequence packing test
+    input_lengths = torch.tensor([33, 48], dtype=torch.int32)
+    attention_mask = torch.zeros(batch_size, seq_len)
+    for i, length in enumerate(input_lengths):
+        attention_mask[i, :length] = 1
+
+    # Create additional data required for ClippedPG loss
+    token_mask = torch.zeros(batch_size, seq_len)
+    sample_mask = torch.ones(batch_size)
+    advantages = torch.randn(batch_size, seq_len)
+    prev_logprobs = torch.randn(batch_size, seq_len)
+    generation_logprobs = prev_logprobs.clone()
+    reference_policy_logprobs = prev_logprobs.clone()
+    labels = torch.randint(0, vocab_size, (batch_size, seq_len))
+
+    for i in range(batch_size):
+        token_mask[i, : input_lengths[i]] = 1
+
+    base_data = BatchedDataDict(
+        {
+            "input_ids": input_ids,
+            "input_lengths": input_lengths,
+            "attention_mask": attention_mask,
+            "token_mask": token_mask,
+            "sample_mask": sample_mask,
+            "advantages": advantages,
+            "prev_logprobs": prev_logprobs,
+            "generation_logprobs": generation_logprobs,
+            "reference_policy_logprobs": reference_policy_logprobs,
+            "labels": labels,
+        }
+    )
+
+    # Test 1: Non-CP model (context_parallel_size=1) with sequence packing
+    print(
+        "=== Testing Non-CP model (context_parallel_size=1) with sequence packing ==="
+    )
+    cluster_no_cp = RayVirtualCluster(
+        name="test-no-cp-training",
+        bundle_ct_per_node_list=[1],
+        use_gpus=True,
+        num_gpus_per_node=1,
+        max_colocated_worker_groups=1,
+    )
+
+    config_no_cp = create_megatron_test_config(
+        tiny_llama_model_path, tp=1, pp=1, precision="bfloat16"
+    )
+    # Ensure context parallel is disabled
+    config_no_cp["megatron_cfg"]["context_parallel_size"] = 1
+    config_no_cp["train_global_batch_size"] = 2
+
+    # Enable sequence packing
+    config_no_cp["sequence_packing"] = {
+        "enabled": True,
+        "train_mb_tokens": seq_len,
+        "logprob_mb_tokens": seq_len,
+        "algorithm": "modified_first_fit_decreasing",
+    }
+
+    tokenizer = get_tokenizer(config_no_cp["tokenizer"])
+    config_no_cp["generation"] = configure_generation_config(
+        config_no_cp["generation"], tokenizer
+    )
+
+    policy_no_cp = Policy(
+        cluster=cluster_no_cp,
+        config=config_no_cp,
+        tokenizer=tokenizer,
+        init_reference_model=False,
+    )
+
+    # Create ClippedPG loss function
+    loss_fn = ClippedPGLossFn(
+        {
+            "ratio_clip_min": 0.2,
+            "ratio_clip_max": 0.2,
+            "ratio_clip_c": None,
+            "reference_policy_kl_penalty": 0.1,
+            "disable_ppo_ratio": False,
+            "use_on_policy_kl_approximation": False,
+            "use_importance_sampling_correction": False,
+            "token_level_loss": True,
+        }
+    )
+
+    # Train non-CP model
+    policy_no_cp.prepare_for_training()
+    no_cp_results = policy_no_cp.train(base_data, loss_fn)
+    no_cp_loss = no_cp_results["loss"]
+    no_cp_metrics = no_cp_results["all_mb_metrics"]
+
+    print(f"Non-CP training loss: {no_cp_loss}")
+    print(f"Non-CP metrics: {no_cp_metrics}")
+
+    # Cleanup non-CP resources
+    policy_no_cp.shutdown()
+    cluster_no_cp.shutdown()
+
+    # Test 2: CP model (context_parallel_size=2) with sequence packing
+    print("=== Testing CP model (context_parallel_size=2) with sequence packing ===")
+    cluster_cp = RayVirtualCluster(
+        name="test-cp-training",
+        bundle_ct_per_node_list=[num_gpus],
+        use_gpus=True,
+        num_gpus_per_node=num_gpus,
+        max_colocated_worker_groups=1,
+    )
+
+    config_cp = create_megatron_test_config(
+        tiny_llama_model_path, tp=1, pp=1, precision="bfloat16"
+    )
+    # Enable context parallel
+    config_cp["megatron_cfg"]["context_parallel_size"] = 2
+    config_cp["train_global_batch_size"] = 2
+
+    # Enable sequence packing
+    config_cp["sequence_packing"] = {
+        "enabled": True,
+        "train_mb_tokens": seq_len,
+        "logprob_mb_tokens": seq_len,
+        "algorithm": "modified_first_fit_decreasing",
+    }
+
+    config_cp["generation"] = configure_generation_config(
+        config_cp["generation"], tokenizer
+    )
+
+    policy_cp = Policy(
+        cluster=cluster_cp,
+        config=config_cp,
+        tokenizer=tokenizer,
+        init_reference_model=False,
+    )
+
+    # Train CP model
+    policy_cp.prepare_for_training()
+    cp_results = policy_cp.train(base_data, loss_fn)
+    cp_loss = cp_results["loss"]
+    cp_metrics = cp_results["all_mb_metrics"]
+
+    print(f"CP training loss: {cp_loss}")
+    print(f"CP metrics: {cp_metrics}")
+
+    # Cleanup CP resources
+    policy_cp.shutdown()
+    cluster_cp.shutdown()
+
+    # Compare training results
+    print("=== Comparing training results ===")
+
+    # Check that neither contains NaN or Inf
+    assert not torch.isnan(no_cp_loss).any(), "Non-CP loss should not contain NaN"
+    assert not torch.isinf(no_cp_loss).any(), "Non-CP loss should not contain Inf"
+    assert not torch.isnan(cp_loss).any(), "CP loss should not contain NaN"
+    assert not torch.isinf(cp_loss).any(), "CP loss should not contain Inf"
+
+    # Check shapes match
+    assert no_cp_loss.shape == cp_loss.shape, (
+        f"Loss shapes should match: {no_cp_loss.shape} vs {cp_loss.shape}"
+    )
+
+    # Compare loss values with tolerance
+    loss_diff = torch.abs(no_cp_loss - cp_loss)
+    max_loss_diff = torch.max(loss_diff).item()
+    mean_loss_diff = torch.mean(loss_diff).item()
+
+    print(f"Loss difference - Max: {max_loss_diff:.6f}, Mean: {mean_loss_diff:.6f}")
+
+    # Check key metrics are similar
+    key_metrics = ["probs_ratio", "grad_norm", "kl_penalty", "approx_entropy"]
+    for metric in key_metrics:
+        if metric in no_cp_metrics and metric in cp_metrics:
+            no_cp_val = no_cp_metrics[metric]
+            cp_val = cp_metrics[metric]
+            if metric == "grad_norm":
+                diff = abs(sum(no_cp_val) - sum(cp_val) * 2)
+            else:
+                diff = abs(sum(no_cp_val) - sum(cp_val))
+            print(
+                f"Metric {metric}: Non-CP={sum(no_cp_val):.6f}, CP={sum(cp_val):.6f}, Diff={diff:.6f}"
+            )
+
+            # Allow some tolerance for floating point differences
+            assert diff < 0.01 * sum(no_cp_val) or diff < 1e-4, (
+                f"Metric {metric} differs too much: {diff:.6f}"
+            )
+
+    # Assert losses are very close (accounting for minor floating point differences)
+    torch.testing.assert_close(
+        no_cp_loss,
+        cp_loss,
+        rtol=1e-2,
+        atol=1e-2,
+        msg="CP and non-CP models should produce very similar training losses with sequence packing",
+    )
+
+    print(
+        "✓ SUCCESS: CP and non-CP models produce consistent training results with ClippedPG loss and sequence packing"
+    )

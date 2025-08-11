@@ -1,0 +1,6 @@
+# BeyondAIME evaluation Configuration
+defaults: "eval.yaml"
+
+data:
+  prompt_file: "examples/prompts/cot.txt"
+  dataset_name: "beyond_aime"

@@ -15,9 +15,6 @@ policy:
   logprob_batch_size: 4
   max_total_sequence_length: 4096
   precision: "bfloat16"
-  fsdp_offload_enabled: false
-  activation_checkpointing_enabled: false
-  refit_buffer_size_gb: 4 # used for refitting inference engine, the unit is GB
 
   dtensor_cfg:
     enabled: false
@@ -50,7 +47,7 @@ policy:
       weight_decay_incr_style: "constant"
       lr_decay_style: "constant"
       lr_decay_iters: null
-      lr_warmup_iters: 50
+      lr_warmup_iters: 13
       lr_warmup_init: 3.0e-8
 
   generation:
@@ -63,7 +60,7 @@ policy:
     stop_strings: null
     vllm_cfg:
       tensor_parallel_size: 4
-      gpu_memory_utilization: 0.8
+      gpu_memory_utilization: 0.6
       max_model_len: ${policy.max_total_sequence_length}
 
 cluster:
