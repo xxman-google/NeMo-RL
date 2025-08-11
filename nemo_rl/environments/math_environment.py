@@ -46,7 +46,8 @@ from nemo_rl.evals.grader_model import (
     OPENAI_SYSTEM_MESSAGE_CHATGPT,
     QA_GRADER_TEMPLATE
 )
-from nemo_rl.evals.ifeval import instructions_registry
+
+# from nemo_rl.evals.ifeval import instructions_registry
 
 
 class MathEnvConfig(TypedDict):

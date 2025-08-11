@@ -222,6 +222,11 @@ def load_eval_dataset(data_config):
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
+    elif dataset_name == "alpaca2":
+        base_dataset = Alpaca2Dataset(
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"], 
+        )
     else:
         raise ValueError(f"Unknown dataset {dataset_name}.")
     return base_dataset
