@@ -14,7 +14,9 @@
 import ast
 import contextlib
 import io
+import json
 import logging
+import os
 import re
 from typing import Any, Optional, TypedDict
 
@@ -23,6 +25,13 @@ import torch
 from math_verify.errors import TimeoutException
 from math_verify.metric import math_metric
 from math_verify.parser import ExprExtractionConfig, LatexExtractionConfig
+from swebench.harness.run_evaluation import run_instances
+from swebench.harness.reporting import make_run_report
+from swebench.harness.constants import (
+    KEY_INSTANCE_ID,
+    KEY_MODEL,
+    KEY_PREDICTION,
+)
 
 from nemo_rl.data.interfaces import LLMMessageLogType
 from nemo_rl.distributed.batched_data_dict import BatchedDataDict
@@ -313,6 +322,78 @@ class ArcAgiVerifyWorker:
         return results
 
 
+@ray.remote
+class SweBenchVerifyWorker:
+    """Response verifier worker for SweBench problems."""
+
+    def verify(
+        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
+    ) -> list[tuple[float, str, str]]:
+        """Run swebench evaluation on the model-generated patches.
+
+        Args:
+            pred_responses: list[str]. The predicted responses from the LLM.
+            metadata_list: list[MathEnvironmentMetadata]. The metadata containing ground truth and other info.
+
+        Returns:
+            list[tuple[float, str, str]]. The rewards, correct answer, and extracted answer for each predicted response.
+        """
+        predictions = {}
+        instances = []
+        model_name = "model_name"  # TODO: Placeholder for the model name, should be set appropriately.
+        for response, metadata in zip(pred_responses, metadata_list):
+            instance = metadata["instance"]
+            prediction = {
+                KEY_INSTANCE_ID: instance[KEY_INSTANCE_ID],
+                KEY_MODEL: model_name,
+                KEY_PREDICTION: response,
+                "golden_patch": instance["patch"],
+            }
+            predictions[instance[KEY_INSTANCE_ID]] = prediction
+            instances.append(instance)
+
+        run_id = "swebench_verified_oracle_eval"
+        run_instances(
+            predictions=predictions,
+            instances=instances,
+            cache_level="env",
+            clean=False,
+            force_rebuild=False,
+            max_workers=4,
+            run_id=run_id,
+            timeout=600,
+        )
+
+        results = []
+        # Read results from instance results files.
+        eval_dir = f"logs/run_evaluation/{run_id}/{model_name}"
+        if not os.path.exists(eval_dir):
+            raise FileNotFoundError(f"Evaluation directory {eval_dir} does not exist.")
+        verified_issues = []
+        for instance_id, prediction in predictions.items():
+            instance_result_file = os.path.join(
+                eval_dir, instance_id, "report.json"
+            )
+            if not os.path.exists(instance_result_file):
+                continue
+            with open(instance_result_file, "r") as f:
+                instance_report = f.read()
+            score = self._get_score_from_report(instance_id, instance_report)
+            golden_patch = prediction["golden_patch"]
+            model_patch = prediction[KEY_PREDICTION]
+            results.append((score, golden_patch, model_patch))
+            if score == 1.0:
+                verified_issues.append(instance_id)
+        with open(f"{eval_dir}/verified_issues.txt", "w") as f:
+            f.write(f"{instance_id}: {model_patch}\n\n")
+        return results
+
+    def _get_score_from_report(self, instance_id: str, instance_report: str) -> float:
+        """Parses the report and returns whether the patch resolved the issue."""
+        instance_report = json.loads(instance_report)
+        return float(instance_report[instance_id]["resolved"])
+
+      
 @ray.remote(max_restarts=-1, max_task_retries=-1)  # pragma: no cover
 class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
     def __init__(self, cfg: MathEnvConfig):
@@ -330,6 +411,7 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
             "mgsm": MGSMVerifyWorker,
             "multilingual_multichoice": MultilingualMultichoiceVerifyWorker,
             "arc_agi": ArcAgiVerifyWorker,
+            "swebench_verified": SweBenchVerifyWorker,
         }[worker_type]
         self.workers = [
             worker_cls.options(  # type: ignore # (decorated with @ray.remote)

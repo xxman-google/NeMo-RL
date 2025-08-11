@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from nemo_rl.data.eval_datasets.arc_agi import ArcAgiDataset
 from nemo_rl.data.eval_datasets.aime2024 import AIME2024Dataset
 from nemo_rl.data.eval_datasets.aime2025 import AIME2025Dataset
 from nemo_rl.data.eval_datasets.arc_agi import ArcAgiDataset
@@ -31,6 +32,9 @@ from nemo_rl.data.eval_datasets.mmlu import MMLUDataset
 from nemo_rl.data.eval_datasets.mmlu_pro import MMLUProDataset
 from nemo_rl.data.eval_datasets.numina_math import NuminaMathDataset
 from nemo_rl.data.eval_datasets.openr1_math import OpenR1MathDataset
+from nemo_rl.data.eval_datasets.swe_bench_verified_oracle import (
+    SweBenchVerifiedOracleDataset,
+)
 from nemo_rl.data.eval_datasets.openr1_verifiable_code import (
     OpenR1VerifiableCodeDataset,
 )
@@ -183,15 +187,19 @@ def load_eval_dataset(data_config):
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
-    elif dataset_name == "openr1_verifiable_code":
-        base_dataset = OpenR1VerifiableCodeDataset(
-            source=data_config["source"],
-            code_exe_dir=data_config["code_exe_dir"],
+    elif dataset_name == "arc_agi":
+        base_dataset = ArcAgiDataset(
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
-    elif dataset_name == "arc_agi":
-        base_dataset = ArcAgiDataset(
+    elif dataset_name == "swebench_verified_oracle":
+        base_dataset = SweBenchVerifiedOracleDataset(
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
+    elif dataset_name == "openr1_verifiable_code":
+        base_dataset = OpenR1VerifiableCodeDataset(
+            code_exe_dir=data_config["code_exe_dir"],
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
@@ -203,6 +211,7 @@ def load_eval_dataset(data_config):
 __all__ = [
     "AIME2024Dataset",
     "AIME2025Dataset",
+    "ArcAgiDataset",
     "BeyondAIMEDataset",
     "DeepScaleRDataset",
     "GPQADataset",
@@ -219,6 +228,7 @@ __all__ = [
     "MMLUProDataset",
     "NuminaMathDataset",
     "OpenR1MathDataset",
+    "SweBenchVerifiedOracleDataset",
     "OpenR1VerifiableCodeDataset",
     "Tulu3SftDataset",
 ]
