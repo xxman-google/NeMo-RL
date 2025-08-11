@@ -378,6 +378,24 @@ async def _run_env_eval_impl(
                 subject_scores,
             )
             score += cur_score
+        elif metric == "length_controlled_winrate":
+            annotations = []
+            for response, verdict, observation in zip(
+                output_texts,
+                rewards,
+                env_return.observations,
+            ):
+                golden_response = observation.get("correct_answer", None)
+                annotation = {
+                    "preference": 2 if verdict else 1,
+                    "annotator": master_config["env"]["math"]["grader_model_name"],
+                    "generator_1": "gpt4_1106_preview",
+                    "generator_2": master_config["generation"]["model_name"],
+                    "output_1": golden_response,
+                    "output_2": response,
+                }
+                annotations.append(annotation)
+            score = get_length_controlled_winrate(annotations)
         else:
             raise ValueError(f"Invalid metric: {metric}")
 
@@ -567,13 +585,21 @@ def _print_results(
     temperature = generation_config["temperature"]
     top_p = generation_config["top_p"]
     top_k = generation_config["top_k"]
-    average_score = score / dataset_size
 
     print("\n" + "=" * 60)
     print(f"{model_name=} {dataset_name=}")
     print(f"{max_new_tokens=} {temperature=} {top_p=} {top_k=}\n")
     print(f"{metric=} {pass_k_value=} {num_tests_per_prompt=}\n")
-    print(f"score={average_score:.4f} ({score}/{dataset_size})")
+    if metric == "length_controlled_winrate":
+        winrate = score["win_rate"]
+        average_score = score["length_controlled_winrate"]
+        print(f"winrate={winrate:.4f}")
+        print(f"length_controlled_winrate={average_score:.4f}")
+    elif metric == "pass@k":
+        average_score = score / dataset_size
+        print(f"score={average_score:.4f} ({score}/{dataset_size})")
+    else:
+        raise ValueError(f"Invalid metric: {metric}")
     print("=" * 60 + "\n")
     logger.log_histogram("generation length", generation_lengths, num_bins=10)
     max_samples_to_html = master_config["logger"].get("max_samples_to_html", 30)

@@ -463,9 +463,11 @@ class Alpaca2VerifyWorker:
             sample_response = data["response"]
             golden_response = str(metadata["golden_response"])
             verdict = self._grade_sample(prompt, golden_response, sample_response)
-            assert verdict in ["m", "M"], (
-                f"Judge model expected to respond with 'm' or 'M', but responded with {verdict}"
-            )
+            if verdict not in ["m", "M"]:
+                logging.warning(
+                    f"Unexpected verdict from grader model: {verdict}. Expected 'm' or 'M'."
+                )
+                continue
             score = verdict == "M"
             results.append((score, golden_response, sample_response))
         return results
