@@ -128,7 +128,7 @@ class MathVerifyWorker:
 @ray.remote  # pragma: no cover
 class QAVerifyWorker:
     def __init__(self, cfg: MathEnvConfig) -> None:
-        model=cfg.get("grader_model", "gemini-2.5-flash")
+        model=cfg.get("grader_model_name", "gemini-2.5-flash")
         self.grader_model = None
         logger = logging.getLogger("qa_verify_worker")
         logger.setLevel(logging.INFO)
