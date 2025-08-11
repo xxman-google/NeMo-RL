@@ -37,7 +37,14 @@ from nemo_rl.environments.metrics import (
 )
 from nemo_rl.environments.utils import chunk_list_to_workers
 from nemo_rl.evals import answer_parsing
-from nemo_rl.evals.grader_model import GptGraderModel, GeminiGraderModel, OPENAI_SYSTEM_MESSAGE_CHATGPT, QA_GRADER_TEMPLATE
+from nemo_rl.evals.grader_model import (
+    GptGraderModel,
+    GeminiGraderModel,
+    ALPACA2_GRADER_TEMPLATE,
+    ALPACA2_SYSTEM_MESSAGE,
+    OPENAI_SYSTEM_MESSAGE_CHATGPT,
+    QA_GRADER_TEMPLATE
+)
 
 # from nemo_rl.evals.ifeval import instructions_registry
 
@@ -405,6 +412,65 @@ class ArcAgiVerifyWorker:
         return results
 
 
+@ray.remote  # pragma: no cover
+class Alpaca2VerifyWorker:
+    def __init__(self, cfg: MathEnvConfig) -> None:
+        model = cfg.get("grader_model_name", "gpt-4-1106-preview")
+        self.grader_model = None
+        logger = logging.getLogger("alpaca2_verify_worker")
+        logger.setLevel(logging.INFO)
+        logger.info(f"Initialized Grader Model: {model})")
+        assert model.startswith("gpt"), (
+            "Alpaca Eval 2.0 requires 'gpt-4-1106-preview' to be the grader model."
+        )
+        self.grader_model = GptGraderModel(
+            model=model,
+            api_key=cfg.get("grader_api_key", os.getenv("OPENAI_API_KEY")),
+            system_message=cfg.get("grader_system_message",ALPACA2_SYSTEM_MESSAGE),
+            temperature=cfg.get("grader_temperature", 1.0),
+            max_tokens=cfg.get("grader_max_tokens", 1),
+            logprobs=cfg.get("grader_logprobs", 1),
+            top_logprobs=cfg.get("grader_top_logprobs", 5),
+        )
+
+    def _grade_sample(self, prompt: str, golden_response: str, sample_response: str) -> str:
+        grader_prompt = ALPACA2_GRADER_TEMPLATE.format(
+            instruction=prompt,
+            output_1=golden_response,
+            output_2=sample_response,
+        )
+        prompt_messages = [
+            self.grader_model.pack_message(content=grader_prompt, role="user")
+        ]
+        grader_response = self.grader_model(prompt_messages)
+        return grader_response.response_text
+        
+    def verify(
+        self, pred_data: list[dict[str, str]], metadata_list: list[MathEnvironmentMetadata]
+    ) -> list[tuple[float, str, str]]:
+        """Verify the correctness of the predicted responses against the ground truth.
+
+        Args:
+            pred_data: list[dict[str, str]]. The predicted data including prompt and response from the LLM.
+            metadata_list: list[MathEnvironmentMetadata]. The metadata containing golden responses and other info.
+
+        Returns:
+            list[tuple[float, str, str]]. The rewards, golden response, and model sample response for each instance.
+        """
+        results = []
+        for data, metadata in zip(pred_data, metadata_list):
+            prompt = data["prompt"]
+            sample_response = data["response"]
+            golden_response = str(metadata["golden_response"])
+            verdict = self._grade_sample(prompt, golden_response, sample_response)
+            assert verdict in ["m", "M"], (
+                f"Judge model expected to respond with 'm' or 'M', but responded with {verdict}"
+            )
+            score = verdict == "M"
+            results.append((score, golden_response, sample_response))
+        return results
+
+
 @ray.remote(max_restarts=-1, max_task_retries=-1)  # pragma: no cover
 class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
     def __init__(self, cfg: MathEnvConfig):
@@ -423,6 +489,7 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
             "mgsm": MGSMVerifyWorker,
             "multilingual_multichoice": MultilingualMultichoiceVerifyWorker,
             "simpleqa": QAVerifyWorker,
+            "alpaca2": Alpaca2VerifyWorker,
         }[worker_type]
         self.workers = [
             worker_cls.options(  # type: ignore # (decorated with @ray.remote)

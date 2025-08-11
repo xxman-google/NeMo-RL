@@ -333,3 +333,12 @@ if_processor = functools.partial(
     question_key="prompt",
     extra_env_info_key_maps=[("checker_info", "checker_info")],
 )
+alpaca2_processor = functools.partial(
+    data_processor,
+    question_key="prompt",
+    extra_env_info_key_maps=[
+        ("golden_response", "golden_response"),
+        ("golden_model", "golden_model"),
+        ("dataset", "dataset"),
+    ],
+)
