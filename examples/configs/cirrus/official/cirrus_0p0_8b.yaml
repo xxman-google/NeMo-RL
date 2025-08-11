@@ -1,29 +1,32 @@
+# reference run: https://wandb.ai/gmayanksharan-google/cirrus/runs/w0ncpxa8?nw=nwuserxxman
 sft:
   max_num_epochs: 1
-  max_num_steps: 538
+  max_num_steps: 3000
   val_period: 100
   val_batches: 32
-  val_global_batch_size: 64
+  val_global_batch_size: 32
   val_micro_batch_size: 2
   val_at_start: true
   seed: 42
 checkpointing:
   enabled: true
-  checkpoint_dir: "results/cirrus_sft_qwen2p5_14b_tulu3"
+  checkpoint_dir: "results/cirrus_0p0_8b"
   metric_name: val_loss
   higher_is_better: false
-  keep_top_k: null
   save_period: 1000
+  keep_top_k: null
 policy:
-  model_name: "Qwen/Qwen2.5-14B"
+  model_name: "Qwen/Qwen3-8B-Base"
   tokenizer:
-    name: "Qwen/Qwen2.5-14B-Instruct"
+    name: "Qwen/Qwen3-8B"
     chat_template: "default"
-  train_global_batch_size: 8
+  train_global_batch_size: 32
   train_micro_batch_size: 1
+  logprob_batch_size: 1
   max_total_sequence_length: 32768
   precision: bfloat16
-
+  fsdp_offload_enabled: false
+  activation_checkpointing_enabled: false
   dtensor_cfg:
     enabled: true
     cpu_offload: false
@@ -33,15 +36,18 @@ policy:
     context_parallel_size: 1
     custom_parallel_plan: null
   dynamic_batching:
-    enabled: False
+    enabled: True
+    train_mb_tokens: ${mul:${policy.max_total_sequence_length}, ${policy.train_micro_batch_size}}
+    logprob_mb_tokens: ${mul:${policy.max_total_sequence_length}, ${policy.logprob_batch_size}}
+    sequence_length_round: 64
   sequence_packing:
     enabled: False
-  make_sequence_length_divisible_by: 8
+  make_sequence_length_divisible_by: ${policy.dtensor_cfg.tensor_parallel_size}
   max_grad_norm: 1
   optimizer:
     name: torch.optim.AdamW
     kwargs:
-      lr: 8.85e-06
+      lr: 1.77e-05
       weight_decay: 0.1
       betas:
         - 0.9
@@ -54,27 +60,39 @@ policy:
       kwargs:
         start_factor: 0.01
         end_factor: 1.0
-        total_iters: 100
+        total_iters: 200
     - name: "torch.optim.lr_scheduler.CosineAnnealingLR"
       kwargs:
-        T_max: 438
-        eta_min: 8.85e-7
-    - milestones: [100]
+        T_max: 2800
+        eta_min: 1.77e-6
+    - milestones: [200]
 data:
   max_input_seq_length: ${policy.max_total_sequence_length}
-  dataset_name: "tulu3sft"
+  dataset_name: "dataset_mixture"
+  mixture:
+    - file_format: "huggingface"
+      name_or_paths: "open-r1/Mixture-of-Thoughts"
+      samples: 349317
+      additional_kwargs:
+        name: "all"
+        split: "train"
+    - file_format: "huggingface"
+      name_or_paths: "allenai/tulu-3-sft-personas-instruction-following"
+      samples: 29980
+      additional_kwargs:
+        split: "train"
   add_bos: true
   add_eos: true
   add_generation_prompt: false
 logger:
-  log_dir: "logs/cirrus_sft_qwen2p5_14b_tulu3"
+  log_dir: "logs/cirrus_0p0_8b"
   wandb_enabled: true
   tensorboard_enabled: false
   mlflow_enabled: false
   monitor_gpus: true
   wandb:
     project: cirrus
-    name: "sft_qwen2p5_14b_tulu3_22m_lr8.85e-6"
+    name: cirrus_0p0_8b_3000steps
   gpu_monitoring:
     collection_interval: 30
     flush_interval: 30

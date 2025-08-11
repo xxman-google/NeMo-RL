@@ -116,10 +116,17 @@ def setup_data(tokenizer: AutoTokenizer, data_config: DataConfig):
     elif data_cls == "openai_format":
         data = hf_datasets.OpenAIFormatDataset(
             data_config["train_data_path"],
-            data_config["val_data_path"],
-            data_config["chat_key"],
-            data_config["system_key"],
-            data_config["system_prompt"],
+            data_config.get("val_data_path"),
+            data_config.get("chat_key"),
+            data_config.get("system_key"),
+            data_config.get("system_prompt"),
+            data_config.get("file_format", "json"),
+            data_config.get("val_ratio", 0.05)
+        )
+    elif data_cls == "dataset_mixture":
+        data = hf_datasets.DatasetMixture(
+            mixture=data_config["mixture"],
+            val_size=data_config.get("val_size", 0.05),
         )
     else:
         raise ValueError(f"Unknown dataset class: {data_cls}")
@@ -130,6 +137,9 @@ def setup_data(tokenizer: AutoTokenizer, data_config: DataConfig):
     train_dataset = data.formatted_ds["train"]
     val_dataset = data.formatted_ds["validation"]
     sft_task_spec = data.task_spec
+
+    print("Train dataset samples", len(train_dataset))
+    print("Val dataset samples", len(val_dataset))
 
     train_dataset = AllTaskProcessedDataset(
         train_dataset,

@@ -15,10 +15,12 @@ import ast
 import builtins
 import contextlib
 import io
+import multiprocessing
 import os
 import re
 import signal
 import sys
+import tempfile
 from collections.abc import Mapping, Sequence
 from contextlib import contextmanager, redirect_stdout
 from copy import copy
@@ -174,6 +176,9 @@ class CodeExecutionWorker:
                 except TimeoutException as err:
                     print("Timeout!")
                     result = err
+                except MemoryError as err:
+                    print("OOM!")
+                    result = err
                 except Exception as err:
                     result = err
 
@@ -196,8 +201,16 @@ class CodeExecutionWorker:
         os.chdir(dir)
         try:
             yield
+        except BaseException as ex:
+            raise ex
         finally:
             os.chdir(current_dir)
+
+    @contextlib.contextmanager
+    def create_tempdir(self):
+        with tempfile.TemporaryDirectory() as dirname:
+            with self.chdir(dirname):
+                yield dirname
 
     def safe_open(self, file: str, *args, **kwargs):
         """Safe version of open() that only allows access to temporary directory."""
@@ -235,6 +248,40 @@ class CodeExecutionRayWorker(CodeExecutionWorker):
 
 @ray.remote
 class PythonUnitTestVerifyRayWorker(CodeExecutionWorker):
+    def _unsafe_execute(self, code: str, metadata: dict[str, Any], result: list[str]):
+        with self.create_tempdir():
+            try:
+                with time_limit(self.timeout):
+                    exec(code, self.sandbox | {"__name__": "__main__"})
+                result.append("passed")
+            except TimeoutException as err:
+                result.append("timed out")
+            except MemoryError as err:
+                result.append("oom")
+            except Exception as err:
+                result.append(f"raised {err}")
+
+    def _check_correctness(self, code: str, metadata: dict[str, Any]):
+        manager = multiprocessing.Manager()
+        result = manager.list()
+
+        p = multiprocessing.Process(
+            target=self._unsafe_execute, args=(code, metadata, result)
+        )
+        p.start()
+        p.join(timeout=self.timeout + 1)
+        if p.is_alive():
+            p.kill()
+
+        if not result:
+            result.append("timed out")
+
+        return dict(
+            passed=result[0] == "passed",
+            result=result[0],
+            terminated=result[0] == "passed",
+        )
+
     def execute(
         self, message_batch: str, metadata_batch: List[UnitTestVerifierMetadata]
     ) -> Tuple[List[float], List[Dict[str, str]], List[bool], List[Any]]:
@@ -251,30 +298,17 @@ class PythonUnitTestVerifyRayWorker(CodeExecutionWorker):
                 terminateds.append(False)
                 continue
             code = matches[-1]
-            eval_code = "\n".join([metadata["base_imports"], code, metadata["tests"]])
-            # print("eval_code: ", eval_code)
+            if "base_imports" in metadata:
+                eval_code = "\n".join(
+                    [metadata["base_imports"], code, metadata["tests"]]
+                )
+            else:
+                eval_code = "\n".join([code, metadata["tests"]])
 
-            result = None
-            terminated = False
-            reward = 0.0
-            with self.chdir(metadata["working_dir"]):
-                try:
-                    # isolate the code in a sandbox
-                    with time_limit(self.timeout):
-                        exec(eval_code, self.sandbox)
-                    reward = 1.0
-                    terminated = True
-                except TimeoutException as err:
-                    print("Timeout!")
-                    result = err
-                except Exception as err:
-                    print(err)
-                    result = err
-
-            result = self.format_result(result, code)
-            results.append(result)
-            terminateds.append(terminated)
-            rewards.append(reward)
+            outputs = self._check_correctness(eval_code, metadata)
+            rewards.append(float(outputs["passed"]))
+            results.append(outputs["result"])
+            terminateds.append(outputs["terminated"])
 
         observations = [
             {"role": "environment", "content": result} for result in results
@@ -286,6 +320,50 @@ class PythonUnitTestVerifyRayWorker(CodeExecutionWorker):
 
 @ray.remote
 class PythonStdoutVerifyRayWorker(CodeExecutionWorker):
+    def _unsafe_execute(self, code: str, metadata: dict[str, Any], result: list[str]):
+        with self.create_tempdir():
+            try:
+                success = True
+                for tests in metadata["tests"]:
+                    sys.stdin = io.StringIO(tests["input"])
+                    buffer = io.StringIO()
+                    with time_limit(self.timeout):
+                        with redirect_stdout(buffer):
+                            exec(code, self.sandbox | {"__name__": "__main__"})
+                    output = buffer.getvalue().strip()
+                    success &= output == tests["output"].strip()
+                terminated = True
+                result.append("passed" if success else "failed")
+            except TimeoutException as err:
+                result.append("timed out")
+            except MemoryError as err:
+                result.append("oom")
+            except Exception as err:
+                result.append(f"raised {err}")
+            finally:
+                sys.stdin = sys.__stdin__
+
+    def _check_correctness(self, code: str, metadata: dict[str, Any]):
+        manager = multiprocessing.Manager()
+        result = manager.list()
+
+        p = multiprocessing.Process(
+            target=self._unsafe_execute, args=(code, metadata, result)
+        )
+        p.start()
+        p.join(timeout=self.timeout + 1)
+        if p.is_alive():
+            p.kill()
+
+        if not result:
+            result.append("timed out")
+
+        return dict(
+            passed=result[0] == "passed",
+            result=result[0],
+            terminated=result[0] in ["passed", "failed"],
+        )
+
     def execute(
         self, message_batch: str, metadata_batch: List[StdoutVerifierMetadata]
     ) -> Tuple[List[float], List[Dict[str, Any]], List[bool], List[Any]]:
@@ -299,39 +377,14 @@ class PythonStdoutVerifyRayWorker(CodeExecutionWorker):
             matches = pattern.findall(message)
             if not matches:
                 results.append("")
+                rewards.append(0.0)
                 terminateds.append(False)
                 continue
             code = matches[-1]
-
-            result = None
-            terminated = False
-            success = True
-            with self.chdir(metadata["working_dir"]):
-                try:
-                    for tests in metadata["tests"]:
-                        sys.stdin = io.StringIO(tests["input"])
-                        buffer = io.StringIO()
-                        with time_limit(self.timeout):
-                            with redirect_stdout(buffer):
-                                exec(code, self.sandbox | {"__name__": "__main__"})
-                        output = buffer.getvalue().strip()
-                        success &= output == tests["output"].strip()
-                    terminated = True
-                    # print("success: ", success)
-                except TimeoutException as err:
-                    result = err
-                    success = False
-                    print("Timeout!")
-                except Exception as err:
-                    result = err
-                    print("exception: ", result)
-                    success = False
-                finally:
-                    sys.stdin = sys.__stdin__
-            rewards.append(float(success))
-            result = self.format_result(result, code)
-            results.append(result)
-            terminateds.append(terminated)
+            outputs = self._check_correctness(code, metadata)
+            rewards.append(float(outputs["passed"]))
+            results.append(outputs["result"])
+            terminateds.append(outputs["terminated"])
 
         observations = [
             {"role": "environment", "content": result} for result in results
