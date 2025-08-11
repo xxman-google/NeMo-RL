@@ -14,6 +14,7 @@
 
 import asyncio
 import collections
+import json
 import os
 from typing import Optional, TypedDict
 
@@ -28,10 +29,12 @@ from nemo_rl.data.datasets import AllTaskProcessedDataset, eval_collate_fn
 from nemo_rl.data.llm_message_utils import get_keys_from_message_log
 from nemo_rl.distributed.batched_data_dict import BatchedDataDict
 from nemo_rl.distributed.virtual_cluster import ClusterConfig, RayVirtualCluster
+from nemo_rl.environments.code_environment import CodeEnvConfig
 from nemo_rl.environments.math_environment import MathEnvConfig
 from nemo_rl.evals import visualization as vis_lib
 from nemo_rl.models.generation.interfaces import GenerationConfig
 from nemo_rl.models.generation.vllm import VllmGeneration
+from nemo_rl.models.policy import TokenizerConfig
 from nemo_rl.utils.logger import Logger, LoggerConfig
 
 # ===============================================================================
@@ -44,13 +47,15 @@ class EvalConfig(TypedDict):
     num_tests_per_prompt: int
     seed: int
     pass_k_value: int
+    save_path: str | None
 
 
 class MasterConfig(TypedDict):
     eval: EvalConfig
-    generate: GenerationConfig
+    generation: GenerationConfig  # Fixed: was 'generate'
+    tokenizer: TokenizerConfig  # Added missing tokenizer key
     data: MathDataConfig
-    env: MathEnvConfig
+    env: CodeEnvConfig | MathEnvConfig
     cluster: ClusterConfig
     logger: LoggerConfig
 
@@ -255,22 +260,27 @@ async def _run_env_eval_impl(
     # Extract for easier access
     generation_config = master_config["generation"]
     eval_config = master_config["eval"]
-    env_config = master_config["env"]["math"]
+    env_type = master_config["env"].get("env_type", "math")
+    env_config = master_config["env"].get(env_type)
     logger_config = master_config["logger"]
     metric = eval_config["metric"]
     num_tests_per_prompt = eval_config["num_tests_per_prompt"]
     pass_k_value = eval_config["pass_k_value"]
+
+    # List to collect evaluation data for parquet file
+    evaluation_data = []
     metric_group_key = env_config.get("metric_group_key", None)
     render_template = {
         "arc_agi": vis_lib.BaseRenderTemplate,
         "math": vis_lib.MathRenderTemplate,
         "mgsm": vis_lib.MathRenderTemplate,
-        "code": vis_lib.CodeRenderTemplate,
+        "python_unit_test_verify": vis_lib.CodeRenderTemplate,
+        "python_stdout_verify": vis_lib.CodeRenderTemplate,
         "english_multichoice": vis_lib.MathRenderTemplate,
         "multilingual_multichoice": vis_lib.MathRenderTemplate,
         "instruction_following": vis_lib.BaseRenderTemplate,
         "swebench_verified": vis_lib.BaseRenderTemplate,
-    }[env_config["verifier_type"]]()
+    }[env_config["worker_type"]]()
 
     # Run evaluation loop
     score = 0.0
@@ -315,6 +325,28 @@ async def _run_env_eval_impl(
         ]
         env_return = ray.get(env.step.remote(to_env, batch["extra_env_info"]))
         rewards = env_return.rewards
+
+        # Collect data for JSON file
+        for i, (prompt, output, message_log, reward, extra_info) in enumerate(
+            zip(
+                prompts,
+                output_texts,
+                batch["message_log"],
+                rewards.tolist(),
+                batch["extra_env_info"],
+            )
+        ):
+            evaluation_data.append(
+                {
+                    "prompt": prompt,
+                    "response": output,
+                    "reward": reward,
+                    "message_log": message_log,
+                    "extra_env_info": extra_info,
+                    "sample_index": len(evaluation_data),
+                }
+            )
+
         for prompt, response, reward, observation in zip(
             prompts,
             output_texts,
@@ -352,6 +384,11 @@ async def _run_env_eval_impl(
     ray.get(env.shutdown.remote())
     vllm_generation.shutdown()
 
+    # Save evaluation data to JSON file if save_path is specified
+    save_path = eval_config.get("save_path")
+    if evaluation_data and save_path is not None:
+        _save_evaluation_data_to_json(evaluation_data, master_config, save_path)
+
     # Print results
     _print_results(
         master_config,
@@ -388,6 +425,124 @@ async def _generate_texts(vllm_generation, inputs, use_async):
         output_texts = outputs["texts"]
         generation_lengths = outputs["generation_lengths"]
         return output_texts, generation_lengths
+
+
+def _save_evaluation_data_to_json(evaluation_data, master_config, save_path):
+    """Save evaluation data to a JSON file.
+
+    Args:
+        evaluation_data: List of evaluation samples
+        master_config: Configuration dictionary
+        save_path: Path to save evaluation results. Set to null to disable saving.
+                  Example: "results/eval_output" or "/path/to/evaluation_results"
+    """
+    # Extract configuration information
+    config_data = {
+        "model_name": master_config["generation"]["model_name"],
+        "dataset_name": master_config["data"]["dataset_name"],
+        "metric": master_config["eval"]["metric"],
+        "pass_k_value": master_config["eval"]["pass_k_value"],
+        "num_tests_per_prompt": master_config["eval"]["num_tests_per_prompt"],
+        "temperature": master_config["generation"]["temperature"],
+        "top_p": master_config["generation"]["top_p"],
+        "top_k": master_config["generation"]["top_k"],
+    }
+
+    # Create directory if it doesn't exist
+    save_dir = save_path
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir, exist_ok=True)
+
+    # Generate file paths within the directory
+    eval_data_path = os.path.join(save_dir, "evaluation_data.json")
+    config_path = os.path.join(save_dir, "config.json")
+
+    # Prepare the data to save
+    data_to_save = {"evaluation_data": evaluation_data}
+
+    # Save configuration to separate JSON file
+    with open(config_path, "w") as f:
+        json.dump(config_data, f, indent=2)
+    print(f"\n✓ Configuration saved to: {config_path}")
+
+    # Process data to make it JSON serializable
+    processed_data = []
+    for sample in evaluation_data:
+        processed_sample = sample.copy()
+        # Convert non-serializable objects to strings
+        processed_sample["message_log"] = str(sample["message_log"])
+        processed_sample["extra_env_info"] = str(sample["extra_env_info"])
+        processed_data.append(processed_sample)
+
+    # Update data to save with processed version
+    data_to_save["evaluation_data"] = processed_data
+
+    # Save to JSON file
+    with open(eval_data_path, "w") as f:
+        json.dump(data_to_save, f, indent=2)
+
+    print(f"\n✓ Evaluation data saved to: {eval_data_path}")
+    print(f"  Total samples: {len(evaluation_data)}")
+    print(f"  File size: {os.path.getsize(eval_data_path) / 1024 / 1024:.2f} MB")
+
+
+def _save_evaluation_data_to_json(evaluation_data, master_config, save_path):
+    """Save evaluation data to a JSON file.
+
+    Args:
+        evaluation_data: List of evaluation samples
+        master_config: Configuration dictionary
+        save_path: Path to save evaluation results. Set to null to disable saving.
+                  Example: "results/eval_output" or "/path/to/evaluation_results"
+    """
+    # Extract configuration information
+    config_data = {
+        "model_name": master_config["generation"]["model_name"],
+        "dataset_name": master_config["data"]["dataset_name"],
+        "metric": master_config["eval"]["metric"],
+        "pass_k_value": master_config["eval"]["pass_k_value"],
+        "num_tests_per_prompt": master_config["eval"]["num_tests_per_prompt"],
+        "temperature": master_config["generation"]["temperature"],
+        "top_p": master_config["generation"]["top_p"],
+        "top_k": master_config["generation"]["top_k"],
+    }
+
+    # Create directory if it doesn't exist
+    save_dir = save_path
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir, exist_ok=True)
+
+    # Generate file paths within the directory
+    eval_data_path = os.path.join(save_dir, "evaluation_data.json")
+    config_path = os.path.join(save_dir, "config.json")
+
+    # Prepare the data to save
+    data_to_save = {"evaluation_data": evaluation_data}
+
+    # Save configuration to separate JSON file
+    with open(config_path, "w") as f:
+        json.dump(config_data, f, indent=2)
+    print(f"\n✓ Configuration saved to: {config_path}")
+
+    # Process data to make it JSON serializable
+    processed_data = []
+    for sample in evaluation_data:
+        processed_sample = sample.copy()
+        # Convert non-serializable objects to strings
+        processed_sample["message_log"] = str(sample["message_log"])
+        processed_sample["extra_env_info"] = str(sample["extra_env_info"])
+        processed_data.append(processed_sample)
+
+    # Update data to save with processed version
+    data_to_save["evaluation_data"] = processed_data
+
+    # Save to JSON file
+    with open(eval_data_path, "w") as f:
+        json.dump(data_to_save, f, indent=2)
+
+    print(f"\n✓ Evaluation data saved to: {eval_data_path}")
+    print(f"  Total samples: {len(evaluation_data)}")
+    print(f"  File size: {os.path.getsize(eval_data_path) / 1024 / 1024:.2f} MB")
 
 
 def _print_results(

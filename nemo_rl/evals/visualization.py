@@ -28,7 +28,7 @@ CODE_HTML_JINJA = """
 {{ preformatted_message_to_html(message) | safe }}
 {% endfor %}
 <h3>Sampled message</h3>
-{{ preformatted_message_to_html(next_message) | safe }}
+{{ message_to_html(next_message) | safe }}
 <h3>Results</h3>
 <p>Correct Answer: <github-md> {{ correct_answer }} </github-mb></p>
 <p>Extracted Answer: <github-md> {{ extracted_answer }} </github-mb></p>
@@ -241,8 +241,6 @@ class CodeRenderTemplate:
     ):
         prompt_messages = [{"content": prompt, "role": "user"}]
         next_message = dict(content=response, role="assistant")
-        correct_answer = "\n".join([f"```{self._lang}", correct_answer, "```"])
-        extracted_answer = "\n".join([f"```{self._lang}", extracted_answer, "```"])
         return self._template.render(
             prompt_messages=prompt_messages,
             next_message=next_message,

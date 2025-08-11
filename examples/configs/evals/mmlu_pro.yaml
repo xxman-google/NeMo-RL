@@ -7,5 +7,5 @@ data:
 
 env:
   math:
-    verifier_type: "english_multichoice"
+    worker_type: "english_multichoice"
     metric_group_key: "subject"

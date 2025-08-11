@@ -1,0 +1,23 @@
+# LiveCodeBench evaluation Configuration
+defaults: "eval.yaml"
+
+data:
+  dataset_name: "livecodebench"
+  code_exe_dir: "/tmp/logs"
+  version: "release_v5"
+  test_type: "stdin"
+
+generation:
+  temperature: 0.7
+  top_p: 0.8
+  model_name: "Qwen/Qwen3-8B"
+  vllm_cfg:
+    max_model_len: 8192
+
+env:
+  env_type: "code"
+  code:
+    num_workers: 8
+    terminate_on_evaluation: true
+    worker_type: "python_stdout_verify"
+    timeout: 10.0

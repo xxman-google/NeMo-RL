@@ -11,5 +11,4 @@ generation:
 
 env:
   math:
-    verifier_type: "arc_agi"
-    verifier_metadata_key: "ground_truth"
+    worker_type: "arc_agi"

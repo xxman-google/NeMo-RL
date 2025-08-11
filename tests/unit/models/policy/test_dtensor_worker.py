@@ -31,18 +31,17 @@ from nemo_rl.distributed.virtual_cluster import RayVirtualCluster
 from nemo_rl.models.generation import configure_generation_config
 from nemo_rl.models.policy import PolicyConfig
 from nemo_rl.models.policy.lm_policy import Policy
-from tests.unit.conftest import TEST_ASSETS
 from tests.unit.test_utils import SimpleLoss
 
 
 def create_test_config(
-    model_name: str = TEST_ASSETS.TINY_LLAMA_MODEL_PATH,
+    model_name: str,
     tp: int = 1,
     cp: int = 1,
     sequence_parallel: bool = False,
     cpu_offload: bool = False,
     activation_checkpointing: bool = False,
-    custom_parallel_plan: str = None,
+    custom_parallel_plan: str | None = None,
 ) -> PolicyConfig:
     return {
         "model_name": model_name,
@@ -83,6 +82,9 @@ def create_test_config(
             "train_mb_tokens": 128,
             "logprob_mb_tokens": 128,
             "sequence_length_round": 4,
+        },
+        "sequence_packing": {
+            "enabled": False,
         },
         "optimizer": {
             "name": "torch.optim.AdamW",
@@ -142,9 +144,9 @@ def gc_collect():
 
 
 @pytest.fixture
-def policy_setup(two_gpu_virtual_cluster):
+def policy_setup(two_gpu_virtual_cluster, tiny_llama_model_path):
     """Setup and teardown for policy tests - creates a virtual cluster and policy."""
-    config = create_test_config()
+    config = create_test_config(tiny_llama_model_path)
     tokenizer = get_tokenizer(config["tokenizer"])
     config["generation"] = configure_generation_config(config["generation"], tokenizer)
 
@@ -157,6 +159,7 @@ def policy_setup(two_gpu_virtual_cluster):
     policy.shutdown()
 
 
+@pytest.mark.hf_gated
 @pytest.mark.timeout(180)
 def test_lm_policy_init(policy_setup):
     policy = policy_setup
@@ -237,16 +240,24 @@ def test_lm_policy_init(policy_setup):
 @pytest.fixture
 def training_setup(request, two_gpu_virtual_cluster):
     """Setup and teardown specifically for training tests."""
-    model_name, tp, cp, cpu_offload, sequence_parallel, activation_checkpointing = (
-        request.param
-    )
+    (
+        model_fixture_name,
+        tp,
+        cp,
+        sequence_parallel,
+        cpu_offload,
+        activation_checkpointing,
+    ) = request.param
+
+    # Get the actual model path from the requested fixture
+    model_name = request.getfixturevalue(model_fixture_name)
     policy = None
     data = None
     loss_fn = None
 
     try:
         config = create_test_config(
-            model_name, tp, cp, cpu_offload, sequence_parallel, activation_checkpointing
+            model_name, tp, cp, sequence_parallel, cpu_offload, activation_checkpointing
         )
         tokenizer = get_tokenizer(config["tokenizer"])
         print(
@@ -296,31 +307,38 @@ def training_setup(request, two_gpu_virtual_cluster):
         policy.shutdown()
 
 
+@pytest.mark.hf_gated
 @pytest.mark.timeout(60)
 @pytest.mark.parametrize(
     "training_setup",
     [
-        # model_name, tp, cp, cpu_offload, sequence_parallel, activation_checkpointing
-        # Split grid over tp/cp/cpu/sp/act across qwen and llama
-        (TEST_ASSETS.TINY_LLAMA_MODEL_PATH, 1, 1, False, False, False),
-        (TEST_ASSETS.TINY_LLAMA_MODEL_PATH, 1, 1, True, False, False),
-        (TEST_ASSETS.TINY_LLAMA_MODEL_PATH, 1, 1, False, True, False),
-        (TEST_ASSETS.TINY_LLAMA_MODEL_PATH, 1, 1, False, False, True),
-        (TEST_ASSETS.TINY_LLAMA_MODEL_PATH, 1, 2, False, False, False),
-        (TEST_ASSETS.TINY_QWEN2_MODEL_PATH, 1, 1, True, True, False),
-        (TEST_ASSETS.TINY_QWEN2_MODEL_PATH, 1, 1, True, False, True),
-        (TEST_ASSETS.TINY_QWEN2_MODEL_PATH, 1, 1, False, True, True),
-        (TEST_ASSETS.TINY_QWEN2_MODEL_PATH, 1, 1, True, True, True),
-        (TEST_ASSETS.TINY_QWEN2_MODEL_PATH, 1, 2, False, False, False),
-        (TEST_ASSETS.TINY_QWEN3_MODEL_PATH, 1, 1, True, True, False),
-        (TEST_ASSETS.TINY_QWEN3_MODEL_PATH, 1, 1, True, False, True),
-        (TEST_ASSETS.TINY_QWEN3_MODEL_PATH, 1, 1, False, True, True),
-        (TEST_ASSETS.TINY_QWEN3_MODEL_PATH, 1, 1, True, True, True),
-        (TEST_ASSETS.TINY_QWEN3_MODEL_PATH, 1, 2, False, False, False),
-        (TEST_ASSETS.TINY_GEMMA3_MODEL_PATH, 1, 1, True, True, False),
-        (TEST_ASSETS.TINY_GEMMA3_MODEL_PATH, 1, 1, True, False, True),
-        (TEST_ASSETS.TINY_GEMMA3_MODEL_PATH, 1, 1, False, True, True),
-        (TEST_ASSETS.TINY_GEMMA3_MODEL_PATH, 1, 1, True, True, True),
+        # model_fixture_name        tp cp  sp     cpu    act
+        ("tiny_llama_model_path", 1, 1, False, False, False),
+        ("tiny_llama_model_path", 1, 1, True, False, False),
+        ("tiny_llama_model_path", 1, 1, False, True, False),
+        ("tiny_llama_model_path", 1, 1, False, False, True),
+        ("tiny_llama_model_path", 1, 2, False, False, False),
+        ("tiny_qwen2_model_path", 1, 1, True, True, False),
+        ("tiny_qwen2_model_path", 1, 1, True, False, True),
+        ("tiny_qwen2_model_path", 1, 1, False, True, True),
+        ("tiny_qwen2_model_path", 1, 1, True, True, True),
+        ("tiny_qwen2_model_path", 1, 2, False, False, False),
+        ("tiny_qwen3_model_path", 1, 1, True, True, False),
+        ("tiny_qwen3_model_path", 1, 1, True, False, True),
+        ("tiny_qwen3_model_path", 1, 1, False, True, True),
+        ("tiny_qwen3_model_path", 1, 1, True, True, True),
+        ("tiny_qwen3_model_path", 1, 2, False, False, False),
+        (
+            "tiny_gemma3_model_path",
+            1,
+            1,
+            True,
+            True,
+            False,
+        ),  # gemma3 doesn't support spda
+        ("tiny_gemma3_model_path", 1, 1, True, False, True),
+        ("tiny_gemma3_model_path", 1, 1, False, True, True),
+        ("tiny_gemma3_model_path", 1, 1, True, True, True),
         # CP doesn't support gemma3 due to spda input has attent_mask != None.
     ],
     indirect=True,
@@ -363,15 +381,23 @@ def test_dtensor_worker_training(training_setup):
 @pytest.fixture
 def logprob_setup(request, two_gpu_virtual_cluster):
     """Setup and teardown specifically for training tests."""
-    model_name, tp, cp, cpu_offload, sequence_parallel, activation_checkpointing = (
-        request.param
-    )
+    (
+        model_fixture_name,
+        tp,
+        cp,
+        sequence_parallel,
+        cpu_offload,
+        activation_checkpointing,
+    ) = request.param
+
+    # Get the actual model path from the requested fixture
+    model_name = request.getfixturevalue(model_fixture_name)
     policy = None
     data = None
 
     try:
         config = create_test_config(
-            model_name, tp, cp, cpu_offload, sequence_parallel, activation_checkpointing
+            model_name, tp, cp, sequence_parallel, cpu_offload, activation_checkpointing
         )
         tokenizer = get_tokenizer(config["tokenizer"])
         print(
@@ -440,28 +466,29 @@ def logprob_setup(request, two_gpu_virtual_cluster):
         policy.shutdown()
 
 
+@pytest.mark.hf_gated
 @pytest.mark.timeout(360)
 @pytest.mark.parametrize(
     "logprob_setup",
     [
         # TP=2, CP=1
-        (TEST_ASSETS.TINY_QWEN2_MODEL_PATH, 2, 1, False, True, False),
-        (TEST_ASSETS.TINY_QWEN2_MODEL_PATH, 2, 1, False, False, False),
-        (TEST_ASSETS.TINY_LLAMA_MODEL_PATH, 2, 1, False, False, False),
-        (TEST_ASSETS.TINY_LLAMA_MODEL_PATH, 2, 1, False, True, False),
-        (TEST_ASSETS.TINY_LLAMA_MODEL_PATH, 2, 1, False, True, True),
-        (TEST_ASSETS.TINY_QWEN3_MODEL_PATH, 2, 1, False, True, False),
-        (TEST_ASSETS.TINY_QWEN3_MODEL_PATH, 2, 1, False, False, False),
-        (TEST_ASSETS.TINY_GEMMA3_MODEL_PATH, 2, 1, False, True, False),
-        (TEST_ASSETS.TINY_GEMMA3_MODEL_PATH, 2, 1, False, False, False),
+        ("tiny_qwen2_model_path", 2, 1, False, True, False),
+        ("tiny_qwen2_model_path", 2, 1, False, False, False),
+        ("tiny_llama_model_path", 2, 1, False, False, False),
+        ("tiny_llama_model_path", 2, 1, False, True, False),
+        ("tiny_llama_model_path", 2, 1, False, True, True),
+        ("tiny_qwen3_model_path", 2, 1, False, True, False),
+        ("tiny_qwen3_model_path", 2, 1, False, False, False),
+        ("tiny_gemma3_model_path", 2, 1, False, True, False),
+        ("tiny_gemma3_model_path", 2, 1, False, False, False),
         # TP=1, CP=2
-        (TEST_ASSETS.TINY_QWEN2_MODEL_PATH, 1, 2, False, True, False),
-        (TEST_ASSETS.TINY_QWEN2_MODEL_PATH, 1, 2, False, False, False),
-        (TEST_ASSETS.TINY_LLAMA_MODEL_PATH, 1, 2, False, False, False),
-        (TEST_ASSETS.TINY_LLAMA_MODEL_PATH, 1, 2, False, True, False),
-        (TEST_ASSETS.TINY_LLAMA_MODEL_PATH, 1, 2, False, True, True),
-        (TEST_ASSETS.TINY_QWEN3_MODEL_PATH, 1, 2, False, True, False),
-        (TEST_ASSETS.TINY_QWEN3_MODEL_PATH, 1, 2, False, False, False),
+        ("tiny_qwen2_model_path", 1, 2, False, True, False),
+        ("tiny_qwen2_model_path", 1, 2, False, False, False),
+        ("tiny_llama_model_path", 1, 2, False, False, False),
+        ("tiny_llama_model_path", 1, 2, False, True, False),
+        ("tiny_llama_model_path", 1, 2, False, True, True),
+        ("tiny_qwen3_model_path", 1, 2, False, True, False),
+        ("tiny_qwen3_model_path", 1, 2, False, False, False),
     ],
     indirect=True,
 )
@@ -482,17 +509,24 @@ def test_dtensor_worker_logprob_tp2_or_cp2_matches_unsharded(logprob_setup):
     )
 
 
-def test_dtensor_tp_and_tied_model_with_custom_parallel_plan(two_gpu_virtual_cluster):
+@pytest.mark.hf_gated
+def test_dtensor_tp_and_tied_model_with_custom_parallel_plan(
+    two_gpu_virtual_cluster, tiny_llama_tied_model_path
+):
     """Test that DTensor with a tp > 1 and a tied model with a custom parallel plan works."""
     from torch.distributed.tensor.parallel import ColwiseParallel
     from torch.distributed.tensor.placement_types import Replicate
 
-    custom_parallel_plan = {"lm_head": ColwiseParallel(output_layouts=Replicate())}
+    custom_parallel_plan = {
+        "lm_head": ColwiseParallel(output_layouts=Replicate()),
+        "model.embed_tokens": ColwiseParallel(output_layouts=Replicate()),
+    }
     config = create_test_config(
-        model_name=TEST_ASSETS.TINY_LLAMA_TIED_MODEL_PATH,
+        model_name=tiny_llama_tied_model_path,
         tp=2,
-        cpu_offload=False,
+        cp=1,
         sequence_parallel=False,
+        cpu_offload=False,
         activation_checkpointing=False,
         custom_parallel_plan=custom_parallel_plan,
     )
@@ -510,19 +544,22 @@ def test_dtensor_tp_and_tied_model_with_custom_parallel_plan(two_gpu_virtual_clu
     state_dict = ray.get(policy.worker_group.workers[0].return_state_dict.remote())
     total_shape = state_dict["lm_head.weight"].shape
     sharded_shape = state_dict["lm_head.weight"].to_local().shape
-    assert total_shape[0] == sharded_shape[0] * 2, (
-        "lm_head.weight should be sharded across 2 GPUs"
+    assert total_shape[0] == sharded_shape[0], (
+        "lm_head.weight should have the same number of rows"
     )
-    assert total_shape[1] == sharded_shape[1], (
-        "lm_head.weight should have the same number of columns"
+    assert total_shape[1] == sharded_shape[1] * 2, (
+        "lm_head.weight should be sharded across 2 GPUs"
     )
 
     # Clean up
     policy.shutdown()
 
 
+@pytest.mark.hf_gated
 @pytest.mark.timeout(180)
-def test_dtensor_loss_independent_of_microbatch_size_two_gpus(two_gpu_virtual_cluster):
+def test_dtensor_loss_independent_of_microbatch_size_two_gpus(
+    two_gpu_virtual_cluster, tiny_llama_model_path
+):
     """Tests that changing microbatch size while keeping global batch size constant does not affect loss values in DTensor."""
     # Create test batch with global batch size of 8
     global_batch_size = 8
@@ -556,7 +593,7 @@ def test_dtensor_loss_independent_of_microbatch_size_two_gpus(two_gpu_virtual_cl
     )
 
     # Test with mbs=1, 2 microbatches per GPU
-    config = create_test_config()
+    config = create_test_config(tiny_llama_model_path)
     tokenizer = get_tokenizer(config["tokenizer"])
 
     print("Creating training Policy with mbs=1...")
@@ -592,7 +629,7 @@ def test_dtensor_loss_independent_of_microbatch_size_two_gpus(two_gpu_virtual_cl
     policy_mbs1.worker_group.shutdown()
 
     # Test with mbs=2, 1 microbatch per GPU
-    config = create_test_config()
+    config = create_test_config(tiny_llama_model_path)
     config["train_micro_batch_size"] = 2
     config["generation"] = configure_generation_config(config["generation"], tokenizer)
 

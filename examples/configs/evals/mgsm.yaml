@@ -11,5 +11,5 @@ generation:
 
 env:
   math:
-    verifier_type: "mgsm"
+    worker_type: "mgsm"
     metric_group_key: "lang"
