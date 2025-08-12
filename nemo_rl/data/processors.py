@@ -245,6 +245,7 @@ def multichoice_qa_processor(
         tokenize=False,
         add_generation_prompt=True,
         add_special_tokens=False,
+        enable_thinking=task_data_spec.enable_thinking,
     )
     user_message["token_ids"] = tokenizer(message, return_tensors="pt")["input_ids"][0]
     user_message["content"] = message
