@@ -36,6 +36,7 @@ from nemo_rl.data.eval_datasets.simpleqa import SimpleQADataset
 from nemo_rl.data.eval_datasets.openr1_verifiable_code import (
     OpenR1VerifiableCodeDataset,
 )
+from nemo_rl.data.eval_datasets.sciq import SciQDataset
 from nemo_rl.data.eval_datasets.tulu3_sft import Tulu3SftDataset
 
 
@@ -205,7 +206,13 @@ def load_eval_dataset(data_config):
     elif dataset_name == "alpaca2":
         base_dataset = Alpaca2Dataset(
             prompt_file=data_config["prompt_file"],
-            system_prompt_file=data_config["system_prompt_file"], 
+            system_prompt_file=data_config["system_prompt_file"],
+        ) 
+    elif dataset_name == "sciq":
+        base_dataset = SciQDataset(
+            split=data_config["split"],
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
         )
     else:
         raise ValueError(f"Unknown dataset {dataset_name}.")
@@ -233,5 +240,6 @@ __all__ = [
     "NuminaMathDataset",
     "OpenR1MathDataset",
     "OpenR1VerifiableCodeDataset",
+    "SciQDataset",
     "Tulu3SftDataset",
 ]
