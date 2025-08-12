@@ -7,7 +7,7 @@ if [ "$#" -ne 2 ]; then
 fi
 
 enable_thinking=false
-if $enable_thinking; then
+if [[ $enable_thinking == "true" ]]; then
   max_model_len=38912
   temperature=0.6
   top_p=0.95
@@ -24,14 +24,10 @@ top_k=20
 ckpt_path=$1
 exp_name=$2
 hf_ckpt_path=$ckpt_path/hf
-max_model_len=32768
-temperature=0.6
-top_p=0.95
-enable_thinking=true
 
-# uv run python examples/converters/convert_dcp_to_hf.py --config $ckpt_path/config.yaml --dcp-ckpt-path $ckpt_path/policy/weights/ --hf-ckpt-path $hf_ckpt_path
+uv run python examples/converters/convert_dcp_to_hf.py --config $ckpt_path/config.yaml --dcp-ckpt-path $ckpt_path/policy/weights/ --hf-ckpt-path $hf_ckpt_path
 
-benchmarks=("aime2024" "aime2025" "beyond_aime" "gpqa" "math" "math500" "mgsm" "mmlu" "mmlu_pro")
+benchmarks=("aime2024" "aime2025" "beyond_aime" "gpqa" "math" "math500" "mgsm" "mmlu" "mmlu_pro" "humaneval" "livecodebench_functional" "livecodebench_stdin")
 
 for benchmark_name in "${benchmarks[@]}"; do
   if [ $benchmark_name = "math500" ]; then
@@ -39,12 +35,17 @@ for benchmark_name in "${benchmarks[@]}"; do
   else
     config_file="examples/configs/evals/${benchmark_name}.yaml"
   fi
+  if [[ $benchmark_name == "livecodebench"* ]]; then
+    dataset_name="livecodebench"
+  else
+    dataset_name=$benchmark_name
+  fi
 
   echo "Reading from config: ${config_file}"
   wandb_name="$exp_name-$benchmark_name"
 
   uv run examples/run_eval.py --config $config_file \
-  data.dataset_name=$benchmark_name \
+  data.dataset_name=$dataset_name \
   generation.stop_token_ids=\[151643,151645\] \
   generation.enable_thinking=$enable_thinking \
   generation.vllm_cfg.max_model_len=$max_model_len \
