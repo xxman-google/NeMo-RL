@@ -35,7 +35,7 @@ from nemo_rl.data.eval_datasets.openr1_verifiable_code import (
     OpenR1VerifiableCodeDataset,
 )
 from nemo_rl.data.eval_datasets.tulu3_sft import Tulu3SftDataset
-from nemo_rl.data.eval_datasets.ifeval_like import IFEvalLikeSFTDataset
+from nemo_rl.data.eval_datasets.ifeval_like import IFEvalLikeDataset
 
 
 def load_eval_dataset(data_config):
@@ -227,5 +227,5 @@ __all__ = [
     "OpenR1MathDataset",
     "OpenR1VerifiableCodeDataset",
     "Tulu3SftDataset",
-    "IFEvalLikeSFTDataset",
+    "IFEvalLikeDataset",
 ]

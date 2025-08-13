@@ -36,6 +36,7 @@ def main(_):
         log_dir=_WANDB_LOG_DIR.value,
         wandb_enabled=True,
         tensorboard_enabled=False,
+        mlflow_enabled=False,
         wandb=WandbConfig(project="data", name=_DATASET_NAME.value),
         monitor_gpus=False,
     )
