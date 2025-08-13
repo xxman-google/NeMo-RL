@@ -25,6 +25,7 @@ from nemo_rl.data.hf_datasets.prompt_response_dataset import (
 from nemo_rl.data.hf_datasets.squad import SquadDataset
 from nemo_rl.data.hf_datasets.tulu3_sft_mixture import Tulu3SftMixtureDataset
 from nemo_rl.data.hf_datasets.tulu3sft import Tulu3SftDataset
+from nemo_rl.data.hf_datasets.ifeval_like_sft import IFEvalLikeSFTDataset
 
 __all__ = [
     "DPODataset",
@@ -38,4 +39,5 @@ __all__ = [
     "Tulu3SftMixtureDataset",
     "COMMON_CHAT_TEMPLATES",
     "Tulu3SftDataset",
+    "IFEvalLikeSFTDataset",
 ]

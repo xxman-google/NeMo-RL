@@ -12,3 +12,14 @@ generation:
   enable_thinking: true
   vllm_cfg:
     max_model_len: 38912
+
+data:
+  dataset_name: "ifeval_like"
+  source: "filtered"
+  prompt_file: "examples/prompts/if_cot.txt"
+
+env:
+  math:
+    num_workers: 8
+    verifier_type: "instruction_following"
+    worker_type: "instruction_following"

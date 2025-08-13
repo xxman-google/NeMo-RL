@@ -35,6 +35,7 @@ from nemo_rl.data.eval_datasets.openr1_verifiable_code import (
     OpenR1VerifiableCodeDataset,
 )
 from nemo_rl.data.eval_datasets.tulu3_sft import Tulu3SftDataset
+from nemo_rl.data.eval_datasets.ifeval_like import IFEvalLikeSFTDataset
 
 
 def load_eval_dataset(data_config):
@@ -194,6 +195,12 @@ def load_eval_dataset(data_config):
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
+    elif dataset_name == "ifeval_like":
+        base_dataset = IFEvalLikeDataset(
+            data_config["source"],
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
     else:
         raise ValueError(f"Unknown dataset {dataset_name}.")
     return base_dataset
@@ -220,4 +227,5 @@ __all__ = [
     "OpenR1MathDataset",
     "OpenR1VerifiableCodeDataset",
     "Tulu3SftDataset",
+    "IFEvalLikeSFTDataset",
 ]

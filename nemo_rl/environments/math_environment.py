@@ -23,6 +23,7 @@ import torch
 from math_verify.errors import TimeoutException
 from math_verify.metric import math_metric
 from math_verify.parser import ExprExtractionConfig, LatexExtractionConfig
+# from nemo_rl.evals.ifeval.if_verify import test_instruction_following_strict
 
 from nemo_rl.data.interfaces import LLMMessageLogType
 from nemo_rl.distributed.batched_data_dict import BatchedDataDict
@@ -37,7 +38,7 @@ from nemo_rl.environments.metrics import (
 from nemo_rl.environments.utils import chunk_list_to_workers
 from nemo_rl.evals import answer_parsing
 
-# from nemo_rl.evals.ifeval import instructions_registry
+from nemo_rl.evals.ifeval import instructions_registry
 
 
 class MathEnvConfig(TypedDict):
@@ -219,62 +220,62 @@ class EnglishMultichoiceVerifyWorker:
         return results
 
 
-# @ray.remote
-# class IFVerifyWorker:
-#     """Response verifier worker for instruction following problems."""
+@ray.remote
+class IFVerifyWorker:
+    """Response verifier worker for instruction following problems."""
 
-#     def _remove_kwargs_none(self, kwargs) -> dict[str, Any]:
-#         return {k: v for k, v in kwargs.items() if v is not None}
+    def _remove_kwargs_none(self, kwargs) -> dict[str, Any]:
+        return {k: v for k, v in kwargs.items() if v is not None}
 
-#     def _is_following(
-#         self, response: str, checker_info: dict[str, Any]
-#     ) -> tuple[bool, list[str], list[str]]:
-#         instruction_list = checker_info["instruction_id_list"]
-#         checker_kwargs = checker_info["checker_kwargs"]
-#         prompt = checker_info["prompt"]
-#         is_following_list = []
-#         descriptions = []
-#         results = []
-#         for index, instruction_id in enumerate(instruction_list):
-#             instruction_cls = instructions_registry.INSTRUCTION_DICT[instruction_id]
-#             instruction = instruction_cls(instruction_id)
+    def _is_following(
+        self, response: str, checker_info: dict[str, Any]
+    ) -> tuple[bool, list[str], list[str]]:
+        instruction_list = checker_info["instruction_id_list"]
+        checker_kwargs = checker_info["checker_kwargs"]
+        prompt = checker_info["prompt"]
+        is_following_list = []
+        descriptions = []
+        results = []
+        for index, instruction_id in enumerate(instruction_list):
+            instruction_cls = instructions_registry.INSTRUCTION_DICT[instruction_id]
+            instruction = instruction_cls(instruction_id)
+            description = instruction.build_description(
+                **self._remove_kwargs_none(checker_kwargs[index])
+            )
+            descriptions.append(description)
+            args = instruction.get_instruction_args()
+            if args and "prompt" in args:
+                instruction.build_description(prompt=prompt)
 
-#             description = instruction.build_description(
-#                 **self._remove_kwargs_none(checker_kwargs[index])
-#             )
-#             descriptions.append(description)
-#             args = instruction.get_instruction_args()
-#             if args and "prompt" in args:
-#                 instruction.build_description(prompt=prompt)
+            if isinstance(response, str) and response.strip() and instruction.check_following(response):
+                is_following_list.append(True)
+                results.append(f"{instruction_id}: True")
+            else:
+                is_following_list.append(False)
+                results.append(f"{instruction_id}: False")
+        return all(is_following_list), descriptions, results
 
-#             if response.strip() and instruction.check_following(response):
-#                 is_following_list.append(True)
-#                 results.append(f"{instruction_id}: True")
-#             else:
-#                 is_following_list.append(False)
-#                 results.append(f"{instruction_id}: False")
-#         return all(is_following_list), descriptions, results
+    def verify(
+        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
+    ) -> list[tuple[float, str, str]]:
+        """Verify the correctness of the predicted responses against the ground truth.
 
-#     def verify(
-#         self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
-#     ) -> list[tuple[float, str, str]]:
-#         """Verify the correctness of the predicted responses against the ground truth.
+        Args:
+            pred_responses: list[str]. The predicted responses from the LLM.
+            checker_info_list: list[dict[str, Any]]. The instruction lists and constraints.
 
-#         Args:
-#             pred_responses: list[str]. The predicted responses from the LLM.
-#             checker_info_list: list[dict[str, Any]]. The instruction lists and constraints.
-
-#         Returns:
-#             list[tuple[float, str, str]]. The rewards, instruction descriptions, and predicted responses.
-#         """
-#         outputs = []
-#         for response, metadata in zip(pred_responses, metadata_list):
-#             checker_info = metadata["checker_info"]
-#             score, descriptions, results = self._is_following(response, checker_info)
-#             description = "\n".join(descriptions)
-#             results = "\n".join(results)
-#             outputs.append((float(score), description, results))
-#         return outputs
+        Returns:
+            list[tuple[float, str, str]]. The rewards, instruction descriptions, and predicted responses.
+        """
+        outputs = []
+        for response, metadata in zip(pred_responses, metadata_list):
+            checker_info = metadata["checker_info"]
+            response = response.split("</think>")[-1].lstrip('\n')
+            score, descriptions, results = self._is_following(response, checker_info)
+            description = "\n".join(descriptions)
+            results = "\n".join(results)
+            outputs.append((float(score), description, results))
+        return outputs
 
 
 @ray.remote
@@ -325,7 +326,7 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
         )
         worker_cls = {
             "english_multichoice": EnglishMultichoiceVerifyWorker,
-            # "instruction_following": IFVerifyWorker,
+            "instruction_following": IFVerifyWorker,
             "math": MathVerifyWorker,
             "mgsm": MGSMVerifyWorker,
             "multilingual_multichoice": MultilingualMultichoiceVerifyWorker,

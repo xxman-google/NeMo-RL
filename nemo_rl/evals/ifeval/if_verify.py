@@ -25,7 +25,7 @@ from absl import app
 from absl import flags
 from absl import logging
 
-import instructions_registry
+from nemo_rl.evals.ifeval import instructions_registry
 
 
 _INPUT_DATA = flags.DEFINE_string(

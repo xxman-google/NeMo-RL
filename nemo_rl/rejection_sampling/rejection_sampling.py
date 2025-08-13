@@ -250,9 +250,12 @@ async def _run_env_rejection_sampling_impl(
             content = [message["content"] for message in message_log]
             content = "\n".join(content)
             prompts.append(content)
-        # problems are prompts without chat template
-        problems = [info["problem"] for info in batch["extra_env_info"]]
-
+        problems = []
+        if env_config["verifier_type"] == "math":
+            # problems are prompts without chat template
+            problems = [info["problem"] for info in batch["extra_env_info"]]
+        elif env_config["verifier_type"] == "instruction_following":
+            problems = [info["checker_info"]["prompt"] for info in batch["extra_env_info"]]
         # generate by vllm
         inputs = BatchedDataDict({"prompts": prompts})
         output_texts, batch_generation_lengths = await _generate_texts(
@@ -270,6 +273,9 @@ async def _run_env_rejection_sampling_impl(
             )
 
         # evaluate generations with the environment
+        for extra_info in batch["extra_env_info"]:
+            if isinstance(extra_info["checker_info"]["checker_kwargs"], str):
+                extra_info["checker_info"]["checker_kwargs"] = eval(extra_info["checker_info"]["checker_kwargs"])
         to_env = [
             get_keys_from_message_log(batch["message_log"][i], ["role", "content"])
             for i in range(len(batch["message_log"]))

@@ -123,6 +123,8 @@ def setup_data(tokenizer: AutoTokenizer, data_config: DataConfig):
         )
     elif data_cls == "tulu3_sft_mixture":
         data = hf_datasets.Tulu3SftMixtureDataset(train_sample_ratio=0.8)
+    elif data_cls == "ifeval_like_sft":
+        data = hf_datasets.IFEvalLikeSFTDataset(train_sample_ratio=1.0)
     elif data_cls == "dataset_mixture":
         data = hf_datasets.DatasetMixture(
             mixture=data_config["mixture"],
