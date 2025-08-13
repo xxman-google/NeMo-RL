@@ -170,7 +170,7 @@ def code_processor(
     return output
 
 
-def _construct_multichoice_prompt(
+def construct_multichoice_prompt(
     prompt: str, question: str, options: dict[str, str]
 ) -> str:
     """Construct prompt from question and options."""
@@ -213,6 +213,7 @@ def multichoice_qa_processor(
     options = datum_dict["options"]
     extra_env_info = {
         "problem": question,
+        "options": options,
         "ground_truth": answer,
     }
     if "subject" in datum_dict:
@@ -239,7 +240,7 @@ def multichoice_qa_processor(
 
     # user prompt
     if task_data_spec.prompt:
-        question = _construct_multichoice_prompt(
+        question = construct_multichoice_prompt(
             task_data_spec.prompt, question, options
         )
     user_message = {"role": "user", "content": question}
