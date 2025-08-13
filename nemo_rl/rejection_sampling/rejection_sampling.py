@@ -26,7 +26,7 @@ from torch.utils.data import DataLoader
 from transformers import AutoTokenizer
 
 from nemo_rl.algorithms.utils import set_seed
-from nemo_rl.data import MathDataConfig
+from nemo_rl.data import MathDataConfig, processors
 from nemo_rl.data.datasets import AllTaskProcessedDataset, eval_collate_fn
 from nemo_rl.data.llm_message_utils import get_keys_from_message_log
 from nemo_rl.distributed.batched_data_dict import BatchedDataDict
@@ -242,7 +242,14 @@ async def _run_env_rejection_sampling_impl(
             content = "\n".join(content)
             prompts.append(content)
         # problems are prompts without chat template
-        problems = [info["problem"] for info in batch["extra_env_info"]]
+        problems = []
+        for info in batch["extra_env_info"]:
+            problem = info["problem"]
+            if "options" in info:
+                problem = processors.construct_multichoice_prompt(
+                    prompt="", question=problem, options=info["options"]
+                )
+            problems.append(problem)
 
         # generate by vllm
         inputs = BatchedDataDict({"prompts": prompts})
