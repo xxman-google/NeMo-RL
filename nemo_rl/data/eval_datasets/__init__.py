@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from nemo_rl.data.eval_datasets.ai2_arc import ArcDataset
 from nemo_rl.data.eval_datasets.aime2024 import AIME2024Dataset
 from nemo_rl.data.eval_datasets.aime2025 import AIME2025Dataset
 from nemo_rl.data.eval_datasets.alpaca2 import Alpaca2Dataset
@@ -56,6 +57,13 @@ def load_eval_dataset(data_config):
                 prompt_file=data_config["prompt_file"],
                 system_prompt_file=data_config["system_prompt_file"],
             )
+    elif dataset_name == "ai2_arc":
+        base_dataset = ArcDataset(
+            subset=data_config["subset"],
+            split=data_config["split"],
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
     elif dataset_name == "deepscaler":
         base_dataset = DeepScaleRDataset(
             prompt_file=data_config["prompt_file"],
@@ -220,6 +228,7 @@ def load_eval_dataset(data_config):
 
 
 __all__ = [
+    "ArcDataset",
     "AIME2024Dataset",
     "AIME2025Dataset",
     "Alpaca2Dataset",
