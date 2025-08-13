@@ -1,0 +1,6 @@
+# Rejection sampling configuration for Qwen3 32B model (no-thinking mode)
+
+defaults: "qwen3_8b_mcq_no_thinking.yaml"
+
+generation:
+  model_name: "Qwen/Qwen3-32B"

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from nemo_rl.data.eval_datasets.ai2_arc import ArcDataset
 from nemo_rl.data.eval_datasets.aime2024 import AIME2024Dataset
 from nemo_rl.data.eval_datasets.aime2025 import AIME2025Dataset
 from nemo_rl.data.eval_datasets.arc_agi import ArcAgiDataset
@@ -35,6 +36,7 @@ from nemo_rl.data.eval_datasets.simpleqa import SimpleQADataset
 from nemo_rl.data.eval_datasets.openr1_verifiable_code import (
     OpenR1VerifiableCodeDataset,
 )
+from nemo_rl.data.eval_datasets.sciq import SciQDataset
 from nemo_rl.data.eval_datasets.tulu3_sft import Tulu3SftDataset
 
 
@@ -54,6 +56,13 @@ def load_eval_dataset(data_config):
                 prompt_file=data_config["prompt_file"],
                 system_prompt_file=data_config["system_prompt_file"],
             )
+    elif dataset_name == "ai2_arc":
+        base_dataset = ArcDataset(
+            subset=data_config["subset"],
+            split=data_config["split"],
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
     elif dataset_name == "deepscaler":
         base_dataset = DeepScaleRDataset(
             prompt_file=data_config["prompt_file"],
@@ -191,6 +200,7 @@ def load_eval_dataset(data_config):
         )
     elif dataset_name == "openr1_verifiable_code":
         base_dataset = OpenR1VerifiableCodeDataset(
+            source=data_config["source"],
             code_exe_dir=data_config["code_exe_dir"],
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
@@ -200,12 +210,19 @@ def load_eval_dataset(data_config):
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
+    elif dataset_name == "sciq":
+        base_dataset = SciQDataset(
+            split=data_config["split"],
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
     else:
         raise ValueError(f"Unknown dataset {dataset_name}.")
     return base_dataset
 
 
 __all__ = [
+    "ArcDataset",
     "AIME2024Dataset",
     "AIME2025Dataset",
     "BeyondAIMEDataset",
@@ -225,5 +242,6 @@ __all__ = [
     "NuminaMathDataset",
     "OpenR1MathDataset",
     "OpenR1VerifiableCodeDataset",
+    "SciQDataset",
     "Tulu3SftDataset",
 ]

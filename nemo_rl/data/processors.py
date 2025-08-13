@@ -109,6 +109,7 @@ def code_processor(
     """Process a datum dictionary (directly loaded from dataset) into a DatumSpec for the Code Environment."""
     problem = datum_dict["question"]
     extra_env_info = {
+        "problem": problem,
         "tests": datum_dict["tests"],
         "working_dir": datum_dict["code_exe_dir"],
     }
@@ -210,7 +211,10 @@ def multichoice_qa_processor(
     question = datum_dict["question"]
     answer = str(datum_dict["answer"])
     options = datum_dict["options"]
-    extra_env_info = {"ground_truth": answer}
+    extra_env_info = {
+        "problem": question,
+        "ground_truth": answer,
+    }
     if "subject" in datum_dict:
         extra_env_info.update({"subject": datum_dict["subject"]})
     if "category" in datum_dict:
@@ -244,6 +248,7 @@ def multichoice_qa_processor(
         tokenize=False,
         add_generation_prompt=True,
         add_special_tokens=False,
+        enable_thinking=task_data_spec.enable_thinking,
     )
     user_message["token_ids"] = tokenizer(message, return_tensors="pt")["input_ids"][0]
     user_message["content"] = message

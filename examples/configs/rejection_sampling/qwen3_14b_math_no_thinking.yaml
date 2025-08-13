@@ -44,10 +44,10 @@ data:
   dataset_name: "numina_math"
 
 env:
+  env_type: "math"
   math:
     num_workers: 8
-    verifier_type: "math"
-    verifier_metadata_key: "ground_truth"
+    worker_type: "math"
 
 logger:
   log_dir: "logs"  # Base directory for all logs
@@ -55,6 +55,7 @@ logger:
   num_ouput_shards: 1
   wandb_enabled: true # Make sure you do a ``wandb login [Your API key]'' before running
   tensorboard_enabled: false # Disable because it does not supprt HTML logging
+  mlflow_enabled: false
   monitor_gpus: true  # If true, will monitor GPU usage and log to wandb and/or tensorboard
   wandb:
     project: "rejection_sampling"

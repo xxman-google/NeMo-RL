@@ -1,0 +1,25 @@
+# Rejection sampling configuration for Qwen3 14B model (no-thinking mode)
+
+defaults: "qwen3_14b_math_no_thinking.yaml"
+
+rejection_sampling:
+  num_tests_per_prompt: 10
+  metric: "pass@1,5,10"
+
+generation:
+  vllm_cfg:
+    max_model_len: 8192
+
+data:
+  prompt_file: "examples/prompts/openr1_verifiable_code.txt"
+  dataset_name: "openr1_verifiable_code"
+  code_exe_dir: "/tmp/logs"
+  source: "taco"
+
+env:
+  env_type: "code"
+  code:
+    num_workers: 8
+    terminate_on_evaluation: true
+    worker_type: "python_stdout_verify"
+    timeout: 3.0
