@@ -211,7 +211,10 @@ def multichoice_qa_processor(
     question = datum_dict["question"]
     answer = str(datum_dict["answer"])
     options = datum_dict["options"]
-    extra_env_info = {"ground_truth": answer}
+    extra_env_info = {
+        "problem": question,
+        "ground_truth": answer,
+    }
     if "subject" in datum_dict:
         extra_env_info.update({"subject": datum_dict["subject"]})
     if "category" in datum_dict:
