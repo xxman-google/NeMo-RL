@@ -10,20 +10,21 @@
 defaults: "eval.yaml"
 
 generation:
-  model_name: "google/gemma-3-12b-it"
+  model_name: "google/gemma-3-4b-it"
 #  model_name: "Qwen/Qwen3-235B-A22B"
-#  model_name: "Qwen/Qwen2.5-7B-Instruct"
+#   model_name: "Qwen/Qwen2.5-7B-Instruct"
+#   model_name: "Qwen/Qwen2.5-Math-1.5B-Instruct"
 
 data:
-#  prompt_file: "examples/prompts/simpleqa.txt"
+  system_prompt_file: "examples/prompts/simpleqa.txt"
   dataset_name: "simpleqa"
 
 env:
   math:
     worker_type: "simpleqa"
-    grader_model_name: "gemini-2.5-flash"
-#    grader_model_name: "gpt-4o"
-    grader_api_key: "your_api_key"
+    # grader_model_name: "gemini-2.5-flash"
+    # grader_api_key: ""
+    grader_model_name: "gpt-4o"
 #    grader_system_message: 
 #    grader_temperature:
 #    grader_max_tokens: 

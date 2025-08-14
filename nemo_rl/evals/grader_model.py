@@ -7,6 +7,7 @@ import openai
 from openai import OpenAI
 import google.generativeai as genai
 from google.api_core import exceptions as google_api_exceptions
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 OPENAI_SYSTEM_MESSAGE_API = "You are a helpful assistant."
 OPENAI_SYSTEM_MESSAGE_CHATGPT = (
@@ -219,30 +220,16 @@ class GeminiGraderModel(GraderModel):
         temperature: float = 0.5,
         max_tokens: int = 4096,
     ):
-        safety_settings = [
-            {
-                "category": "HARM_CATEGORY_HARASSMENT",
-                "threshold": "BLOCK_NONE",
-            },
-            {
-                "category": "HARM_CATEGORY_HATE_SPEECH",
-                "threshold": "BLOCK_NONE",
-            },
-            {
-                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                "threshold": "BLOCK_NONE",
-            },
-            {
-                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-                "threshold": "BLOCK_NONE",
-            },
-        ]
-
         genai.configure(api_key=api_key)
         self.client = genai.GenerativeModel(
             model_name=model,
             system_instruction=system_message,
-            safety_settings=safety_settings,
+            safety_settings={
+                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE
+            }
         )
         self.generation_config = genai.types.GenerationConfig(
             temperature=temperature,
