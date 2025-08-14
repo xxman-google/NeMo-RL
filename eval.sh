@@ -6,9 +6,9 @@ if [ "$#" -ne 2 ]; then
     exit 1
 fi
 
-enable_thinking=false
+enable_thinking=true
 if [[ $enable_thinking == "true" ]]; then
-  max_model_len=38912
+  max_model_len=32768
   temperature=0.6
   top_p=0.95
   num_tests_per_prompt=1
@@ -25,11 +25,16 @@ ckpt_path=$1
 exp_name=$2
 hf_ckpt_path=$ckpt_path/hf
 
-uv run python examples/converters/convert_dcp_to_hf.py --config $ckpt_path/config.yaml --dcp-ckpt-path $ckpt_path/policy/weights/ --hf-ckpt-path $hf_ckpt_path
+# uv run python examples/converters/convert_dcp_to_hf.py --config $ckpt_path/config.yaml --dcp-ckpt-path $ckpt_path/policy/weights/ --hf-ckpt-path $hf_ckpt_path
 
-benchmarks=("aime2024" "aime2025" "beyond_aime" "gpqa" "math" "math500" "mgsm" "mmlu" "mmlu_pro" "humaneval" "livecodebench_functional" "livecodebench_stdin")
+benchmarks=("aime2024" "aime2025" "beyond_aime" "math" "math500" "mgsm" "gpqa" "mmlu" "mmlu_pro" "humaneval" "livecodebench_functional" "livecodebench_stdin")
+num_tests_per_prompt=(5 5 5 1 1 1 5 1 1 5 5 5)
+len=${#benchmarks[@]}
 
-for benchmark_name in "${benchmarks[@]}"; do
+for ((i=0; i<$len; i++)); do
+
+  benchmark_name=${benchmarks[$i]}
+  repeats=${num_tests_per_prompt[$i]}
   if [ $benchmark_name = "math500" ]; then
     config_file="examples/configs/evals/math.yaml"  
   else
@@ -45,6 +50,7 @@ for benchmark_name in "${benchmarks[@]}"; do
   wandb_name="$exp_name-$benchmark_name"
 
   uv run examples/run_eval.py --config $config_file \
+  eval.num_tests_per_prompt=$repeats \
   data.dataset_name=$dataset_name \
   generation.stop_token_ids=\[151643,151645\] \
   generation.enable_thinking=$enable_thinking \
