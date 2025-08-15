@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import re
+import shutil
 from typing import Any, Optional, TypedDict
 
 import ray
@@ -353,6 +354,10 @@ class SweBenchVerifyWorker:
             instances.append(instance)
 
         run_id = "swebench_verified_oracle_eval"
+        eval_dir = f"logs/run_evaluation/{run_id}/{model_name}"
+        if os.path.exists(eval_dir):
+            print(f"Evaluation directory {eval_dir} already exists, removing it.")
+            shutil.rmtree(eval_dir)
         run_instances(
             predictions=predictions,
             instances=instances,
@@ -366,7 +371,6 @@ class SweBenchVerifyWorker:
 
         results = []
         # Read results from instance results files.
-        eval_dir = f"logs/run_evaluation/{run_id}/{model_name}"
         if not os.path.exists(eval_dir):
             raise FileNotFoundError(f"Evaluation directory {eval_dir} does not exist.")
         verified_issues = []
@@ -385,7 +389,8 @@ class SweBenchVerifyWorker:
             if score == 1.0:
                 verified_issues.append(instance_id)
         with open(f"{eval_dir}/verified_issues.txt", "w") as f:
-            f.write(f"{instance_id}: {model_patch}\n\n")
+            for instance_id in verified_issues:
+                f.write(f"{instance_id}\n")
         return results
 
     def _get_score_from_report(self, instance_id: str, instance_report: str) -> float:
