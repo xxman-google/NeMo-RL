@@ -385,7 +385,8 @@ class SweBenchVerifyWorker:
             if score == 1.0:
                 verified_issues.append(instance_id)
         with open(f"{eval_dir}/verified_issues.txt", "w") as f:
-            f.write(f"{instance_id}: {model_patch}\n\n")
+            for instance_id in verified_issues:
+                f.write(f"{instance_id}\n")
         return results
 
     def _get_score_from_report(self, instance_id: str, instance_report: str) -> float:
