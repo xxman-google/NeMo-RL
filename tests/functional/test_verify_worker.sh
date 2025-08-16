@@ -10,5 +10,5 @@
 #   Score        : False
 
 
-export GRADER_API_KEY="your_api_key"
+export GRADER_API_KEY="your_gemini_api_key"
 uv run -v tests/functional/test_verify_worker.py
