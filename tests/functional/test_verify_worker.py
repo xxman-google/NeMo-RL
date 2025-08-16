@@ -1,16 +1,16 @@
 import os
 import ray
-from nemo_rl.environments.math_environment import MathEnvConfig, MathEnvironmentMetadata, QAVerifyWorker
+from nemo_rl.environments.math_environment import MathEnvConfig, MathEnvironmentMetadata, GraderVerifyWorker
 
 def main():
     cfg = MathEnvConfig(
         {
-            "verifier_type": "qa",
+            "verifier_type": "simpleqa",
             "verifier_metadata_key": "ground_truth",
-            "grader_model_name": "gpt-4o",
+            "grader_model_name": "gemini-2.5-flash",
             "grader_api_key": os.getenv("GRADER_API_KEY")
         })
-    verifier = QAVerifyWorker.remote(cfg)
+    verifier = GraderVerifyWorker.remote(cfg)
     pred_data_batch = [
         {"prompt": "Who was awarded the Oceanography Society's Jerlov Award in 2018?", "response": "Dr. Annick Bricaud Honored with 2018 Jerlov Award"},
         {"prompt": "In which year did Melbourne's Monash Gallery of Art (MGA) rebrand and become the Museum of Australian Photography (MAPh)?", "response": "Monash Gallery of Art Rebranded as Museum of Australian Photography in 2032"}

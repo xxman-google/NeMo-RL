@@ -133,7 +133,7 @@ class MathVerifyWorker:
 
 
 @ray.remote  # pragma: no cover
-class QAVerifyWorker:
+class GraderVerifyWorker:
     def __init__(self, cfg: MathEnvConfig) -> None:
         model=cfg.get("grader_model_name", "gemini-2.5-flash")
         self.grader_model = None
@@ -490,8 +490,8 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
             "math": MathVerifyWorker,
             "mgsm": MGSMVerifyWorker,
             "multilingual_multichoice": MultilingualMultichoiceVerifyWorker,
-            "simpleqa": QAVerifyWorker,
             "alpaca2": Alpaca2VerifyWorker,
+            "simpleqa": GraderVerifyWorker,
         }[worker_type]
         self.workers = [
             worker_cls.options(  # type: ignore # (decorated with @ray.remote)
