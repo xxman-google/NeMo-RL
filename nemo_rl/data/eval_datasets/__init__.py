@@ -30,6 +30,7 @@ from nemo_rl.data.eval_datasets.mbpp import MBPPDataset
 from nemo_rl.data.eval_datasets.mgsm import MGSMDataset
 from nemo_rl.data.eval_datasets.mmlu import MMLUDataset
 from nemo_rl.data.eval_datasets.mmlu_pro import MMLUProDataset
+from nemo_rl.data.eval_datasets.nemotron import NemotronDataset
 from nemo_rl.data.eval_datasets.numina_math import NuminaMathDataset
 from nemo_rl.data.eval_datasets.openr1_math import OpenR1MathDataset
 from nemo_rl.data.eval_datasets.simpleqa import SimpleQADataset
@@ -185,6 +186,12 @@ def load_eval_dataset(data_config):
         base_dataset = Tulu3SftDataset(
             source=data_config["subset"],
             prompt_file=data_config["prompt_file"],
+        )
+    elif dataset_name == "nemotron":
+        base_dataset = NemotronDataset(
+            split=data_config["split"],
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
         )
     elif dataset_name == "numina_math":
         base_dataset = NuminaMathDataset(

@@ -1,0 +1,1 @@
+uv run -v tests/functional/test_nemotron_dataset.py
