@@ -1,0 +1,29 @@
+# Rejection sampling configuration for Qwen3 14B model (no-thinking mode)
+
+defaults: "qwen3_14b_code_no_thinking.yaml"
+
+rejection_sampling:
+  num_tests_per_prompt: 1
+  metric: ""
+  seed: 42
+  rejection: false # Do not reject, only samples. The other configs are not useful for sampling only.
+
+generation:
+  temperature: 0.0
+  top_p: 0.8
+  top_k: 1
+  model_name: "Qwen/Qwen3-8B"
+  enable_thinking: false
+
+data:
+  # prompt_file: "examples/prompts/gpqa.txt"
+  # dataset_name: "sciq"
+  # split: "train"
+  prompt_file: null
+  system_prompt_file: "examples/prompts/nemotron_science.txt"
+  dataset_name: "nemotron"
+  split: "science"
+
+logger:
+  wandb:
+    project: "sampling"

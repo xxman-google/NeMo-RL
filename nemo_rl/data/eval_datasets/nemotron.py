@@ -33,7 +33,9 @@ class NemotronDataset:
         prompt_file: Optional[str] = None,
         system_prompt_file: Optional[str] = None,
     ):
+        print("Loading NemotronDataset from huggingface...")
         ds = load_dataset("nvidia/Llama-Nemotron-Post-Training-Dataset", split=split)
+        print("Loaded NemotronDataset from huggingface.")
         self._rng = random.Random()
         self.rekeyed_ds = ds.map(self._rekey, remove_columns=ds.column_names)
         self.task_spec = TaskDataSpec(
@@ -41,7 +43,7 @@ class NemotronDataset:
             prompt_file=prompt_file,
             system_prompt_file=system_prompt_file,
         )
-        self.processor = processors.multichoice_qa_processor
+        self.processor = processors.data_processor
 
     def _rekey(self, data: dict[str, Any]):
         """Rekey the data to match the expected format.       

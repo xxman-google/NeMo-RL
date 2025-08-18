@@ -15,10 +15,10 @@ def main():
 
     # Show a few examples
     print("\n== Sample Rekeyed Data ==")
-    for i in range(5):
+    for i in range(2):
         example = dataset.rekeyed_ds[i]
         print(f"\nExample {i + 1}:")
-        print(f"  Question: {example['question']}")  # Changed from 'problem'
+        print(f"  Problem: {example['problem']}")  # Changed from 'problem'
         print(f"  Answer: {example['answer']}")      # Changed from 'expected_answer'
 
 if __name__ == "__main__":

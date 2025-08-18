@@ -43,8 +43,9 @@ from nemo_rl.utils.logger import Logger, LoggerConfig
 
 
 class RejectionSamplingConfig(TypedDict):
-    num_tests_per_prompt: int
+    num_tests_per_prompt: int # Number of tests to run per prompt when rejection = true
     seed: int
+    rejection: bool # If false, only sample once and do not reject
 
 
 class MasterConfig(TypedDict):
@@ -178,17 +179,35 @@ def run_env_rejection_sampling(vllm_generation, dataloader, env, master_config, 
     """
     # Check if async engine is enabled and run appropriate version
     if master_config["generation"]["vllm_cfg"]["async_engine"]:
-        asyncio.run(
-            _run_env_rejection_sampling_impl(
-                vllm_generation, dataloader, env, master_config, logger, use_async=True
+        if master_config["rejection_sampling"]["rejection"]:
+            print("Run async rejection sampling")
+            asyncio.run(
+                _run_env_rejection_sampling_impl(
+                    vllm_generation, dataloader, env, master_config, logger, use_async=True
+                )
             )
-        )
+        else:
+            print("Run async sampling")
+            asyncio.run(
+                _run_env_sampling_impl(
+                    vllm_generation, dataloader, env, master_config, logger, use_async=True
+                )
+            )
     else:
-        asyncio.run(
-            _run_env_rejection_sampling_impl(
-                vllm_generation, dataloader, env, master_config, logger, use_async=False
+        if master_config["rejection_sampling"]["rejection"]:
+            print("Run sync rejection sampling")
+            asyncio.run(
+                _run_env_rejection_sampling_impl(
+                    vllm_generation, dataloader, env, master_config, logger, use_async=False
+                )
             )
-        )
+        else:
+            print("Run sync sampling")
+            asyncio.run(
+                _run_env_sampling_impl(
+                    vllm_generation, dataloader, env, master_config, logger, use_async=False
+                )
+            )
 
 
 def write_to_parquet(
@@ -305,7 +324,61 @@ async def _run_env_rejection_sampling_impl(
     )
     write_to_parquet(
         Dataset.from_list(data),
-        num_shards=logger_config["num_ouput_shards"],
+        num_shards=logger_config["num_output_shards"],
+        output_dir=logger_config["output_dir"],
+    )
+
+
+async def _run_env_sampling_impl(
+    vllm_generation, dataloader, env, master_config, logger, use_async=False
+):
+    """Unified implementation for both sync and async evaluation."""
+    # Extract for easier access
+    generation_config = master_config["generation"]
+    rejection_sampling_config = master_config["rejection_sampling"]
+    logger_config = master_config["logger"]
+
+    # Run rejection sampling loop
+    generation_lengths = []
+    data = []
+
+    for batch in dataloader:
+        # get input prompt from message_log
+        prompts = []
+        for message_log in batch["message_log"]:
+            content = [message["content"] for message in message_log]
+            content = "\n".join(content)
+            prompts.append(content)
+        # problems are prompts without chat template
+        problems = []
+        for info in batch["extra_env_info"]:
+            problem = info["problem"]
+            if "options" in info:
+                problem = processors.construct_multichoice_prompt(
+                    prompt="", question=problem, options=info["options"]
+                )
+            problems.append(problem)
+
+        # generate by vllm
+        inputs = BatchedDataDict({"prompts": prompts})
+        output_texts, batch_generation_lengths = await _generate_texts(
+            vllm_generation, inputs, use_async
+        )
+        generation_lengths.extend(batch_generation_lengths)
+
+        for output, problem in zip(output_texts, problems):
+            messages = [
+                {"role": "user", "content": problem},
+                {"role": "assistant", "content": output},
+            ]
+            data.append({"messages": messages})
+
+    # Cleanup before printing results
+    ray.get(env.shutdown.remote())
+    vllm_generation.shutdown()
+    write_to_parquet(
+        Dataset.from_list(data),
+        num_shards=logger_config["num_output_shards"],
         output_dir=logger_config["output_dir"],
     )
 
