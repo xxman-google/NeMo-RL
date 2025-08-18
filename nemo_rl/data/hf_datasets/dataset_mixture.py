@@ -57,7 +57,7 @@ class DatasetMixture:
             target_samples = weighted_ds["samples"]
             ds.shuffle(seed=seed)
             if isinstance(target_samples, (float)):
-                target_samples *= len(ds)
+                target_samples = int(target_samples * len(ds))
             if target_samples > len(ds):
                 print(
                     f"Requested samples: {target_samples} is greater than the actual dataset size: {len(ds)}."

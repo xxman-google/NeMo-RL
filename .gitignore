@@ -39,15 +39,8 @@ wandb/
 checkpoints/
 results/
 code_snapshots/
+data/
 
 # Runtime env
 *runtime_env.yaml
 !default_runtime_env.yaml
-data/ifeval_like/no_thinking_with_extra_prompt/train-00000-of-00001.parquet
-data/ifeval_like/no_thinking_with_extra_prompt_large/train-00000-of-00001.parquet
-data/ifeval_like/no_thinking_without_extra_prompt/train-00000-of-00001.parquet
-data/ifeval_like/no_thinking_without_extra_prompt_large/train-00000-of-00001.parquet
-data/ifeval_like/thinking_with_extra_prompt/train-00000-of-00001.parquet
-data/ifeval_like/thinking_with_extra_prompt_large/train-00000-of-00001.parquet
-data/ifeval_like/thinking_without_extra_prompt/train-00000-of-00001.parquet
-data/ifeval_like/thinking_without_extra_prompt_large/train-00000-of-00001.parquet
