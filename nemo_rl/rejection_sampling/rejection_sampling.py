@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import asyncio
+import collections
 import itertools
 import os
 import re
@@ -20,6 +21,7 @@ from typing import TypedDict
 
 import numpy as np
 import ray
+import torch
 import tqdm
 from datasets import Dataset
 from torch.utils.data import DataLoader
@@ -229,6 +231,7 @@ async def _run_env_rejection_sampling_impl(
     generation_lengths = []
     data = []
     scores = {f"pass@{k}": 0 for k in ks}
+    num_corrects = []
 
     for batch in dataloader:
         # measure multiple samples
@@ -237,10 +240,16 @@ async def _run_env_rejection_sampling_impl(
 
         # get input prompt from message_log
         prompts = []
+        prompt_lengths = []
         for message_log in batch["message_log"]:
             content = [message["content"] for message in message_log]
             content = "\n".join(content)
             prompts.append(content)
+            prompt_length = sum(
+                [torch.numel(message["token_ids"]) for message in message_log]
+            )
+            prompt_lengths.append(prompt_length)
+
         # problems are prompts without chat template
         problems = []
         for info in batch["extra_env_info"]:
@@ -276,8 +285,20 @@ async def _run_env_rejection_sampling_impl(
         rewards = itertools.batched(env_return.rewards.tolist(), num_tests_per_prompt)
         output_texts = itertools.batched(output_texts, num_tests_per_prompt)
         problems = itertools.batched(problems, num_tests_per_prompt)
-        for chunk_rewards, chunk_outputs, chunk_problems in zip(
-            rewards, output_texts, problems
+        prompt_lengths = itertools.batched(prompt_lengths, num_tests_per_prompt)
+        generation_lengths = itertools.batched(generation_lengths, num_tests_per_prompt)
+        for (
+            chunk_rewards,
+            chunk_outputs,
+            chunk_problems,
+            chunk_prompt_lengths,
+            chunk_generation_lengths,
+        ) in zip(
+            rewards,
+            output_texts,
+            problems,
+            prompt_lengths,
+            generation_lengths,
         ):
             sorted_indices = np.argsort(chunk_rewards)
             last_idx = sorted_indices[-1]
@@ -287,7 +308,16 @@ async def _run_env_rejection_sampling_impl(
                 {"role": "user", "content": chunk_problems[last_idx]},
                 {"role": "assistant", "content": chunk_outputs[last_idx]},
             ]
-            data.append({"messages": messages})
+            reward_sum = int(np.sum(chunk_rewards))
+            num_corrects.append(reward_sum)
+            data.append(
+                {
+                    "messages": messages,
+                    "num_corrects": reward_sum,
+                    "prompt_length": chunk_prompt_lengths[last_idx],
+                    "generation_length": chunk_generation_lengths[last_idx],
+                }
+            )
 
         for k in ks:
             cur_score = eval_lib.eval_pass_k(
@@ -301,7 +331,12 @@ async def _run_env_rejection_sampling_impl(
     ray.get(env.shutdown.remote())
     vllm_generation.shutdown()
     _print_results(
-        master_config, generation_config, scores, len(dataloader.dataset), logger
+        master_config,
+        generation_config,
+        scores,
+        num_corrects,
+        len(dataloader.dataset),
+        logger,
     )
     write_to_parquet(
         Dataset.from_list(data),
@@ -335,6 +370,7 @@ def _print_results(
     master_config,
     generation_config,
     scores,
+    num_corrects,
     dataset_size,
     logger,
 ):
@@ -356,3 +392,8 @@ def _print_results(
     columns = ["Metric", "Scores"]
     rows = [[metric, score / dataset_size] for metric, score in scores.items()]
     logger.log_table("Overall Results", columns, rows)
+    reward_counter = collections.Counter(num_corrects)
+    columns = ["Number of corrects", "Counts"]
+    sorted_rewards = sorted(list(reward_counter.keys()))
+    rows = [[reward, reward_counter[reward]] for reward in sorted_rewards]
+    logger.log_table("Reward sum", columns, rows)
