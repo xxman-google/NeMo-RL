@@ -2,8 +2,8 @@
 sft:
   ## total number of steps to train will equal
   ## min((max_num_epochs * len(train_dataloader)), max_num_steps)
-  max_num_epochs: 2
-  max_num_steps: 10000
+  max_num_epochs: 3
+  max_num_steps: 1000
 
   val_period: 100
   val_batches: 8
@@ -18,7 +18,7 @@ checkpointing:
   metric_name: "val_loss"
   higher_is_better: false
   keep_top_k: 2
-  save_period: 1000
+  save_period: 100
 
 policy:
   model_name: "Qwen/Qwen3-8B-Base"
@@ -80,17 +80,17 @@ policy:
       kwargs:
         start_factor: 0.001
         end_factor: 1.0
-        total_iters: 200
+        total_iters: 50
     - name: "torch.optim.lr_scheduler.CosineAnnealingLR"
       kwargs:
-        T_max: 10000
+        T_max: 1000
         eta_min: 5.0e-7
     # - name: "torch.optim.lr_scheduler.LinearLR"
     #   kwargs:
     #     start_factor: 1.0
     #     end_factor: 0.0
     #     total_iters: 10000 # 6971 - 210
-    - milestones: [200] # 6971 * 0.03
+    - milestones: [50] # 6971 * 0.03
     
 data:
   max_input_seq_length: ${policy.max_total_sequence_length}
@@ -100,8 +100,8 @@ data:
   add_generation_prompt: false
   mixture:
     - file_format: "parquet"
-      name_or_paths: "/tmp/logs/openr1_math_amc_aime_qwen3_8b_no_thinking/train-unboxed*"
-      samples: 70000
+      name_or_paths: "data/ifeval_like/no_thinking_without_extra_prompt_large/train*"
+      samples: 1.0
       additional_kwargs:
         split: "train"
 
@@ -114,8 +114,8 @@ logger:
   wandb:
     project: "qwen3-8b-base-if-sft"
     name: "sft_qwen3_8b_no_thinking_without_extra_prompt"
-  # tensorboard:
-  #   log_dir: "tb_logs-qwen3-8b-seq_packing-${data.dataset_name}_1.0"
+  tensorboard:
+    log_dir: "tb_logs_qwen3_8b_no_thinking_without_extra_prompt"
   gpu_monitoring:
     collection_interval: 10  # How often to collect GPU usage metrics (in seconds)
     flush_interval: 10  # How often to flush GPU usage metrics to the loggers (in seconds)
@@ -123,3 +123,5 @@ logger:
 cluster:
   gpus_per_node: 8
   num_nodes: 1
+
+

@@ -38,7 +38,7 @@ def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Run SFT training with configuration")
     parser.add_argument(
-        "--config", type=str, default=None, help="Path to YAML config file"
+        "--config", type=str, default="/home/tangyoubao_google_com/nemo-rl/examples/configs/cirrus/ablations/sft-qwen3-8b-base-if-distilled-non-thinking.yaml", help="Path to YAML config file"
     )
 
     # Parse known args for the script
