@@ -3,7 +3,6 @@
 dataset_name="sciq"
 
 model_names=("qwen3_14b_mcq_no_thinking")
-# sources=("amc_aime" "aops_forum" "cn_contest" "inequalities" "number_theory" "olympiads" "olympiads_ref")
 
 for model_name in "${model_names[@]}"; do
   config_path="examples/configs/rejection_sampling/${model_name}.yaml"
