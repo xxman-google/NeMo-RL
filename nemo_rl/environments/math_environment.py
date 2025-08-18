@@ -44,8 +44,7 @@ from nemo_rl.evals.grader_model import (
     GptGraderModel,
     GraderModel,
 )
-
-# from nemo_rl.evals.ifeval import instructions_registry
+from nemo_rl.evals.ifeval import instructions_registry
 
 
 class MathEnvConfig(TypedDict):
@@ -71,11 +70,8 @@ def _mute_output():
 
 class MathEnvironmentMetadata(TypedDict):
     ground_truth: str
-
-
-class MultilingualMathEnvironmentMetadata(TypedDict):
-    ground_truth: str
-    lang: str
+    checker_info: NotRequired[dict[str, Any]]
+    lang: NotRequired[str]
 
 
 @ray.remote  # pragma: no cover
@@ -225,7 +221,7 @@ class MGSMVerifyWorker:
     def verify(
         self,
         pred_data: list[dict[str, str]],
-        metadata_list: list[MultilingualMathEnvironmentMetadata],
+        metadata_list: list[MathEnvironmentMetadata],
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
@@ -326,63 +322,68 @@ class EnglishMultichoiceVerifyWorker:
         return results
 
 
-# @ray.remote
-# class IFVerifyWorker:
-#     """Response verifier worker for instruction following problems."""
+@ray.remote
+class IFVerifyWorker:
+    """Response verifier worker for instruction following problems."""
 
-#     def _remove_kwargs_none(self, kwargs) -> dict[str, Any]:
-#         return {k: v for k, v in kwargs.items() if v is not None}
+    def __init__(self, cfg: MathEnvConfig) -> None:
+        pass
 
-#     def _is_following(
-#         self, response: str, checker_info: dict[str, Any]
-#     ) -> tuple[bool, list[str], list[str]]:
-#         instruction_list = checker_info["instruction_id_list"]
-#         checker_kwargs = checker_info["checker_kwargs"]
-#         prompt = checker_info["prompt"]
-#         is_following_list = []
-#         descriptions = []
-#         results = []
-#         for index, instruction_id in enumerate(instruction_list):
-#             instruction_cls = instructions_registry.INSTRUCTION_DICT[instruction_id]
-#             instruction = instruction_cls(instruction_id)
+    def _remove_kwargs_none(self, kwargs) -> dict[str, Any]:
+        return {k: v for k, v in kwargs.items() if v is not None}
 
-#             description = instruction.build_description(
-#                 **self._remove_kwargs_none(checker_kwargs[index])
-#             )
-#             descriptions.append(description)
-#             args = instruction.get_instruction_args()
-#             if args and "prompt" in args:
-#                 instruction.build_description(prompt=prompt)
+    def _is_following(
+        self, response: str, checker_info: dict[str, Any]
+    ) -> tuple[bool, list[str], list[str]]:
+        instruction_list = checker_info["instruction_id_list"]
+        checker_kwargs = checker_info["checker_kwargs"]
+        prompt = checker_info["prompt"]
+        is_following_list = []
+        descriptions = []
+        results = []
+        for index, instruction_id in enumerate(instruction_list):
+            instruction_cls = instructions_registry.INSTRUCTION_DICT[instruction_id]
+            instruction = instruction_cls(instruction_id)
 
-#             if response.strip() and instruction.check_following(response):
-#                 is_following_list.append(True)
-#                 results.append(f"{instruction_id}: True")
-#             else:
-#                 is_following_list.append(False)
-#                 results.append(f"{instruction_id}: False")
-#         return all(is_following_list), descriptions, results
+            description = instruction.build_description(
+                **self._remove_kwargs_none(checker_kwargs[index])
+            )
+            descriptions.append(description)
+            args = instruction.get_instruction_args()
+            if args and "prompt" in args:
+                instruction.build_description(prompt=prompt)
 
-#     def verify(
-#         self, pred_data: list[dict[str, str]], metadata_list: list[MathEnvironmentMetadata]
-#     ) -> list[tuple[float, str, str]]:
-#         """Verify the correctness of the predicted responses against the ground truth.
+            if response.strip() and instruction.check_following(response):
+                is_following_list.append(True)
+                results.append(f"{instruction_id}: True")
+            else:
+                is_following_list.append(False)
+                results.append(f"{instruction_id}: False")
+        return all(is_following_list), descriptions, results
 
-#         Args:
-#             pred_data: list[dict[str, str]]. The predicted data including prompt and response from the LLM.
-#             checker_info_list: list[dict[str, Any]]. The instruction lists and constraints.
+    def verify(
+        self,
+        pred_data: list[dict[str, str]],
+        metadata_list: list[MathEnvironmentMetadata],
+    ) -> list[tuple[float, str, str]]:
+        """Verify the correctness of the predicted responses against the ground truth.
 
-#         Returns:
-#             list[tuple[float, str, str]]. The rewards, instruction descriptions, and predicted responses.
-#         """
-#         outputs = []
-#         for data, metadata in zip(pred_data, metadata_list):
-#             response = data["response"]
-#             checker_info = metadata["checker_info"]
-#             score, descriptions, results = self._is_following(response, checker_info)
-#             description = "\n".join(descriptions)
-#             results = "\n".join(results)
-#             outputs.append((float(score), description, results))
-#         return outputs
+        Args:
+            pred_data: list[dict[str, str]]. The predicted data including prompt and response from the LLM.
+            checker_info_list: list[dict[str, Any]]. The instruction lists and constraints.
+
+        Returns:
+            list[tuple[float, str, str]]. The rewards, instruction descriptions, and predicted responses.
+        """
+        outputs = []
+        for data, metadata in zip(pred_data, metadata_list):
+            response = data["response"]
+            checker_info = metadata["checker_info"]
+            score, descriptions, results = self._is_following(response, checker_info)
+            description = "\n".join(descriptions)
+            results = "\n".join(results)
+            outputs.append((float(score), description, results))
+        return outputs
 
 
 @ray.remote
@@ -440,7 +441,7 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
         worker_cls = {
             "arc_agi": ArcAgiVerifyWorker,
             "english_multichoice": EnglishMultichoiceVerifyWorker,
-            # "instruction_following": IFVerifyWorker,
+            "instruction_following": IFVerifyWorker,
             "math": MathVerifyWorker,
             "mgsm": MGSMVerifyWorker,
             "multilingual_multichoice": MultilingualMultichoiceVerifyWorker,

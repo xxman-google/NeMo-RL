@@ -1,8 +1,13 @@
-# Math evaluation Configuration
-defaults: "gpqa.yaml"
+# IFEval evaluation Configuration
+defaults: "eval.yaml"
+
+generation:
+  model_name: "Qwen/Qwen3-8B"
+  vllm_cfg:
+    max_model_len: 8192
 
 data:
-  prompt_file: "examples/prompts/cot.txt"
+  prompt_file: null
   dataset_name: "ifeval"
 
 env:
