@@ -7,7 +7,7 @@ temperature=0.0
 top_p=1.0
 top_k=-1
 num_tests_per_prompt=1
-benchmarks=("aime2024" "aime2025" "beyond_aime" "gpqa" "math" "math500" "mgsm" "mmlu" "mmlu_pro" "humaneval" "livecodebench_functional" "livecodebench_stdin")
+benchmarks=("aime2024" "aime2025" "beyond_aime" "gpqa" "math" "math500" "mgsm" "mmlu" "mmlu_pro" "humaneval" "livecodebench_functional" "livecodebench_stdin" "ifeval")
 
 for model_name in "${model_names[@]}"; do
 

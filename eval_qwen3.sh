@@ -1,7 +1,7 @@
 #!/bin/bash
 
 model_names=("Qwen/Qwen3-8B" "Qwen/Qwen3-14B" "Qwen/Qwen3-32B")
-enable_thinking=true
+enable_thinking=false
 if $enable_thinking; then
   max_model_len=38912
   temperature=0.6
@@ -13,8 +13,8 @@ else
 fi
 
 top_k=20
-benchmarks=("aime2024" "aime2025" "beyond_aime" "math" "math500" "mgsm" "gpqa" "mmlu" "mmlu_pro" "humaneval" "livecodebench_functional" "livecodebench_stdin")
-num_tests_per_prompt=(5 5 5 1 1 1 5 1 1 5 5 5)
+benchmarks=("aime2024" "aime2025" "beyond_aime" "math" "math500" "mgsm" "gpqa" "mmlu" "mmlu_pro" "humaneval" "livecodebench_functional" "livecodebench_stdin" "ifeval")
+num_tests_per_prompt=(5 5 5 1 1 1 5 1 1 5 5 5 1)
 len=${#benchmarks[@]}
 
 for model_name in "${model_names[@]}"; do

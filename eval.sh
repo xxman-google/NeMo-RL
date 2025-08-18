@@ -6,7 +6,7 @@ if [ "$#" -ne 2 ]; then
     exit 1
 fi
 
-enable_thinking=true
+enable_thinking=false
 if [[ $enable_thinking == "true" ]]; then
   max_model_len=32768
   temperature=0.6
@@ -27,8 +27,8 @@ hf_ckpt_path=$ckpt_path/hf
 
 # uv run python examples/converters/convert_dcp_to_hf.py --config $ckpt_path/config.yaml --dcp-ckpt-path $ckpt_path/policy/weights/ --hf-ckpt-path $hf_ckpt_path
 
-benchmarks=("aime2024" "aime2025" "beyond_aime" "math" "math500" "mgsm" "gpqa" "mmlu" "mmlu_pro" "humaneval" "livecodebench_functional" "livecodebench_stdin")
-num_tests_per_prompt=(5 5 5 1 1 1 5 1 1 5 5 5)
+benchmarks=("aime2024" "aime2025" "beyond_aime" "math" "math500" "mgsm" "gpqa" "mmlu" "mmlu_pro" "humaneval" "livecodebench_functional" "livecodebench_stdin" "ifeval")
+num_tests_per_prompt=(5 5 5 1 1 1 5 1 1 5 5 5 1)
 len=${#benchmarks[@]}
 
 for ((i=0; i<$len; i++)); do
