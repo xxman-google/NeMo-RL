@@ -100,8 +100,8 @@ data:
   add_generation_prompt: false
   mixture:
     - file_format: "parquet"
-      name_or_paths: "/tmp/logs/openr1_math_amc_aime_qwen3_8b_no_thinking/train-unboxed*"
-      samples: 70000
+      name_or_paths: "data/ifeval_like/no_thinking_without_extra_prompt_large/train*"
+      samples: 1.0
       additional_kwargs:
         split: "train"
 
@@ -114,8 +114,8 @@ logger:
   wandb:
     project: "qwen3-8b-base-if-sft"
     name: "sft_qwen3_8b_no_thinking_without_extra_prompt"
-  # tensorboard:
-  #   log_dir: "tb_logs-qwen3-8b-seq_packing-${data.dataset_name}_1.0"
+  tensorboard:
+    log_dir: "tb_logs_qwen3_8b_no_thinking_without_extra_prompt"
   gpu_monitoring:
     collection_interval: 10  # How often to collect GPU usage metrics (in seconds)
     flush_interval: 10  # How often to flush GPU usage metrics to the loggers (in seconds)
@@ -123,3 +123,5 @@ logger:
 cluster:
   gpus_per_node: 8
   num_nodes: 1
+
+
