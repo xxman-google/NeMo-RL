@@ -335,6 +335,7 @@ async def _run_env_sampling_impl(
     """Unified implementation for both sync and async sampling without rejection."""
     # Extract for easier access
     generation_config = master_config["generation"]
+    model_name = generation_config["model_name"]
     rejection_sampling_config = master_config["rejection_sampling"]
     logger_config = master_config["logger"]
 
@@ -380,6 +381,7 @@ async def _run_env_sampling_impl(
         Dataset.from_list(data),
         num_shards=logger_config["num_output_shards"],
         output_dir=logger_config["output_dir"],
+        basename=model_name,
     )
 
 
