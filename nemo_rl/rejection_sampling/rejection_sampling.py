@@ -232,7 +232,7 @@ def parse_pass_at_k_values(pass_at_ks: str) -> list[int]:
 async def _run_env_rejection_sampling_impl(
     vllm_generation, dataloader, env, master_config, logger, use_async=False
 ):
-    """Unified implementation for both sync and async evaluation."""
+    """Unified implementation for both sync and async rejection sampling."""
     # Extract for easier access
     generation_config = master_config["generation"]
     rejection_sampling_config = master_config["rejection_sampling"]
@@ -332,7 +332,7 @@ async def _run_env_rejection_sampling_impl(
 async def _run_env_sampling_impl(
     vllm_generation, dataloader, env, master_config, logger, use_async=False
 ):
-    """Unified implementation for both sync and async evaluation."""
+    """Unified implementation for both sync and async sampling without rejection."""
     # Extract for easier access
     generation_config = master_config["generation"]
     rejection_sampling_config = master_config["rejection_sampling"]
