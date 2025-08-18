@@ -271,10 +271,13 @@ class IFVerifyWorker:
         for response, metadata in zip(pred_responses, metadata_list):
             checker_info = metadata["checker_info"]
             response = response.split("</think>")[-1].lstrip('\n')
-            score, descriptions, results = self._is_following(response, checker_info)
-            description = "\n".join(descriptions)
-            results = "\n".join(results)
-            outputs.append((float(score), description, results))
+            try:
+                score, descriptions, results = self._is_following(response, checker_info)
+                description = "\n".join(descriptions)
+                results = "\n".join(results)
+                outputs.append((float(score), description, results))
+            except:
+                outputs.append((0.0, "", response))
         return outputs
 
 

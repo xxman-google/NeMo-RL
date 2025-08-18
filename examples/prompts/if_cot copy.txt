@@ -1,4 +1,4 @@
-Think step-by-step to generate a response based on the following prompt, which exactly follows the instructions stated in the prompt.
+Think step-by-step to generate a response, which exactly follows the instructions stated in the following prompt.
 {}
 
 Let's think step-by-step

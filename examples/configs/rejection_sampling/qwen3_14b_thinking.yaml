@@ -15,7 +15,7 @@ generation:
 
 data:
   dataset_name: "ifeval_like"
-  source: "filtered"
+  source: "default"
   prompt_file: "examples/prompts/if_cot.txt"
 
 env:
@@ -23,3 +23,7 @@ env:
     num_workers: 8
     verifier_type: "instruction_following"
     worker_type: "instruction_following"
+
+logger:
+  log_dir: "logs"  # Base directory for all logs
+  output_dir: "${logger.log_dir}/${data.dataset_name}/thinking_without_extra_prompt_large"
