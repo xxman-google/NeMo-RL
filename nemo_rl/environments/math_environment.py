@@ -17,7 +17,7 @@ import io
 import logging
 import os
 import re
-from typing import Any, Optional, TypedDict
+from typing import Any, NotRequired, Optional, TypedDict
 
 import ray
 import torch
@@ -37,7 +37,13 @@ from nemo_rl.environments.metrics import (
 )
 from nemo_rl.environments.utils import chunk_list_to_workers
 from nemo_rl.evals import answer_parsing
-from nemo_rl.evals.grader_model import GptGraderModel, GeminiGraderModel, OPENAI_SYSTEM_MESSAGE_CHATGPT, QA_GRADER_TEMPLATE
+from nemo_rl.evals.grader_model import (
+    OPENAI_SYSTEM_MESSAGE_CHATGPT,
+    QA_GRADER_TEMPLATE,
+    GeminiGraderModel,
+    GptGraderModel,
+    GraderModel,
+)
 
 # from nemo_rl.evals.ifeval import instructions_registry
 
@@ -46,11 +52,11 @@ class MathEnvConfig(TypedDict):
     num_workers: int
     stop_strings: Optional[list[str]]  # Default stop strings for this env
     worker_type: Optional[str]
-    grader_model_name: Optional[str]  # Model to use for grading, e.g., "gpt-4o"
+    grader_model_name: NotRequired[str]  # Model to use for grading, e.g., "gpt-4o"
     grader_api_key: Optional[str]  # API key
     grader_system_message: Optional[str]  # System message for the grader model
-    grader_temperature: Optional[float]  # Temperature for the grader model
-    grader_max_tokens: Optional[int]  # Max tokens for the grader model
+    grader_temperature: NotRequired[float]  # Temperature for the grader model
+    grader_max_tokens: NotRequired[int]  # Max tokens for the grader model
 
 
 @contextlib.contextmanager
@@ -88,7 +94,9 @@ class MathVerifyWorker:
         )
 
     def verify(
-        self, pred_data: list[dict[str, str]], metadata_list: list[MathEnvironmentMetadata]
+        self,
+        pred_data: list[dict[str, str]],
+        metadata_list: list[MathEnvironmentMetadata],
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
@@ -128,30 +136,34 @@ class MathVerifyWorker:
 @ray.remote  # pragma: no cover
 class GraderVerifyWorker:
     def __init__(self, cfg: MathEnvConfig) -> None:
-        model=cfg.get("grader_model_name", "gemini-2.5-flash")
-        self.grader_model = None
+        model = cfg.get("grader_model_name", "gemini-2.5-flash")
         logger = logging.getLogger("qa_verify_worker")
         logger.setLevel(logging.INFO)
         logger.info(f"Initialized Grader Mmodel: {model})")
         if model.startswith("gpt"):
-            self.grader_model = GptGraderModel(
+            self.grader_model: GraderModel = GptGraderModel(
                 model=model,
                 api_key=cfg.get("grader_api_key", os.getenv("OPENAI_API_KEY")),
-                system_message=cfg.get("grader_system_message",OPENAI_SYSTEM_MESSAGE_CHATGPT),
+                system_message=cfg.get(
+                    "grader_system_message", OPENAI_SYSTEM_MESSAGE_CHATGPT
+                ),
                 temperature=cfg.get("grader_temperature", 0.5),
                 max_tokens=cfg.get("grader_max_tokens", 1024),
             )
         else:
-           self.grader_model = GeminiGraderModel(
-               model=model,
-               api_key=cfg.get("grader_api_key", os.getenv("GEMINI_API_KEY")),
-               system_message=cfg.get("grader_system_message", OPENAI_SYSTEM_MESSAGE_CHATGPT),
-               temperature=cfg.get("grader_temperature", 0.5),
-               max_tokens=cfg.get("grader_max_tokens", 1024),
-           )
-        
-    
-    def _grade_sample(self, question: str, ground_truth: str, predicted_answer: str) -> str:
+            self.grader_model: GraderModel = GeminiGraderModel(
+                model=model,
+                api_key=cfg.get("grader_api_key", os.getenv("GEMINI_API_KEY")),
+                system_message=cfg.get(
+                    "grader_system_message", OPENAI_SYSTEM_MESSAGE_CHATGPT
+                ),
+                temperature=cfg.get("grader_temperature", 0.5),
+                max_tokens=cfg.get("grader_max_tokens", 1024),
+            )
+
+    def _grade_sample(
+        self, question: str, ground_truth: str, predicted_answer: str
+    ) -> str:
         grader_prompt = QA_GRADER_TEMPLATE.format(
             question=question,
             target=ground_truth,
@@ -164,10 +176,14 @@ class GraderVerifyWorker:
         grading_response = grader_response.response_text
         # Extract the grading letter (A, B, C) from the response
         match = re.search(r"(A|B|C)", grading_response)
-        return match.group(0) if match else "C"  # Default to "NOT_ATTEMPTED" if no match
-        
+        return (
+            match.group(0) if match else "C"
+        )  # Default to "NOT_ATTEMPTED" if no match
+
     def verify(
-        self, pred_data: list[dict[str, str]], metadata_list: list[MathEnvironmentMetadata]
+        self,
+        pred_data: list[dict[str, str]],
+        metadata_list: list[MathEnvironmentMetadata],
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
@@ -190,7 +206,7 @@ class GraderVerifyWorker:
             score = is_correct
             results.append((score, ground_truth, data["response"]))
         return results
-        
+
 
 @ray.remote  # pragma: no cover
 class MGSMVerifyWorker:
@@ -238,7 +254,9 @@ class MultilingualMultichoiceVerifyWorker:
         pass
 
     def verify(
-        self, pred_data: list[dict[str, str]], metadata_list: list[MathEnvironmentMetadata]
+        self,
+        pred_data: list[dict[str, str]],
+        metadata_list: list[MathEnvironmentMetadata],
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
@@ -276,7 +294,9 @@ class EnglishMultichoiceVerifyWorker:
         pass
 
     def verify(
-        self, pred_data: list[dict[str, str]], metadata_list: list[MathEnvironmentMetadata]
+        self,
+        pred_data: list[dict[str, str]],
+        metadata_list: list[MathEnvironmentMetadata],
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
@@ -385,7 +405,9 @@ class ArcAgiVerifyWorker:
             return None
 
     def verify(
-        self, pred_data: list[dict[str, str]], metadata_list: list[MathEnvironmentMetadata]
+        self,
+        pred_data: list[dict[str, str]],
+        metadata_list: list[MathEnvironmentMetadata],
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
@@ -473,7 +495,10 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
             ]
             assistant_response_batch.append("".join(assistant_responses))
 
-        chunk = [{"prompt": p, "response": r} for p, r in zip(user_prompt_batch, assistant_response_batch)]
+        chunk = [
+            {"prompt": p, "response": r}
+            for p, r in zip(user_prompt_batch, assistant_response_batch)
+        ]
         chunked_batch = chunk_list_to_workers(chunk, self.num_workers)
         chunked_verifier_metadata = chunk_list_to_workers(metadata, self.num_workers)
 
