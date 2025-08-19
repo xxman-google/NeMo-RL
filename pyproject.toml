@@ -52,6 +52,10 @@ dependencies = [
     "evaluate",
     "absl-py",
     "tqdm",
+    "openai>=1.0",
+    "google-cloud-aiplatform",
+    "google-generativeai",
+
 ]
 
 [project.optional-dependencies]
