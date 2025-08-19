@@ -49,6 +49,7 @@ from nemo_rl.evals.ifeval import instructions_registry
 
 class MathEnvConfig(TypedDict):
     num_workers: int
+    end_thinking_token: Optional[str]  # end thinking token, e.g., </think>
     stop_strings: Optional[list[str]]  # Default stop strings for this env
     worker_type: Optional[str]
     grader_model_name: NotRequired[str]  # Model to use for grading, e.g., "gpt-4o"
@@ -66,6 +67,14 @@ def _mute_output():
         contextlib.redirect_stderr(devnull_err),
     ):
         yield
+
+
+def extract_response_after_thinking(response: str, end_thinking_token: str) -> str:
+    """Extracts response after the end of thinking."""
+    idx = response.find(end_thinking_token)
+    if idx < 0:
+        return response
+    return response[idx + len(end_thinking_token) :]
 
 
 class MathEnvironmentMetadata(TypedDict):
@@ -88,6 +97,7 @@ class MathVerifyWorker:
                 LatexExtractionConfig(),
             ),
         )
+        self.end_thinking_token = cfg.get("end_thinking_token")
 
     def verify(
         self,
@@ -106,6 +116,10 @@ class MathVerifyWorker:
         results = []
         for data, metadata in zip(pred_data, metadata_list):
             response = data["response"]
+            if self.end_thinking_token is not None:
+                response = extract_response_after_thinking(
+                    response, self.end_thinking_token
+                )
             ground_truth = str(metadata["ground_truth"])
             extracted_answer = None
             try:
@@ -207,7 +221,7 @@ class GraderVerifyWorker:
 @ray.remote  # pragma: no cover
 class MGSMVerifyWorker:
     def __init__(self, cfg: MathEnvConfig) -> None:
-        pass
+        self.end_thinking_token = cfg.get("end_thinking_token")
 
     def _score_mgsm(self, target: str, prediction: str) -> bool:
         if "." in prediction:
@@ -235,6 +249,10 @@ class MGSMVerifyWorker:
         results = []
         for data, metadata in zip(pred_data, metadata_list):
             response = data["response"]
+            if self.end_thinking_token is not None:
+                response = extract_response_after_thinking(
+                    response, self.end_thinking_token
+                )
             lang = metadata["lang"]
             correct_answer = metadata["ground_truth"]
             answer_prefix = answer_parsing.LANG_TO_ANSWER_PREFIX[lang]
@@ -247,7 +265,7 @@ class MGSMVerifyWorker:
 @ray.remote  # pragma: no cover
 class MultilingualMultichoiceVerifyWorker:
     def __init__(self, cfg: MathEnvConfig) -> None:
-        pass
+        self.end_thinking_token = cfg.get("end_thinking_token")
 
     def verify(
         self,
@@ -266,6 +284,10 @@ class MultilingualMultichoiceVerifyWorker:
         results = []
         for data, metadata in zip(pred_data, metadata_list):
             response = data["response"]
+            if self.end_thinking_token is not None:
+                response = extract_response_after_thinking(
+                    response, self.end_thinking_token
+                )
             ground_truth = answer_parsing.normalize_response(metadata["ground_truth"])
             response = answer_parsing.normalize_response(response)
             extracted_answer = None
@@ -287,7 +309,7 @@ class MultilingualMultichoiceVerifyWorker:
 @ray.remote  # pragma: no cover
 class EnglishMultichoiceVerifyWorker:
     def __init__(self, cfg: MathEnvConfig) -> None:
-        pass
+        self.end_thinking_token = cfg.get("end_thinking_token")
 
     def verify(
         self,
@@ -306,6 +328,10 @@ class EnglishMultichoiceVerifyWorker:
         results = []
         for data, metadata in zip(pred_data, metadata_list):
             response = data["response"]
+            if self.end_thinking_token is not None:
+                response = extract_response_after_thinking(
+                    response, self.end_thinking_token
+                )
             ground_truth = answer_parsing.normalize_response(metadata["ground_truth"])
             response = answer_parsing.normalize_response(response)
             extracted_answer = None
@@ -327,7 +353,7 @@ class IFVerifyWorker:
     """Response verifier worker for instruction following problems."""
 
     def __init__(self, cfg: MathEnvConfig) -> None:
-        pass
+        self.end_thinking_token = cfg.get("end_thinking_token")
 
     def _remove_kwargs_none(self, kwargs) -> dict[str, Any]:
         return {k: v for k, v in kwargs.items() if v is not None}
@@ -378,6 +404,10 @@ class IFVerifyWorker:
         outputs = []
         for data, metadata in zip(pred_data, metadata_list):
             response = data["response"]
+            if self.end_thinking_token is not None:
+                response = extract_response_after_thinking(
+                    response, self.end_thinking_token
+                )
             checker_info = metadata["checker_info"]
             score, descriptions, results = self._is_following(response, checker_info)
             description = "\n".join(descriptions)
