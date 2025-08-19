@@ -21,3 +21,4 @@ env:
     terminate_on_evaluation: true
     worker_type: "python_stdout_verify"
     timeout: 10.0
+    end_thinking_token: null
