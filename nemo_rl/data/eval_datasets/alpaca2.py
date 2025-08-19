@@ -43,7 +43,7 @@ class Alpaca2Dataset:
     def _rekey(self, data: dict[str, Any]):
         return {
             "prompt": data["instruction"],
-            "golden_response": data["output"],
-            "golden_model": data["generator"],
+            "baseline_model_response": data["output"],
+            "baseline_model": data["generator"],
             "dataset": data["dataset"],
         }

@@ -452,10 +452,10 @@ class Alpaca2VerifyWorker:
             top_logprobs=cfg.get("grader_top_logprobs", 5),
         )
 
-    def _grade_sample(self, prompt: str, golden_response: str, sample_response: str) -> str:
+    def _grade_sample(self, prompt: str, baseline_model_response: str, sample_response: str) -> str:
         grader_prompt = ALPACA2_GRADER_TEMPLATE.format(
             instruction=prompt,
-            output_1=golden_response,
+            output_1=baseline_model_response,
             output_2=sample_response,
         )
         prompt_messages = [
@@ -471,24 +471,24 @@ class Alpaca2VerifyWorker:
 
         Args:
             pred_data: list[dict[str, str]]. The predicted data including prompt and response from the LLM.
-            metadata_list: list[MathEnvironmentMetadata]. The metadata containing golden responses and other info.
+            metadata_list: list[MathEnvironmentMetadata]. The metadata containing baseline responses and other info.
 
         Returns:
-            list[tuple[float, str, str]]. The rewards, golden response, and model sample response for each instance.
+            list[tuple[float, str, str]]. The rewards, baseline response, and model sample response for each instance.
         """
         results = []
         for data, metadata in zip(pred_data, metadata_list):
             prompt = data["prompt"]
             sample_response = data["response"]
-            golden_response = str(metadata["golden_response"])
-            verdict = self._grade_sample(prompt, golden_response, sample_response)
+            baseline_model_response = str(metadata["baseline_model_response"])
+            verdict = self._grade_sample(prompt, baseline_model_response, sample_response)
             if verdict not in ["m", "M"]:
                 logging.warning(
                     f"Unexpected verdict from grader model: {verdict}. Expected 'm' or 'M'."
                 )
                 continue
             score = verdict == "M"
-            results.append((score, golden_response, sample_response))
+            results.append((score, baseline_model_response, sample_response))
         return results
 
 

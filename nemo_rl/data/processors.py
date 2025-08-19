@@ -343,8 +343,8 @@ alpaca2_processor = functools.partial(
     data_processor,
     question_key="prompt",
     extra_env_info_key_maps=[
-        ("golden_response", "golden_response"),
-        ("golden_model", "golden_model"),
+        ("baseline_model_response", "baseline_model_response"),
+        ("baseline_model", "baseline_model"),
         ("dataset", "dataset"),
     ],
 )
