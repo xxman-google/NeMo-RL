@@ -2,9 +2,15 @@
 defaults: "gpqa.yaml"
 
 data:
-  prompt_file: "examples/prompts/cot.txt"
+  prompt_file: "examples/prompts/if_cot.txt"
   dataset_name: "ifeval"
 
 env:
   math:
     worker_type: "instruction_following"
+
+generation:
+  model_name: "Qwen/Qwen3-8B"
+  enable_thinking: true
+  vllm_cfg:
+    max_model_len: 4096
