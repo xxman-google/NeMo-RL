@@ -44,10 +44,10 @@ data:
   dataset_name: "numina_math"
 
 env:
+  env_type: "math"
   math:
     num_workers: 8
-    verifier_type: "math"
-    verifier_metadata_key: "ground_truth"
+    worker_type: "math"
 
 logger:
   log_dir: "logs"  # Base directory for all logs

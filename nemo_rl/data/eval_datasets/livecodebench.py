@@ -29,6 +29,7 @@ from datasets import load_dataset
 from nemo_rl.data import processors
 from nemo_rl.data.interfaces import TaskDataSpec
 
+# original jsons are located in: /mnt/datasets/livecodebench/
 _VERSION_TO_FILE = {
     "release_v1": "/tmp/logs/test.jsonl",
     "release_v2": "/tmp/logs/test2.jsonl",

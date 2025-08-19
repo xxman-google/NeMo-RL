@@ -48,6 +48,7 @@ env:
   math:
     num_workers: 8
     worker_type: "math"
+    end_thinking_token: null
 
 logger:
   log_dir: "logs"  # Base directory for all logs
