@@ -3,7 +3,7 @@ sft:
   ## total number of steps to train will equal
   ## min((max_num_epochs * len(train_dataloader)), max_num_steps)
   max_num_epochs: 3
-  max_num_steps: 2000
+  max_num_steps: 1000
 
   val_period: 100
   val_batches: 8
@@ -14,16 +14,16 @@ sft:
 
 checkpointing:
   enabled: true
-  checkpoint_dir: "results/qwen3_8b_thinking_without_extra_prompt"
+  checkpoint_dir: "results/qwen3_8b_no_thinking_without_extra_prompt"
   metric_name: "val_loss"
   higher_is_better: false
-  keep_top_k: null
-  save_period: 500
+  keep_top_k: 2
+  save_period: 100
 
 policy:
   model_name: "Qwen/Qwen3-8B-Base"
   tokenizer:
-    name: "Qwen/Qwen3-8B" #${policy.model_name} ## specify if you'd like to use a tokenizer different from the model's default
+    name: ${policy.model_name} ## specify if you'd like to use a tokenizer different from the model's default
     chat_template: "default"
     # chat_template: "{%- if tools %}\n    {{- '<|im_start|>system\\n' }}\n    {%- if messages[0].role == 'system' %}\n        {{- messages[0].content + '\\n\\n' }}\n    {%- endif %}\n    {{- \"# Tools\\n\\nYou may call one or more functions to assist with the user query.\\n\\nYou are provided with function signatures within <tools></tools> XML tags:\\n<tools>\" }}\n    {%- for tool in tools %}\n        {{- \"\\n\" }}\n        {{- tool | tojson }}\n    {%- endfor %}\n    {{- \"\\n</tools>\\n\\nFor each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:\\n<tool_call>\\n{\\\"name\\\": <function-name>, \\\"arguments\\\": <args-json-object>}\\n</tool_call><|im_end|>\\n\" }}\n{%- else %}\n    {%- if messages[0].role == 'system' %}\n        {{- '<|im_start|>system\\n' + messages[0].content + '<|im_end|>\\n' }}\n    {%- endif %}\n{%- endif %}\n{%- set ns = namespace(multi_step_tool=true, last_query_index=messages|length - 1) %}\n{%- for message in messages[::-1] %}\n    {%- set index = (messages|length - 1) - loop.index0 %}\n    {%- if ns.multi_step_tool and message.role == \"user\" and message.content is string and not(message.content.startswith('<tool_response>') and message.content.endswith('</tool_response>')) %}\n        {%- set ns.multi_step_tool = false %}\n        {%- set ns.last_query_index = index %}\n    {%- endif %}\n{%- endfor %}\n{%- for message in messages %}\n    {%- if message.content is string %}\n        {%- set content = message.content %}\n    {%- else %}\n        {%- set content = '' %}\n    {%- endif %}\n    {%- if (message.role == \"user\") or (message.role == \"system\" and not loop.first) %}\n        {{- '<|im_start|>' + message.role + '\\n' + content + '<|im_end|>' + '\\n' }}\n    {%- elif message.role == \"assistant\" %}\n        {%- set reasoning_content = '' %}\n        {%- if message.reasoning_content is string %}\n            {%- set reasoning_content = message.reasoning_content %}\n        {%- else %}\n            {%- if '</think>' in content %}\n                {%- set reasoning_content = content.split('</think>')[0].rstrip('\\n').split('<think>')[-1].lstrip('\\n') %}\n                {%- set content = content.split('</think>')[-1].lstrip('\\n') %}\n            {%- endif %}\n        {%- endif %}\n        {%- if loop.index0 > ns.last_query_index %}\n            {%- if loop.last or (not loop.last and reasoning_content) %}\n                {{- '<|im_start|>' + message.role + '\\n<think>\\n' + reasoning_content.strip('\\n') + '\\n</think>\\n\\n' + content.lstrip('\\n') }}\n            {%- else %}\n                {{- '<|im_start|>' + message.role + '\\n' + content }}\n            {%- endif %}\n        {%- else %}\n            {{- '<|im_start|>' + message.role + '\\n' + content }}\n        {%- endif %}\n        {%- if message.tool_calls %}\n            {%- for tool_call in message.tool_calls %}\n                {%- if (loop.first and content) or (not loop.first) %}\n                    {{- '\\n' }}\n                {%- endif %}\n                {%- if tool_call.function %}\n                    {%- set tool_call = tool_call.function %}\n                {%- endif %}\n                {{- '<tool_call>\\n{\"name\": \"' }}\n                {{- tool_call.name }}\n                {{- '\", \"arguments\": ' }}\n                {%- if tool_call.arguments is string %}\n                    {{- tool_call.arguments }}\n                {%- else %}\n                    {{- tool_call.arguments | tojson }}\n                {%- endif %}\n                {{- '}\\n</tool_call>' }}\n            {%- endfor %}\n        {%- endif %}\n        {{- '<|im_end|>\\n' }}\n    {%- elif message.role == \"tool\" %}\n        {%- if loop.first or (messages[loop.index0 - 1].role != \"tool\") %}\n            {{- '<|im_start|>user' }}\n        {%- endif %}\n        {{- '\\n<tool_response>\\n' }}\n        {{- content }}\n        {{- '\\n</tool_response>' }}\n        {%- if loop.last or (messages[loop.index0 + 1].role != \"tool\") %}\n            {{- '<|im_end|>\\n' }}\n        {%- endif %}\n    {%- endif %}\n{%- endfor %}\n{%- if add_generation_prompt %}\n    {{- '<|im_start|>assistant\\n' }}\n    {%- if enable_thinking is defined and enable_thinking is false %}\n        {{- '<think>\\n\\n</think>\\n\\n' }}\n    {%- endif %}\n{%- endif %}"
   train_global_batch_size: 128
@@ -80,17 +80,17 @@ policy:
       kwargs:
         start_factor: 0.001
         end_factor: 1.0
-        total_iters: 100
+        total_iters: 50
     - name: "torch.optim.lr_scheduler.CosineAnnealingLR"
       kwargs:
-        T_max: 2000
+        T_max: 1000
         eta_min: 5.0e-7
     # - name: "torch.optim.lr_scheduler.LinearLR"
     #   kwargs:
     #     start_factor: 1.0
     #     end_factor: 0.0
     #     total_iters: 10000 # 6971 - 210
-    - milestones: [100] # 6971 * 0.03
+    - milestones: [50] # 6971 * 0.03
     
 data:
   max_input_seq_length: ${policy.max_total_sequence_length}
@@ -99,13 +99,8 @@ data:
   add_eos: true
   add_generation_prompt: false
   mixture:
-    # - file_format: "parquet"
-    #   name_or_paths: "data/ifeval_like/no_thinking_without_extra_prompt_large/train*"
-    #   samples: 1.0
-    #   additional_kwargs:
-    #     split: "train"
     - file_format: "parquet"
-      name_or_paths: "data/ifeval_like/thinking_without_extra_prompt_large/train*"
+      name_or_paths: "data/ifeval_like/no_thinking_without_extra_prompt_large/train*"
       samples: 1.0
       additional_kwargs:
         split: "train"
@@ -116,16 +111,16 @@ data:
     #     split: "train"
 
 logger:
-  log_dir: "logs/sft_qwen3_8b_thinking_without_extra_prompt"  # Base directory for all logs
+  log_dir: "logs/sft_qwen3_8b_no_thinking_without_extra_prompt"  # Base directory for all logs
   wandb_enabled: true # Make sure you do a ``wandb login [Your API key]'' before running
   tensorboard_enabled: true
   mlflow_enabled: false
   monitor_gpus: false  # If true, will monitor GPU usage and log to wandb and/or tensorboard
   wandb:
     project: "qwen3-8b-base-if-sft"
-    name: "sft_qwen3_8b_thinking_without_extra_prompt"
+    name: "sft_qwen3_8b_no_thinking_without_extra_prompt"
   tensorboard:
-    log_dir: "tb_logs_qwen3_8b_thinking_without_extra_prompt"
+    log_dir: "tb_logs_qwen3_8b_no_thinking_without_extra_prompt"
   gpu_monitoring:
     collection_interval: 10  # How often to collect GPU usage metrics (in seconds)
     flush_interval: 10  # How often to flush GPU usage metrics to the loggers (in seconds)

@@ -16,26 +16,17 @@
 Original dataset: https://huggingface.co/datasets/open-r1/verifiable-coding-problems-python_decontaminated-tested-shuffled
 """
 
-from typing import Any, Literal, Optional
+from typing import Any, Optional
 
 from datasets import load_dataset
 
 from nemo_rl.data import processors
 from nemo_rl.data.interfaces import TaskDataSpec
 
-_TO_REMOVE = """The input will be stdin and you should print your solution to stdout
-
-
-Now solve the problem and return the code."""
-_TO_REMOVE2 = """The input will be given via stdin and the output should be printed to stdout by your code.
-
-Now solve the problem by providing the code."""
-
 
 class OpenR1VerifiableCodeDataset:
     def __init__(
         self,
-        source: Literal["taco", "code_contests", "apps"],
         code_exe_dir: str,
         prompt_file: Optional[str],
         system_prompt_file: Optional[str] = None,
@@ -45,7 +36,6 @@ class OpenR1VerifiableCodeDataset:
             "open-r1/verifiable-coding-problems-python_decontaminated-tested-shuffled",
             split="train",
         )
-        ds = ds.filter(lambda example: example["source"] == source)
         self.rekeyed_ds = ds.map(self._rekey, remove_columns=ds.column_names)
         self.task_spec = TaskDataSpec(
             task_name="OpenR1VerifiableCode",
@@ -55,11 +45,8 @@ class OpenR1VerifiableCodeDataset:
         self.processor = processors.code_processor
 
     def _rekey(self, data: dict[str, Any]):
-        problem = data["problem"]
-        problem = problem.replace(_TO_REMOVE, "")
-        problem = problem.replace(_TO_REMOVE2, "")
         return {
-            "question": problem,
+            "question": data["problem"],
             "tests": data["verification_info"]["test_cases"],
             "code_exe_dir": self.code_exe_dir,
         }

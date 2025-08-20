@@ -1,5 +1,5 @@
 # Math evaluation Configuration
-defaults: "eval.yaml"
+defaults: "gpqa.yaml"
 
 generation:
   model_name: "Qwen/Qwen2.5-7B-Instruct"
@@ -7,3 +7,7 @@ generation:
 data:
   prompt_file: "examples/prompts/cot.txt"
   dataset_name: "math"
+
+env:
+  math:
+    worker_type: "math"

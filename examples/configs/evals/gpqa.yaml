@@ -13,3 +13,15 @@ data:
 env:
   math:
     worker_type: "english_multichoice"
+
+logger:
+  log_dir: "logs"  # Base directory for all logs
+  wandb_enabled: true # Make sure you do a ``wandb login [Your API key]'' before running
+  tensorboard_enabled: false # Disable because it does not supprt HTML logging
+  monitor_gpus: true  # If true, will monitor GPU usage and log to wandb and/or tensorboard
+  wandb:
+    project: "eval"
+    name: "${data.dataset_name}/${generation.model_name}"
+  gpu_monitoring:
+    collection_interval: 10  # How often to collect GPU usage metrics (in seconds)
+    flush_interval: 10  # How often to flush GPU usage metrics to the loggers (in seconds)

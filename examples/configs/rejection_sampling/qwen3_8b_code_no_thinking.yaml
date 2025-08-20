@@ -1,6 +1,0 @@
-# Rejection sampling configuration for Qwen3 8B model (no-thinking mode)
-
-defaults: "qwen3_14b_code_no_thinking.yaml"
-
-generation:
-  model_name: "Qwen/Qwen3-8B"

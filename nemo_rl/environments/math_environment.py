@@ -15,9 +15,8 @@ import ast
 import contextlib
 import io
 import logging
-import os
 import re
-from typing import Any, NotRequired, Optional, TypedDict
+from typing import Any, Optional, TypedDict
 
 import ray
 import torch
@@ -39,26 +38,13 @@ from nemo_rl.environments.metrics import (
 from nemo_rl.environments.utils import chunk_list_to_workers
 from nemo_rl.evals import answer_parsing
 
-from nemo_rl.evals.grader_model import (
-    OPENAI_SYSTEM_MESSAGE_CHATGPT,
-    QA_GRADER_TEMPLATE,
-    GeminiGraderModel,
-    GptGraderModel,
-    GraderModel,
-)
 from nemo_rl.evals.ifeval import instructions_registry
 
 
 class MathEnvConfig(TypedDict):
     num_workers: int
-    end_thinking_token: Optional[str]  # end thinking token, e.g., </think>
     stop_strings: Optional[list[str]]  # Default stop strings for this env
     worker_type: Optional[str]
-    grader_model_name: NotRequired[str]  # Model to use for grading, e.g., "gpt-4o"
-    grader_api_key: Optional[str]  # API key
-    grader_system_message: Optional[str]  # System message for the grader model
-    grader_temperature: NotRequired[float]  # Temperature for the grader model
-    grader_max_tokens: NotRequired[int]  # Max tokens for the grader model
 
 
 @contextlib.contextmanager
@@ -71,23 +57,18 @@ def _mute_output():
         yield
 
 
-def extract_response_after_thinking(response: str, end_thinking_token: str) -> str:
-    """Extracts response after the end of thinking."""
-    idx = response.find(end_thinking_token)
-    if idx < 0:
-        return response
-    return response[idx + len(end_thinking_token) :]
-
-
 class MathEnvironmentMetadata(TypedDict):
     ground_truth: str
-    checker_info: NotRequired[dict[str, Any]]
-    lang: NotRequired[str]
+
+
+class MultilingualMathEnvironmentMetadata(TypedDict):
+    ground_truth: str
+    lang: str
 
 
 @ray.remote  # pragma: no cover
 class MathVerifyWorker:
-    def __init__(self, cfg: MathEnvConfig) -> None:
+    def __init__(self) -> None:
         logging.getLogger("math_verify").setLevel(logging.CRITICAL)
 
         # Use Latex and plain math extraction from predictions
@@ -99,29 +80,21 @@ class MathVerifyWorker:
                 LatexExtractionConfig(),
             ),
         )
-        self.end_thinking_token = cfg.get("end_thinking_token")
 
     def verify(
-        self,
-        pred_data: list[dict[str, str]],
-        metadata_list: list[MathEnvironmentMetadata],
+        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
         Args:
-            pred_data: list[dict[str, str]]. The predicted data including prompt and response from the LLM.
+            pred_responses: list[str]. The predicted responses from the LLM.
             ground_truths: list[str]. The ground truth responses.
 
         Returns:
             list[tuple[float, str, str]]. The rewards, correct answer, and the extracted answer for each predicted response.
         """
         results = []
-        for data, metadata in zip(pred_data, metadata_list):
-            response = data["response"]
-            if self.end_thinking_token is not None:
-                response = extract_response_after_thinking(
-                    response, self.end_thinking_token
-                )
+        for response, metadata in zip(pred_responses, metadata_list):
             ground_truth = str(metadata["ground_truth"])
             extracted_answer = None
             try:
@@ -146,85 +119,7 @@ class MathVerifyWorker:
 
 
 @ray.remote  # pragma: no cover
-class GraderVerifyWorker:
-    def __init__(self, cfg: MathEnvConfig) -> None:
-        model = cfg.get("grader_model_name", "gemini-2.5-flash")
-        logger = logging.getLogger("qa_verify_worker")
-        logger.setLevel(logging.INFO)
-        logger.info(f"Initialized Grader Mmodel: {model})")
-        if model.startswith("gpt"):
-            self.grader_model: GraderModel = GptGraderModel(
-                model=model,
-                api_key=cfg.get("grader_api_key", os.getenv("OPENAI_API_KEY")),
-                system_message=cfg.get(
-                    "grader_system_message", OPENAI_SYSTEM_MESSAGE_CHATGPT
-                ),
-                temperature=cfg.get("grader_temperature", 0.5),
-                max_tokens=cfg.get("grader_max_tokens", 1024),
-            )
-        else:
-            self.grader_model: GraderModel = GeminiGraderModel(
-                model=model,
-                api_key=cfg.get("grader_api_key", os.getenv("GEMINI_API_KEY")),
-                system_message=cfg.get(
-                    "grader_system_message", OPENAI_SYSTEM_MESSAGE_CHATGPT
-                ),
-                temperature=cfg.get("grader_temperature", 0.5),
-                max_tokens=cfg.get("grader_max_tokens", 1024),
-            )
-
-    def _grade_sample(
-        self, question: str, ground_truth: str, predicted_answer: str
-    ) -> str:
-        grader_prompt = QA_GRADER_TEMPLATE.format(
-            question=question,
-            target=ground_truth,
-            predicted_answer=predicted_answer,
-        )
-        prompt_messages = [
-            self.grader_model.pack_message(content=grader_prompt, role="user")
-        ]
-        grader_response = self.grader_model(prompt_messages)
-        grading_response = grader_response.response_text
-        # Extract the grading letter (A, B, C) from the response
-        match = re.search(r"(A|B|C)", grading_response)
-        return (
-            match.group(0) if match else "C"
-        )  # Default to "NOT_ATTEMPTED" if no match
-
-    def verify(
-        self,
-        pred_data: list[dict[str, str]],
-        metadata_list: list[MathEnvironmentMetadata],
-    ) -> list[tuple[float, str, str]]:
-        """Verify the correctness of the predicted responses against the ground truth.
-
-        Args:
-            pred_data: list[dict[str, str]]. The predicted data including prompt and response from the LLM.
-            ground_truths: list[str]. The ground truth responses.
-
-        Returns:
-            list[tuple[float, str, str]]. The rewards, correct answer, and the extracted answer for each predicted response.
-        """
-        results = []
-        for data, metadata in zip(pred_data, metadata_list):
-            question = data["prompt"]
-            model_response = data["response"]
-            ground_truth = str(metadata["ground_truth"])
-            grade_letter = self._grade_sample(question, ground_truth, model_response)
-            is_correct = grade_letter == "A"
-            is_incorrect = grade_letter == "B"
-            is_not_attempted = grade_letter == "C"
-            score = is_correct
-            results.append((score, ground_truth, data["response"]))
-        return results
-
-
-@ray.remote  # pragma: no cover
 class MGSMVerifyWorker:
-    def __init__(self, cfg: MathEnvConfig) -> None:
-        self.end_thinking_token = cfg.get("end_thinking_token")
-
     def _score_mgsm(self, target: str, prediction: str) -> bool:
         if "." in prediction:
             prediction = prediction.rstrip("0").rstrip(".")
@@ -236,25 +131,20 @@ class MGSMVerifyWorker:
 
     def verify(
         self,
-        pred_data: list[dict[str, str]],
-        metadata_list: list[MathEnvironmentMetadata],
+        pred_responses: list[str],
+        metadata_list: list[MultilingualMathEnvironmentMetadata],
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
         Args:
-            pred_data: list[dict[str, str]]. The predicted data including prompt and response from the LLM.
+            pred_responses: list[str]. The predicted responses from the LLM.
             ground_truths: list[str]. The ground truth responses.
 
         Returns:
             list[tuple[float, str, str]]. The rewards, correct answer, and the extracted answer for each predicted response.
         """
         results = []
-        for data, metadata in zip(pred_data, metadata_list):
-            response = data["response"]
-            if self.end_thinking_token is not None:
-                response = extract_response_after_thinking(
-                    response, self.end_thinking_token
-                )
+        for response, metadata in zip(pred_responses, metadata_list):
             lang = metadata["lang"]
             correct_answer = metadata["ground_truth"]
             answer_prefix = answer_parsing.LANG_TO_ANSWER_PREFIX[lang]
@@ -266,30 +156,20 @@ class MGSMVerifyWorker:
 
 @ray.remote  # pragma: no cover
 class MultilingualMultichoiceVerifyWorker:
-    def __init__(self, cfg: MathEnvConfig) -> None:
-        self.end_thinking_token = cfg.get("end_thinking_token")
-
     def verify(
-        self,
-        pred_data: list[dict[str, str]],
-        metadata_list: list[MathEnvironmentMetadata],
+        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
         Args:
-            pred_data: list[dict[str, str]]. The predicted data including prompt and response from the LLM.
+            pred_responses: list[str]. The predicted responses from the LLM.
             ground_truths: list[str]. The ground truth responses.
 
         Returns:
             list[tuple[float, str, str]]. The rewards, correct answer, and extracted answers for each predicted response.
         """
         results = []
-        for data, metadata in zip(pred_data, metadata_list):
-            response = data["response"]
-            if self.end_thinking_token is not None:
-                response = extract_response_after_thinking(
-                    response, self.end_thinking_token
-                )
+        for response, metadata in zip(pred_responses, metadata_list):
             ground_truth = answer_parsing.normalize_response(metadata["ground_truth"])
             response = answer_parsing.normalize_response(response)
             extracted_answer = None
@@ -310,30 +190,20 @@ class MultilingualMultichoiceVerifyWorker:
 
 @ray.remote  # pragma: no cover
 class EnglishMultichoiceVerifyWorker:
-    def __init__(self, cfg: MathEnvConfig) -> None:
-        self.end_thinking_token = cfg.get("end_thinking_token")
-
     def verify(
-        self,
-        pred_data: list[dict[str, str]],
-        metadata_list: list[MathEnvironmentMetadata],
+        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
         Args:
-            pred_data: list[dict[str, str]]. The predicted data including prompt and response from the LLM.
+            pred_responses: list[str]. The predicted responses from the LLM.
             ground_truths: list[str]. The ground truth responses.
 
         Returns:
             list[tuple[float, str, str]]. The rewards, correct answer, and extracted answers for each predicted response.
         """
         results = []
-        for data, metadata in zip(pred_data, metadata_list):
-            response = data["response"]
-            if self.end_thinking_token is not None:
-                response = extract_response_after_thinking(
-                    response, self.end_thinking_token
-                )
+        for response, metadata in zip(pred_responses, metadata_list):
             ground_truth = answer_parsing.normalize_response(metadata["ground_truth"])
             response = answer_parsing.normalize_response(response)
             extracted_answer = None
@@ -354,9 +224,6 @@ class EnglishMultichoiceVerifyWorker:
 class IFVerifyWorker:
     """Response verifier worker for instruction following problems."""
 
-    def __init__(self, cfg: MathEnvConfig) -> None:
-        self.end_thinking_token = cfg.get("end_thinking_token")
-
     def _remove_kwargs_none(self, kwargs) -> dict[str, Any]:
         return {k: v for k, v in kwargs.items() if v is not None}
 
@@ -372,7 +239,6 @@ class IFVerifyWorker:
         for index, instruction_id in enumerate(instruction_list):
             instruction_cls = instructions_registry.INSTRUCTION_DICT[instruction_id]
             instruction = instruction_cls(instruction_id)
-
             description = instruction.build_description(
                 **self._remove_kwargs_none(checker_kwargs[index])
             )
@@ -419,9 +285,6 @@ class IFVerifyWorker:
 class ArcAgiVerifyWorker:
     """Response verifier worker for ARC-AGI problems."""
 
-    def __init__(self, cfg: MathEnvConfig) -> None:
-        pass
-
     def _extract_response_grid(self, s: str) -> Optional[list[list[int]]]:
         # Regex for a 2D grid of integers (optionally with whitespace)
         pattern = r"<output>\s*(\[[^\]]*(?:\][^\[]*\[?[^\]]*)*)\s*</output>"
@@ -435,22 +298,19 @@ class ArcAgiVerifyWorker:
             return None
 
     def verify(
-        self,
-        pred_data: list[dict[str, str]],
-        metadata_list: list[MathEnvironmentMetadata],
+        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
 
         Args:
-            pred_data: list[dict[str, str]]. The predicted data including prompt and response from the LLM.
+            pred_responses: list[str]. The predicted responses from the LLM.
             metadata_list: list[MathEnvironmentMetadata]. The metadata containing ground truth and other info.
 
         Returns:
             list[tuple[float, str, str]]. The rewards, correct answer, and extracted answer for each predicted response.
         """
         results = []
-        for data, metadata in zip(pred_data, metadata_list):
-            response = data["response"]
+        for response, metadata in zip(pred_responses, metadata_list):
             extracted_answer = self._extract_response_grid(response)
             score = 1.0 if extracted_answer == metadata["ground_truth"] else 0.0
             results.append((score, metadata["ground_truth"], extracted_answer))
@@ -468,18 +328,17 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
             f"{worker_type=} must be a string but was {type(worker_type)}"
         )
         worker_cls = {
-            "arc_agi": ArcAgiVerifyWorker,
             "english_multichoice": EnglishMultichoiceVerifyWorker,
             "instruction_following": IFVerifyWorker,
             "math": MathVerifyWorker,
             "mgsm": MGSMVerifyWorker,
             "multilingual_multichoice": MultilingualMultichoiceVerifyWorker,
-            "simpleqa": GraderVerifyWorker,
+            "arc_agi": ArcAgiVerifyWorker,
         }[worker_type]
         self.workers = [
             worker_cls.options(  # type: ignore # (decorated with @ray.remote)
                 runtime_env={"py_executable": PY_EXECUTABLES.SYSTEM}
-            ).remote(cfg=self.cfg)
+            ).remote()
             for _ in range(self.num_workers)
         ]
 
@@ -509,15 +368,8 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
         """
         # Extract the assistant's responses from the message history
         # Each message list should have at least one assistant response
-        user_prompt_batch = []
         assistant_response_batch = []
         for conversation in message_log_batch:
-            user_prompts = [
-                str(interaction["content"])
-                for interaction in conversation
-                if interaction["role"] == "user"
-            ]
-            user_prompt_batch.append("".join(user_prompts))
             assistant_responses = [
                 str(interaction["content"])
                 for interaction in conversation
@@ -525,18 +377,16 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
             ]
             assistant_response_batch.append("".join(assistant_responses))
 
-        chunk = [
-            {"prompt": p, "response": r}
-            for p, r in zip(user_prompt_batch, assistant_response_batch)
-        ]
-        chunked_batch = chunk_list_to_workers(chunk, self.num_workers)
+        chunked_assistant_response_batch = chunk_list_to_workers(
+            assistant_response_batch, self.num_workers
+        )
         chunked_verifier_metadata = chunk_list_to_workers(metadata, self.num_workers)
 
         # # Process each chunk in parallel
         futures = [
             self.workers[i].verify.remote(chunk, metadata_chunk)
             for i, (chunk, metadata_chunk) in enumerate(
-                zip(chunked_batch, chunked_verifier_metadata)
+                zip(chunked_assistant_response_batch, chunked_verifier_metadata)
             )
         ]
 

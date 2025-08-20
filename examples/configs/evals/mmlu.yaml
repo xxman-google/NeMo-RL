@@ -1,5 +1,5 @@
 # Math evaluation Configuration
-defaults: "eval.yaml"
+defaults: "gpqa.yaml"
 
 data:
   prompt_file: "examples/prompts/mmlu.txt"
