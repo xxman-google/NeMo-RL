@@ -1,0 +1,136 @@
+# reference run: https://wandb.ai/gmayanksharan-google/cirrus/runs/9l02wj81
+sft:
+  max_num_epochs: 1
+  max_num_steps: 1307
+  val_period: 100
+  val_batches: 16
+  val_global_batch_size: 128
+  val_micro_batch_size: 2
+  val_at_start: true
+  seed: 42
+checkpointing:
+  enabled: true
+  checkpoint_dir: "results/sft_qwen3_14b_openr1_math_mcq"
+  metric_name: val_loss
+  higher_is_better: false
+  save_period: 1000
+  keep_top_k: null
+policy:
+  model_name: "Qwen/Qwen3-14B-Base"
+  tokenizer:
+    name: "Qwen/Qwen3-14B"
+    chat_template: "default"
+  train_global_batch_size: 64
+  train_micro_batch_size: 1
+  logprob_batch_size: 1
+  max_total_sequence_length: 8192
+  precision: bfloat16
+
+  dtensor_cfg:
+    enabled: true
+    cpu_offload: false
+    sequence_parallel: false
+    activation_checkpointing: true
+    tensor_parallel_size: 2
+    context_parallel_size: 1
+    custom_parallel_plan: null
+  dynamic_batching:
+    enabled: True
+    train_mb_tokens: ${mul:${policy.max_total_sequence_length}, ${policy.train_micro_batch_size}}
+    logprob_mb_tokens: ${mul:${policy.max_total_sequence_length}, ${policy.logprob_batch_size}}
+    sequence_length_round: 64
+  sequence_packing:
+    enabled: False
+  make_sequence_length_divisible_by: ${policy.dtensor_cfg.tensor_parallel_size}
+  max_grad_norm: 1
+  optimizer:
+    name: torch.optim.AdamW
+    kwargs:
+      lr: 1.11e-05
+      weight_decay: 0.1
+      betas:
+        - 0.9
+        - 0.95
+      eps: 1e-06
+      foreach: false
+      fused: false
+  scheduler:
+    - name: "torch.optim.lr_scheduler.LinearLR"
+      kwargs:
+        start_factor: 0.01
+        end_factor: 1.0
+        total_iters: 100
+    - name: "torch.optim.lr_scheduler.CosineAnnealingLR"
+      kwargs:
+        T_max: 1207
+        eta_min: 1.11e-6
+    - milestones: [100]
+data:
+  max_input_seq_length: ${policy.max_total_sequence_length}
+  dataset_name: "dataset_mixture"
+  # the original math dataset is located in /mnt/dataset/cirrus0.0/
+  # the original mcq dataset is located in /mnt/dataset/cirrus0.1/
+  mixture:
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_amc_aime_qwen3_14b_no_thinking/train-unboxed*"
+      samples: 563
+      additional_kwargs:
+        split: "train"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_aops_forum_qwen3_14b_no_thinking/train-unboxed*"
+      samples: 5700
+      additional_kwargs:
+        split: "train"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_cn_contest_qwen3_14b_no_thinking/train-unboxed*"
+      samples: 6460
+      additional_kwargs:
+        split: "train"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_inequalities_qwen3_14b_no_thinking/train-unboxed*"
+      samples: 568
+      additional_kwargs:
+        split: "train"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_number_theory_qwen3_14b_no_thinking/train-unboxed*"
+      samples: 178
+      additional_kwargs:
+        split: "train"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_olympiads_qwen3_14b_no_thinking/train-unboxed*"
+      samples: 40212
+      additional_kwargs:
+        split: "train"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_olympiads_ref_qwen3_14b_no_thinking/train-unboxed*"
+      samples: 423
+      additional_kwargs:
+        split: "train"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/sciq_qwen3_14b_mcq_no_thinking/train-augmented*"
+      samples: 4000
+      additional_kwargs:
+        split: "train"
+    - file_format: "huggingface"
+      name_or_paths: "allenai/tulu-3-sft-personas-instruction-following"
+      samples: 29980
+      additional_kwargs:
+        split: "train"
+  add_bos: true
+  add_eos: true
+  add_generation_prompt: false
+logger:
+  log_dir: "logs/sft_qwen3_14b_openr1_math_mcq_non_thinking"
+  wandb_enabled: true
+  tensorboard_enabled: false
+  mlflow_enabled: false
+  monitor_gpus: true
+  wandb:
+    project: cirrus
+    name: sft_qwen3_14b_openr1_math_mcq_non_thinking
+  gpu_monitoring:
+    collection_interval: 30
+    flush_interval: 30
+cluster:
+  gpus_per_node: 8
+  num_nodes: 4

@@ -279,6 +279,7 @@ async def _run_env_eval_impl(
         "english_multichoice": vis_lib.MathRenderTemplate,
         "multilingual_multichoice": vis_lib.MathRenderTemplate,
         "instruction_following": vis_lib.BaseRenderTemplate,
+        "simpleqa": vis_lib.BaseRenderTemplate,
     }[env_config["worker_type"]]()
 
     # Run evaluation loop

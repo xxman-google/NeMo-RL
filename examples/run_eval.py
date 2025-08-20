@@ -42,7 +42,7 @@ def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Run Evaluation with configuration")
     parser.add_argument(
-        "--config", type=str, default=None, help="Path to YAML config file"
+        "--config", type=str, default="examples/configs/evals/ifeval.yaml", help="Path to YAML config file"
     )
 
     # Parse known args for the script

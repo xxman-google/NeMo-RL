@@ -1,0 +1,10 @@
+# Rejection sampling configuration for Qwen3 8B model (no-thinking mode)
+
+defaults: "qwen3_8b_mcq_no_thinking.yaml"
+
+generation:
+  enable_thinking: true
+  temperature: 0.6
+  top_p: 0.95
+  vllm_cfg:
+    max_model_len: 38912

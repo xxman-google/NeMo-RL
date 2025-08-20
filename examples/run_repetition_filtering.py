@@ -88,6 +88,7 @@ def main(_):
     logger_config = LoggerConfig(
         log_dir=_WANDB_LOG_DIR.value,
         wandb_enabled=True,
+        mlflow_enabled=False,
         tensorboard_enabled=False,
         wandb=WandbConfig(project="data_filtering", name=_DATASET_NAME.value),
         monitor_gpus=False,
