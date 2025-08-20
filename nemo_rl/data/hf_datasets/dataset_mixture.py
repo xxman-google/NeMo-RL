@@ -41,6 +41,20 @@ class DatasetMixture:
             val_size: Percentage of the data used for validation.
             seed: Random seed.
         """
+        def _format_swebench(data: dict[str, Any]) -> dict[str, list[dict[str, str]]]:
+            return {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": data["text"],
+                    },
+                    {
+                        "role": "assistant",
+                        "content": data["patch"],
+                    },
+                ]
+            }
+
         datasets = []
         for weighted_ds in mixture:
             file_format = weighted_ds["file_format"]
@@ -54,6 +68,9 @@ class DatasetMixture:
                 ds = load_dataset(
                     weighted_ds["name_or_paths"], **weighted_ds["additional_kwargs"]
                 )
+                if weighted_ds["name_or_paths"] == "hellomlp/SWE-bench-all__style-3__fs-oracle":
+                    ds = ds.map(_format_swebench)
+
             target_samples = weighted_ds["samples"]
             ds.shuffle(seed=seed)
             if target_samples > len(ds):
