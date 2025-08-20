@@ -54,6 +54,10 @@ class DatasetMixture:
                     },
                 ]
             }
+        def _filter_long_seq(data: dict[str, Any]) -> bool:
+            if len(data["messages"][0]["content"]) > 32000:
+                return False
+            return True
 
         datasets = []
         for weighted_ds in mixture:
@@ -70,6 +74,7 @@ class DatasetMixture:
                 )
                 if weighted_ds["name_or_paths"] == "hellomlp/SWE-bench-all__style-3__fs-oracle":
                     ds = ds.map(_format_swebench)
+                    ds = ds.filter(_)
 
             target_samples = weighted_ds["samples"]
             ds.shuffle(seed=seed)
