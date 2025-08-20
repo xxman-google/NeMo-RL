@@ -1,7 +1,7 @@
 # reference run: https://wandb.ai/gmayanksharan-google/cirrus/runs/1fy0dcpm
 sft:
   max_num_epochs: 1
-  max_num_steps: 5000
+  max_num_steps: 2838
   val_period: 100
   val_batches: 32
   val_global_batch_size: 32
@@ -23,7 +23,7 @@ policy:
   train_global_batch_size: 32
   train_micro_batch_size: 1
   logprob_batch_size: 1
-  max_total_sequence_length: 32768
+  max_total_sequence_length: 16384
   precision: bfloat16
 
   dtensor_cfg:
@@ -59,12 +59,12 @@ policy:
       kwargs:
         start_factor: 0.01
         end_factor: 1.0
-        total_iters: 100
+        total_iters: 200
     - name: "torch.optim.lr_scheduler.CosineAnnealingLR"
       kwargs:
-        T_max: 1240
+        T_max: 2638
         eta_min: 1.11e-6
-    - milestones: [100]
+    - milestones: [200]
 data:
   max_input_seq_length: ${policy.max_total_sequence_length}
   dataset_name: "dataset_mixture"
