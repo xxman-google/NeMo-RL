@@ -134,7 +134,7 @@ def setup(
     train_dataloader = StatefulDataLoader(
         train_dataset,
         batch_size=policy_config["train_global_batch_size"],
-        shuffle=data_config["shuffle"],
+        shuffle=data_config.get("shuffle", True),
         collate_fn=rl_collate_fn,
         drop_last=True,
     )
