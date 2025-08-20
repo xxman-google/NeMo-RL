@@ -74,7 +74,7 @@ class DatasetMixture:
                 )
                 if weighted_ds["name_or_paths"] == "hellomlp/SWE-bench-all__style-3__fs-oracle":
                     ds = ds.map(_format_swebench)
-                    ds = ds.filter(_)
+                    ds = ds.filter(_filter_long_seq)
 
             target_samples = weighted_ds["samples"]
             ds.shuffle(seed=seed)
