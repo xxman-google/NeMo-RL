@@ -1,4 +1,4 @@
-# reference run: https://wandb.ai/gmayanksharan-google/cirrus/runs/ak69pj10
+# reference run: https://wandb.ai/gmayanksharan-google/cirrus/runs/ucdl9b9c
 sft:
   max_num_epochs: 1
   max_num_steps: 1127
@@ -10,11 +10,12 @@ sft:
   seed: 42
 checkpointing:
   enabled: true
-  checkpoint_dir: "results/sft_qwen3_8b_openr1_math"
+  checkpoint_dir: "results/sft_qwen3_8b_openr1_math_non_thinking_megatron"
   metric_name: val_loss
   higher_is_better: false
   save_period: 1000
   keep_top_k: null
+  checkpoint_must_save_by: null
 policy:
   model_name: "Qwen/Qwen3-8B-Base"
   tokenizer:
@@ -34,7 +35,7 @@ policy:
     empty_unused_memory_level: 1
     activation_checkpointing: true
     converter_type: "Qwen2ForCausalLM"
-    tensor_model_parallel_size: 1
+    tensor_model_parallel_size: 4
     expert_tensor_parallel_size: 1
     expert_model_parallel_size: 1
     pipeline_model_parallel_size: 1
@@ -42,7 +43,7 @@ policy:
     num_layers_in_last_pipeline_stage: null
     context_parallel_size: 1
     pipeline_dtype: ${policy.precision}
-    sequence_parallel: true
+    sequence_parallel: false
     freeze_moe_router: true
     moe_router_dtype: "fp64"
     moe_router_load_balancing_type: "none" # "seq_aux_loss" causes logprob error divergence for grpo
@@ -171,14 +172,14 @@ data:
   add_eos: true
   add_generation_prompt: false
 logger:
-  log_dir: "logs/sft_qwen3_8b_openr1_math_non_thinking"
+  log_dir: "logs/sft_qwen3_8b_openr1_math_non_thinking_megatron"
   wandb_enabled: true
   tensorboard_enabled: false
   mlflow_enabled: false
   monitor_gpus: true
   wandb:
     project: cirrus
-    name: sft_qwen3_8b_openr1_math_non_thinking
+    name: sft_qwen3_8b_openr1_math_non_thinking_megatron
   gpu_monitoring:
     collection_interval: 30
     flush_interval: 30
