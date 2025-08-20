@@ -5,7 +5,6 @@ data:
   prompt_file: "examples/prompts/openr1_verifiable_code.txt"
   dataset_name: "openr1_verifiable_code"
   code_exe_dir: "/tmp/logs"
-  source: "code_contests"
 
 generation:
   temperature: 0.7
@@ -20,4 +19,3 @@ env:
     num_workers: 8
     terminate_on_evaluation: true
     worker_type: "python_stdout_verify"
-    timeout: 3.0

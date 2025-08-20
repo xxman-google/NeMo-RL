@@ -1,16 +1,10 @@
-# IFEval evaluation Configuration
-defaults: "eval.yaml"
+# Math evaluation Configuration
+defaults: "gpqa.yaml"
 
 data:
-  prompt_file: "examples/prompts/if_cot.txt"
+  prompt_file: "examples/prompts/cot.txt"
   dataset_name: "ifeval"
 
 env:
   math:
     worker_type: "instruction_following"
-
-generation:
-  model_name: "/home/tangyoubao_google_com/nemo-rl/results/qwen3_8b_thinking_without_extra_prompt/step_1000/hf"
-  enable_thinking: true
-  vllm_cfg:
-    max_model_len: 4096

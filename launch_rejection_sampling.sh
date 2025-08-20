@@ -1,9 +1,9 @@
 #!/bin/bash
 
-dataset_name="openr1_verifiable_code"
+dataset_name="openr1_math"
 
-model_names=("qwen3_14b_code_no_thinking" "qwen3_14b_code_thinking")
-sources=("taco" "code_contests" "apps")
+model_names=("qwen3_14b_no_thinking" "qwen3_14b_thinking")
+sources=("amc_aime" "aops_forum" "cn_contest" "inequalities" "number_theory" "olympiads" "olympiads_ref")
 
 for model_name in "${model_names[@]}"; do
   config_path="examples/configs/rejection_sampling/${model_name}.yaml"
@@ -13,7 +13,7 @@ for model_name in "${model_names[@]}"; do
   else
     max_model_len=38912
   fi
-  if [[ "$model_name" == "qwen3_32b_code_thinking" ]]; then
+  if [[ "$model_name" == "qwen3_32b_thinking" ]]; then
     tp=2
   else
     tp=1
