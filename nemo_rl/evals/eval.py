@@ -105,7 +105,11 @@ def setup(
     top_k = generation_config["top_k"]
 
     # Validate metrics
-    assert metric in ["pass@k", "cons@k"], f"Invalid metric: {metric}"
+    assert metric in [
+        "pass@k",
+        "cons@k",
+        "length_controlled_winrate",
+    ], f"Invalid metric: {metric}"
     if num_tests_per_prompt > 1:
         assert temperature > 0 and top_k != 1, (
             "temperature > 0 and top_k != 1 are required for multiple samples"

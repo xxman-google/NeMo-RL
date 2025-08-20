@@ -5,6 +5,9 @@
 
 defaults: "eval.yaml"
 
+eval:
+  metric: "length_controlled_winrate"
+
 generation:
   vllm_cfg:
     max_model_len: 32768
