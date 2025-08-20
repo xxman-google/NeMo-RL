@@ -108,7 +108,7 @@ class MathVerifyWorker:
 
         Args:
             pred_data: list[dict[str, str]]. The predicted data including prompt and response from the LLM.
-            ground_truths: list[str]. The ground truth responses.
+            metadata_list: list[MathEnvironmentMetadata]. The list of metadata used for response verification.
 
         Returns:
             list[tuple[float, str, str]]. The rewards, correct answer, and the extracted answer for each predicted response.
@@ -493,12 +493,13 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
         self,
         message_log_batch: list[LLMMessageLogType],
         metadata: list[MathEnvironmentMetadata],
+        return_extracted_answer: bool = False,
     ) -> EnvironmentReturn[MathEnvironmentMetadata]:
         """Runs a step in the math environment.
 
         Args:
             message_log: list[list[dict[str, str]]]. A batch of OpenAI-API-like message logs that represent interactions with the LLM.
-            metadata: list[MathEnvironmentMetadata]. The grader will use the 'ground_truth' key to evaluate correctness.
+            metadata: list[MathEnvironmentMetadata]. The grader will use the 'ground_truth' key to evaluate correctness. The extracted answer will be stored to caculate cons@k.
 
         Returns:
             EnvironmentReturn: A tuple containing:
@@ -533,7 +534,7 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
         chunked_batch = chunk_list_to_workers(chunk, self.num_workers)
         chunked_verifier_metadata = chunk_list_to_workers(metadata, self.num_workers)
 
-        # # Process each chunk in parallel
+        # Process each chunk in parallel
         futures = [
             self.workers[i].verify.remote(chunk, metadata_chunk)
             for i, (chunk, metadata_chunk) in enumerate(
@@ -541,12 +542,12 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
             )
         ]
 
-        results = ray.get(futures)
+        worker_results = ray.get(futures)
 
         # flatten the results
         results = [
             (score, correct_answer, extracted_answer)
-            for sublist in results
+            for sublist in worker_results
             for (score, correct_answer, extracted_answer) in sublist
         ]
         observations = [
@@ -560,11 +561,11 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
             }
             for score, correct_answer, extracted_answer in results
         ]
+        extracted_answers = [extracted_answer for _, _, extracted_answer in results]
 
         # create a tensor of rewards and done flags
         rewards = torch.tensor([score for score, _, _ in results]).cpu()
         done = torch.ones_like(rewards).cpu()
-
         next_stop_strings = [None] * len(message_log_batch)
 
         return EnvironmentReturn(
@@ -573,6 +574,7 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
             next_stop_strings=next_stop_strings,
             rewards=rewards,
             terminateds=done,
+            answers=extracted_answers,
         )
 
     def global_post_process_and_metrics(
