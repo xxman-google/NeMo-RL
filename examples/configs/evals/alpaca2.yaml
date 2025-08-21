@@ -1,0 +1,25 @@
+# Alpaca Eval 2.0 configuration.
+
+# Note that the grader model config is specified here:
+#  https://github.com/tatsu-lab/alpaca_eval/blob/main/src/alpaca_eval/evaluators_configs/weighted_alpaca_eval_gpt4_turbo/configs.yaml
+
+defaults: "eval.yaml"
+
+eval:
+  metric: "length_controlled_winrate"
+
+generation:
+  vllm_cfg:
+    max_model_len: 32768
+
+data:
+  dataset_name: "alpaca2"
+
+env:
+  math:
+    worker_type: "alpaca2"
+    grader_model_name: "gpt-4-1106-preview"
+    grader_max_tokens: 1
+    grader_temperature: 1
+    grader_logprobs: true
+    grader_top_logprobs: 5

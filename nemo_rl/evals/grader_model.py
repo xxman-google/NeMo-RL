@@ -15,6 +15,31 @@ OPENAI_SYSTEM_MESSAGE_CHATGPT = (
     + "\nKnowledge cutoff: 2023-12\nCurrent date: 2024-04-01"
 )
 
+ALPACA2_SYSTEM_MESSAGE = "You are a highly efficient assistant, who evaluates and selects the best large language model (LLMs) based on the quality of their responses to a given instruction. This process will be used to create a leaderboard reflecting the most accurate and human-preferred answers."
+
+ALPACA2_GRADER_TEMPLATE = """
+I require a leaderboard for various large language models. I'll provide you with prompts given to these models and their corresponding outputs. Your task is to assess these responses, and select the model that produces the best output from a human perspective.
+## Instruction
+{{
+    "instruction": {instruction},
+}}
+## Model Outputs
+Here are the unordered outputs from the models. Each output is associated with a specific model, identified by a unique model identifier.
+{{
+    {{
+        "model_identifier": "m",
+        "output": {output_1}
+    }},
+    {{
+        "model_identifier": "M",
+        "output": {output_2}
+    }}
+}}
+## Task
+Evaluate the models based on the quality and relevance of their outputs, and select the model that generated the best output. Answer by providing the model identifier of the best model. We will use your output as the name of the best model, so make sure your output only contains one of the following model identifiers and nothing else (no quotes, no spaces, no new lines, ...): m or M.
+## Best Model Identifier
+""".strip()
+
 QA_GRADER_TEMPLATE = """
 Your job is to look at a question, a gold target, and a predicted answer, and then assign a grade of either ["CORRECT", "INCORRECT", "NOT_ATTEMPTED"].
 First, I will give examples of each grade, and then you will grade a new example.
@@ -139,12 +164,16 @@ class GptGraderModel(GraderModel):
         system_message: str | None = None,
         temperature: float = 0.5,
         max_tokens: int = 4096,
+        logprobs: bool = False,
+        top_logprobs: int = 5
     ):
         self.client = OpenAI(api_key=api_key)
         self.model = model
         self.system_message = system_message
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.logprobs = logprobs
+        self.top_logprobs = top_logprobs
         self.image_format = "url"
 
     def _handle_image(
@@ -178,6 +207,8 @@ class GptGraderModel(GraderModel):
                     messages=message_list,
                     temperature=self.temperature,
                     max_tokens=self.max_tokens,
+                    logprobs=self.logprobs,
+                    top_logprobs=self.top_logprobs,
                 )
                 content = response.choices[0].message.content
                 if content is None:
