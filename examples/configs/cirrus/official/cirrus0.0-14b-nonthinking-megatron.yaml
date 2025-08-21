@@ -1,7 +1,17 @@
-# reference run: https://wandb.ai/gmayanksharan-google/cirrus/runs/ucdl9b9c
+# Reference run: https://wandb.ai/gmayanksharan-google/cirrus/runs/blt7fbo3
+# In order to train with this config, please copy the data from /mnt to your log directory. For example,
+# cp -r /mnt/datasets/cirrus0.0/openr1_math_*qwen3_14b_no_thinking/ $JOB_ID/ray-logs/app_logs/
+#
+# Example launch command:
+# uv run examples/run_sft.py --config examples/configs/cirrus/official/cirrus0.0-14b-nonthinking-megatron.yaml \
+# cluster.num_nodes=4 \
+# cluster.gpus_per_node=8 \
+# logger.log_dir=$LOCAL_LOG_DIR_IN_CONTAINER \
+# checkpointing.checkpoint_dir=${CKPT_LOCAL_DIR}/cirrus0p0_14b_nonthinking_megatron \
+# logger.wandb.name=cirrus0p0_14b_nonthinking_megatron
 sft:
   max_num_epochs: 1
-  max_num_steps: 1127
+  max_num_steps: 1227
   val_period: 100
   val_batches: 16
   val_global_batch_size: 128
@@ -10,16 +20,16 @@ sft:
   seed: 42
 checkpointing:
   enabled: true
-  checkpoint_dir: "results/sft_qwen3_8b_openr1_math_non_thinking_megatron"
+  checkpoint_dir: "results/sft_qwen3_14b_openr1_math_non_thinking_megatron"
   metric_name: val_loss
   higher_is_better: false
   save_period: 1000
   keep_top_k: null
   checkpoint_must_save_by: null
 policy:
-  model_name: "Qwen/Qwen3-8B-Base"
+  model_name: "Qwen/Qwen3-14B-Base"
   tokenizer:
-    name: "Qwen/Qwen3-8B"
+    name: "Qwen/Qwen3-14B"
     chat_template: "default"
   train_global_batch_size: 64
   train_micro_batch_size: 1
@@ -78,7 +88,7 @@ policy:
       end_weight_decay: ${policy.megatron_cfg.optimizer.weight_decay}
       weight_decay_incr_style: "constant"
       lr_decay_style: "cosine"
-      lr_decay_iters: 1127
+      lr_decay_iters: 1227
       lr_warmup_iters: 100
       lr_warmup_init: 1.17e-7
 
@@ -101,65 +111,45 @@ policy:
 
   make_sequence_length_divisible_by: ${policy.megatron_cfg.tensor_model_parallel_size}
   max_grad_norm: 1
-  optimizer:
-    name: torch.optim.AdamW
-    kwargs:
-      lr: 1.17e-05
-      weight_decay: 0.1
-      betas:
-        - 0.9
-        - 0.95
-      eps: 1e-06
-      foreach: false
-      fused: false
-  scheduler:
-    - name: "torch.optim.lr_scheduler.LinearLR"
-      kwargs:
-        start_factor: 0.01
-        end_factor: 1.0
-        total_iters: 100
-    - name: "torch.optim.lr_scheduler.CosineAnnealingLR"
-      kwargs:
-        T_max: 1127
-        eta_min: 1.17e-6
-    - milestones: [100]
+  optimizer: null
+
 data:
   max_input_seq_length: ${policy.max_total_sequence_length}
   dataset_name: "dataset_mixture"
   # the original dataset is located in /mnt/dataset/cirrus0.0/
   mixture:
     - file_format: "parquet"
-      name_or_paths: "/tmp/logs/openr1_math_amc_aime_qwen3_8b_no_thinking/train-unboxed*"
+      name_or_paths: "/tmp/logs/openr1_math_amc_aime_qwen3_14b_no_thinking/train-unboxed*"
       samples: 523
       additional_kwargs:
         split: "train"
     - file_format: "parquet"
-      name_or_paths: "/tmp/logs/openr1_math_aops_forum_qwen3_8b_no_thinking/train-unboxed*"
+      name_or_paths: "/tmp/logs/openr1_math_aops_forum_qwen3_14b_no_thinking/train-unboxed*"
       samples: 5510
       additional_kwargs:
         split: "train"
     - file_format: "parquet"
-      name_or_paths: "/tmp/logs/openr1_math_cn_contest_qwen3_8b_no_thinking/train-unboxed*"
+      name_or_paths: "/tmp/logs/openr1_math_cn_contest_qwen3_14b_no_thinking/train-unboxed*"
       samples: 6227
       additional_kwargs:
         split: "train"
     - file_format: "parquet"
-      name_or_paths: "/tmp/logs/openr1_math_inequalities_qwen3_8b_no_thinking/train-unboxed*"
+      name_or_paths: "/tmp/logs/openr1_math_inequalities_qwen3_14b_no_thinking/train-unboxed*"
       samples: 573
       additional_kwargs:
         split: "train"
     - file_format: "parquet"
-      name_or_paths: "/tmp/logs/openr1_math_number_theory_qwen3_8b_no_thinking/train-unboxed*"
+      name_or_paths: "/tmp/logs/openr1_math_number_theory_qwen3_14b_no_thinking/train-unboxed*"
       samples: 175
       additional_kwargs:
         split: "train"
     - file_format: "parquet"
-      name_or_paths: "/tmp/logs/openr1_math_olympiads_qwen3_8b_no_thinking/train-unboxed*"
+      name_or_paths: "/tmp/logs/openr1_math_olympiads_qwen3_14b_no_thinking/train-unboxed*"
       samples: 39280
       additional_kwargs:
         split: "train"
     - file_format: "parquet"
-      name_or_paths: "/tmp/logs/openr1_math_olympiads_ref_qwen3_8b_no_thinking/train-unboxed*"
+      name_or_paths: "/tmp/logs/openr1_math_olympiads_ref_qwen3_14b_no_thinking/train-unboxed*"
       samples: 422
       additional_kwargs:
         split: "train"
@@ -172,14 +162,14 @@ data:
   add_eos: true
   add_generation_prompt: false
 logger:
-  log_dir: "logs/sft_qwen3_8b_openr1_math_non_thinking_megatron"
+  log_dir: "logs/sft_qwen3_14b_openr1_math_non_thinking_megatron"
   wandb_enabled: true
   tensorboard_enabled: false
   mlflow_enabled: false
   monitor_gpus: true
   wandb:
     project: cirrus
-    name: sft_qwen3_8b_openr1_math_non_thinking_megatron
+    name: sft_qwen3_14b_openr1_math_non_thinking_megatron
   gpu_monitoring:
     collection_interval: 30
     flush_interval: 30
