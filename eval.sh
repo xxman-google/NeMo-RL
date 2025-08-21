@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Check for exactly 2 arguments
-if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 <ckpt_path> <exp_name>"
+# Check for exactly 3 arguments
+if [ "$#" -ne 3 ]; then
+    echo "Usage: $0 <ckpt_path> <exp_name> <is_megatron>"
     exit 1
 fi
 
-enable_thinking=false
+enable_thinking=true
 if [[ $enable_thinking == "true" ]]; then
   max_model_len=32768
   temperature=0.6
@@ -23,12 +23,24 @@ top_k=20
 
 ckpt_path=$1
 exp_name=$2
+is_megatron=$3
 hf_ckpt_path=$ckpt_path/hf
 
-# uv run python examples/converters/convert_dcp_to_hf.py --config $ckpt_path/config.yaml --dcp-ckpt-path $ckpt_path/policy/weights/ --hf-ckpt-path $hf_ckpt_path
+if [ $is_megatron = "false" ]; then
+  uv run python examples/converters/convert_dcp_to_hf.py \
+  --config $ckpt_path/config.yaml \
+  --dcp-ckpt-path $ckpt_path/policy/weights/ \
+  --hf-ckpt-path $hf_ckpt_path
+else
+  uv run --extra mcore python examples/converters/convert_megatron_to_hf.py \
+  --config $ckpt_path/config.yaml \
+  --megatron-ckpt-path $ckpt_path/policy/weights/iter_0000000 \
+  --hf-ckpt-path $hf_ckpt_path
+fi
 
 benchmarks=("aime2024" "aime2025" "beyond_aime" "math" "math500" "mgsm" "gpqa" "mmlu" "mmlu_pro" "humaneval" "livecodebench_functional" "livecodebench_stdin" "ifeval")
 num_tests_per_prompt=(5 5 5 1 1 1 5 1 1 5 5 5 1)
+
 len=${#benchmarks[@]}
 
 for ((i=0; i<$len; i++)); do
@@ -55,6 +67,8 @@ for ((i=0; i<$len; i++)); do
   generation.stop_token_ids=\[151643,151645\] \
   generation.enable_thinking=$enable_thinking \
   generation.vllm_cfg.max_model_len=$max_model_len \
+  generation.vllm_cfg.tensor_parallel_size=1 \
+  generation.vllm_cfg.gpu_memory_utilization=0.9 \
   generation.temperature=$temperature \
   generation.top_p=$top_p \
   generation.top_k=$top_k \
