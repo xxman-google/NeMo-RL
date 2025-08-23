@@ -188,17 +188,23 @@ def construct_multichoice_prompt(
     return output
 
 
+def _stringfy_list(matrix: list[list[int]]) -> str:
+    return '[' + ',\n'.join([str(row) for row in matrix]) + ']'
+
+
 def _construct_arc_agi_prompt(
     prompt: str, training_examples: list[dict[str, Any]], test_input: list[list[int]]
 ) -> str:
     """Construct ARC-AGI prompt from training examples and test input."""
     output = prompt
-    output += f"'training_examples':\n{training_examples}\n\n"
-    output += f"'test_input':\n{test_input}\n\n"
-    output += (
-        "The final output grid response should be formatted exactly as follows:\n\n"
-    )
-    output += "<output>\n[output grid]\n</output>\n"
+    output += "Training_examples:\n"
+    for example in training_examples:
+        output += "Input:\n"
+        output += _stringfy_list(example["input"]) + "\n"
+        output += "Output:\n"
+        output += _stringfy_list(example["output"]) + "\n\n"
+    output += "Test input:\n"
+    output += _stringfy_list(test_input) + "\n"
     return output
 
 
@@ -311,6 +317,7 @@ def arc_agi_processor(
         tokenize=False,
         add_generation_prompt=True,
         add_special_tokens=False,
+        enable_thinking=task_data_spec.enable_thinking,
     )
     user_message["token_ids"] = tokenizer(message, return_tensors="pt")["input_ids"][0]
     user_message["content"] = message
