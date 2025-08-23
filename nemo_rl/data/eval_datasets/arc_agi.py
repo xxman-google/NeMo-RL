@@ -25,10 +25,11 @@ from nemo_rl.data.interfaces import TaskDataSpec
 class ArcAgiDataset:
     def __init__(
         self,
+        split: str = "evaluation",
         prompt_file: Optional[str] = None,
         system_prompt_file: Optional[str] = None,
     ):
-        ds = load_dataset("dataartist/arc-agi", split="training")
+        ds = load_dataset("dataartist/arc-agi", split=split)
         self.rekeyed_ds = ds.map(self._rekey, remove_columns=ds.column_names)
         self.task_spec = TaskDataSpec(
             task_name="arg_agi",

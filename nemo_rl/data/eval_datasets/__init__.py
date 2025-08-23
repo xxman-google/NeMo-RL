@@ -207,6 +207,7 @@ def load_eval_dataset(data_config):
         )
     elif dataset_name == "arc_agi":
         base_dataset = ArcAgiDataset(
+            split=data_config.get("split", "evaluation"),
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
