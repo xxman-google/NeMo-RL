@@ -421,15 +421,18 @@ class ArcAgiVerifyWorker:
     """Response verifier worker for ARC-AGI problems."""
 
     def __init__(self, cfg: MathEnvConfig) -> None:
-        pass
+        self.end_thinking_token = cfg.get("end_thinking_token")
 
-    def _extract_response_grid(self, s: str) -> Optional[list[list[int]]]:
-        # Regex for a 2D grid of integers (optionally with whitespace)
-        pattern = r"<output>\s*(\[[^\]]*(?:\][^\[]*\[?[^\]]*)*)\s*</output>"
-        match = re.search(pattern, s, re.DOTALL)
+    def _extract_response_grid(self, response: str) -> Optional[list[list[int]]]:
+        if self.end_thinking_token is not None:
+            response = extract_response_after_thinking(
+                response, self.end_thinking_token
+            )
+        pattern = re.compile(r"```json\n(.*?)```", re.DOTALL)
+        match = pattern.findall(response)
         if not match:
             return None
-        grid_str = match.group(1)
+        grid_str = match[-1]
         try:
             return ast.literal_eval(grid_str)
         except (SyntaxError, ValueError):
