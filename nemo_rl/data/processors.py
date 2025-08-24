@@ -334,6 +334,13 @@ math_rejection_sampling_processor = functools.partial(
         ("problem", "problem"),
     ],
 )
+science_rejection_sampling_processor = functools.partial(
+    data_processor,
+    extra_env_info_key_maps=[
+        ("answer", "ground_truth"),
+        ("problem", "problem"),
+    ],
+)
 if_processor = functools.partial(
     data_processor,
     question_key="prompt",

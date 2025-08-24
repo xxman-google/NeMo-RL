@@ -43,12 +43,17 @@ class NemotronDataset:
             prompt_file=prompt_file,
             system_prompt_file=system_prompt_file,
         )
-        self.processor = processors.data_processor
+        self.processor = processors.science_rejection_sampling_processor
 
     def _rekey(self, data: dict[str, Any]):
         """Rekey the data to match the expected format.       
         """
+        problem = None
+        if isinstance(data["input"], list) and len(data["input"]) > 0 and "content" in data["input"][0]:
+            problem = data["input"][0]["content"]
+        else:
+            problem = str(data["input"])
         return {
-            "problem": data["input"],
+            "problem": problem,
             "answer": data["output"],
         }
