@@ -311,6 +311,7 @@ def arc_agi_processor(
         question = _construct_arc_agi_prompt(
             task_data_spec.prompt, training_examples, test_input
         )
+        extra_env_info["problem"] = question
     user_message = {"role": "user", "content": question}
     message = tokenizer.apply_chat_template(
         [user_message],

@@ -4,6 +4,7 @@ defaults: "eval.yaml"
 data:
   prompt_file: "examples/prompts/arc_agi.txt"
   dataset_name: "arc_agi"
+  split: "evaluation"
 
 generation:
   vllm_cfg:
