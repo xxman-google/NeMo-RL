@@ -1,6 +1,6 @@
 # Rejection sampling configuration for Qwen3 8B model (no-thinking mode)
 
-defaults: "qwen3_14b_code_no_thinking.yaml"
+defaults: "qwen3_14b_math_no_thinking.yaml"
 
 rejection_sampling:
   num_tests_per_prompt: 1

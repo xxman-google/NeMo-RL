@@ -336,15 +336,23 @@ async def _run_env_sampling_impl(
     # Extract for easier access
     generation_config = master_config["generation"]
     model_name = generation_config["model_name"]
-    rejection_sampling_config = master_config["rejection_sampling"]
     logger_config = master_config["logger"]
 
     # Run rejection sampling loop
     generation_lengths = []
     data = []
 
+
+    # batch_count= 0
     for batch in dataloader:
+        # This is for debugging purposes
+        # if batch_count > 1:
+        #     break;
+        # print("Run Sampling Batch: ", batch_count)
+        # batch_count += 1
+
         # get input prompt from message_log
+        
         prompts = []
         for message_log in batch["message_log"]:
             content = [message["content"] for message in message_log]
@@ -359,6 +367,10 @@ async def _run_env_sampling_impl(
                     prompt="", question=problem, options=info["options"]
                 )
             problems.append(problem)
+        
+        # This is for debugging purposes    
+        # prompts = prompts[:128]
+        # problems = problems[:128]
 
         # generate by vllm
         inputs = BatchedDataDict({"prompts": prompts})
