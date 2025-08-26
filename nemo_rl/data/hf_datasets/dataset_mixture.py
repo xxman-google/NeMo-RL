@@ -63,7 +63,7 @@ class DatasetMixture:
                 ds = load_dataset(
                     weighted_ds["name_or_paths"], **weighted_ds["additional_kwargs"]
                 )
-            if weighted_ds["user_msg_postfix"]:
+            if weighted_ds.get("user_msg_postfix", None):
                 ds = ds.map(lambda example: _append_postfix_for_user_msg(example, postfix=weighted_ds["user_msg_postfix"]))
             target_samples = weighted_ds["samples"]
             ds.shuffle(seed=seed)

@@ -64,6 +64,11 @@ def data_processor(
     # user prompt
     if task_data_spec.prompt:
         problem = task_data_spec.prompt.format(problem)
+    if task_data_spec.append_think_token_to_user_msg:
+        if task_data_spec.enable_thinking:
+            problem += " /think"
+        else:
+            problem += " /no_think"
     user_message = {"role": "user", "content": problem}
     message = tokenizer.apply_chat_template(
         [user_message],
@@ -137,6 +142,11 @@ def code_processor(
     # user prompt
     if task_data_spec.prompt:
         problem = task_data_spec.prompt.format(problem)
+    if task_data_spec.append_think_token_to_user_msg:
+        if task_data_spec.enable_thinking:
+            problem += " /think"
+        else:
+            problem += " /no_think"
     user_message = {"role": "user", "content": problem}
     message = tokenizer.apply_chat_template(
         [user_message],
@@ -251,6 +261,11 @@ def multichoice_qa_processor(
         question = construct_multichoice_prompt(
             task_data_spec.prompt, question, options
         )
+    if task_data_spec.append_think_token_to_user_msg:
+        if task_data_spec.enable_thinking:
+            question += " /think"
+        else:
+            question += " /no_think"
     user_message = {"role": "user", "content": question}
     message = tokenizer.apply_chat_template(
         [user_message],
@@ -312,6 +327,11 @@ def arc_agi_processor(
             task_data_spec.prompt, training_examples, test_input
         )
         extra_env_info["problem"] = question
+    if task_data_spec.append_think_token_to_user_msg:
+        if task_data_spec.enable_thinking:
+            question += " /think"
+        else:
+            question += " /no_think"
     user_message = {"role": "user", "content": question}
     message = tokenizer.apply_chat_template(
         [user_message],
