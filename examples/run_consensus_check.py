@@ -8,7 +8,7 @@ The script:
 4. Saves the consistent conversations to a new parquet file
 
 Usage:
-    uv run examples/run_consensus_check.py --input_parquet_files logs/nemotron/Qwen/ --output_file logs/nemotron/Qwen/filterred.parquet
+    uv run examples/run_consensus_check.py --input_parquet_files logs/nemotron/Qwen/ --output_file logs/nemotron/Qwen/consensus_examples.parquet
 """
 
 
@@ -74,7 +74,8 @@ def process_parquet_files(input_path):
     ds = load_dataset("parquet", data_files=parquet_files, split="train")
     print(f"Loaded dataset with {len(ds)} entries.")
     # Process each row in the dataset
-    consistent_messages = []
+    problems = []
+    expected_answers = []
     
     for row in ds:
         messages = row.get('messages', [])
@@ -93,26 +94,18 @@ def process_parquet_files(input_path):
         # There are less answers than the number of model responses or the answer is not consistent
         if len(answers) < len_files or len(set(answers)) != 1:
             continue
-        consistent_messages.append({
-            "user": prompt,
-            "assistant": answers[0],
-        })
-    # Convert back to original message format
-    filterred_messages = []
-    for msg in consistent_messages:
-        filterred_messages.append([
-            {"role": "user", "content": msg["user"]},
-            {"role": "assistant", "content": msg['assistant']}
-        ])
+        problems.append(prompt)
+        expected_answers.append(answers[0])
 
-    print(f"Filtered messages: {len(filterred_messages)}")
+    print(f"Filtered problems: {len(problems)}")
+    print(f"Filtered expected_answers: {len(expected_answers)}")
 
-    return filterred_messages
+    return problems, expected_answers
 
 def main(_):
-    filtered_messages = process_parquet_files(FLAGS.input_parquet_files)
+    problems, expected_answers = process_parquet_files(FLAGS.input_parquet_files)
     # Save filtered messages to parquet file
-    df = pd.DataFrame({"messages": filtered_messages})
+    df = pd.DataFrame({"problems": problems, "expected_answers": expected_answers})
     df.to_parquet(FLAGS.output_file)
 
 if __name__ == "__main__":
