@@ -473,6 +473,9 @@ class ArcAgiVerifyWorker:
 class SweBenchVerifyWorker:
     """Response verifier worker for SweBench problems."""
 
+    def __init__(self, cfg: MathEnvConfig) -> None:
+        self.end_thinking_token = cfg.get("end_thinking_token")
+
     def verify(
         self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
@@ -493,7 +496,7 @@ class SweBenchVerifyWorker:
             prediction = {
                 KEY_INSTANCE_ID: instance[KEY_INSTANCE_ID],
                 KEY_MODEL: model_name,
-                KEY_PREDICTION: response,
+                KEY_PREDICTION: self._extract_patch(response),
                 "golden_patch": instance["patch"],
             }
             predictions[instance[KEY_INSTANCE_ID]] = prediction
@@ -501,31 +504,34 @@ class SweBenchVerifyWorker:
 
         run_id = "swebench_verified_oracle_eval"
         eval_dir = f"logs/run_evaluation/{run_id}/{model_name}"
-        if os.path.exists(eval_dir):
-            print(f"Evaluation directory {eval_dir} already exists, removing it.")
-            shutil.rmtree(eval_dir)
         run_instances(
             predictions=predictions,
             instances=instances,
             cache_level="env",
-            clean=False,
+            clean=True,
             force_rebuild=False,
-            max_workers=4,
+            max_workers=8,
             run_id=run_id,
             timeout=600,
+            namespace="us-central1-docker.pkg.dev/cloud-nas-260507/swebench",
         )
 
         results = []
         # Read results from instance results files.
         if not os.path.exists(eval_dir):
             raise FileNotFoundError(f"Evaluation directory {eval_dir} does not exist.")
-        verified_issues = []
+
+        submitted_instances = []
+        error_instances = []
+        verified_instances = []
         for instance_id, prediction in predictions.items():
             instance_result_file = os.path.join(
                 eval_dir, instance_id, "report.json"
             )
             if not os.path.exists(instance_result_file):
+                error_instances.append(instance_id)
                 continue
+            submitted_instances.append(instance_id)
             with open(instance_result_file, "r") as f:
                 instance_report = f.read()
             score = self._get_score_from_report(instance_id, instance_report)
@@ -533,14 +539,43 @@ class SweBenchVerifyWorker:
             model_patch = prediction[KEY_PREDICTION]
             results.append((score, golden_patch, model_patch))
             if score == 1.0:
-                verified_issues.append(instance_id)
-        with open(f"{eval_dir}/verified_issues.txt", "w") as f:
-            for instance_id in verified_issues:
-                f.write(f"{instance_id}\n")
+                verified_instances.append(instance_id)
+        with open(f"{eval_dir}/final_report.txt", "w") as f:
+            report = {
+                "total_instances": len(submitted_instances) + len(error_instances),
+                "submitted_instances": len(submitted_instances),
+                "verified_instances": len(verified_instances),
+                "error_instances": len(error_instances),
+                "submitted_instance_ids": submitted_instances,
+                "verified_instance_ids": verified_instances,
+                "unresolved_instance_ids": [id_ for id_ in submitted_instances if id_ not in verified_instances],
+                "error_instance_ids": error_instances
+            }
+            f.write(json.dumps(report, indent=4))
+
+        print("***************** SWE-Bench Verified Report *****************")
+        print(report)
+        print("*************************************************************")
         return results
 
+    def _extract_patch(self, response: str) -> Optional[str]:
+        if self.end_thinking_token is not None:
+            response = extract_response_after_thinking(
+                response, self.end_thinking_token
+            )
+        pattern = r"<patch>(.*?)</patch>"
+        match = re.search(pattern, response, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        # Check for another possible pattern.
+        pattern = r"```patch(.*?)```"
+        match = re.search(pattern, response, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        return None
+
     def _get_score_from_report(self, instance_id: str, instance_report: str) -> float:
-        """Parses the report and returns whether the patch resolved the issue."""
+        """Parses the instance report and returns whether the patch resolved the issue."""
         instance_report = json.loads(instance_report)
         return float(instance_report[instance_id]["resolved"])
 
