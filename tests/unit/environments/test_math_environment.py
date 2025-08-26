@@ -20,7 +20,6 @@ import ray
 from nemo_rl.distributed.ray_actor_environment_registry import (
     get_actor_python_env,
 )
-from nemo_rl.environments.math_environment import ArcAgiVerifyWorker
 from nemo_rl.environments.math_environment import MathEnvironment
 
 
@@ -55,25 +54,6 @@ def multichoice_env(request):
             "env_vars": dict(os.environ),
         }
     ).remote({"num_workers": 2, "verifier_type": verifier_type})
-    yield env
-    # Clean up the actor and wait for it to be killed
-    env.shutdown.remote()
-    ray.kill(env)
-    # Give some time for cleanup
-    time.sleep(0.1)
-
-
-@pytest.fixture(scope="module")
-def arc_agi_env():
-    """Create a MathEnvironment actor for testing ARC-AGI problems."""
-    env = MathEnvironment.options(
-        runtime_env={
-            "py_executable": get_actor_python_env(
-                "nemo_rl.environments.math_environment.MathEnvironment"
-            ),
-            "env_vars": dict(os.environ),
-        }
-    ).remote({"num_workers": 1, "worker_type": "arc_agi"})
     yield env
     # Clean up the actor and wait for it to be killed
     env.shutdown.remote()
@@ -427,102 +407,3 @@ Now, let's consider \(f = x - n = (2 + \sqrt{3})^{1000} - \lfloor (2 + \sqrt{3})
         "Terminated flags should be a tensor of shape (1,)"
     )
     assert result.terminateds[0] == 1.0, "Terminated flag should be 1.0"
-
-
-@pytest.mark.parametrize(
-    "response_str, expected_output",
-    [
-        ("Here is the solution:\n```json\n[[1, 2], [3, 4]]\n```", [[1, 2], [3, 4]]),
-        ("""
-        Here is the solution:
-        ```json
-            [
-                [1, 2],
-                    \n[3,     4,5]] ```
-        """, [[1, 2], [3, 4, 5]]),
-        ("Solution is [[1,2],[3,4]]", None),
-        ("No JSON here", None),
-        ("Malformed ```json\n[[1, 2], [3, 4]\n```", None),
-        ("```json\nNot a list\n```", None),
-        ("```json\n[[1, 2], 'three', [4]]\n```", [[1, 2], 'three', [4]]),
-        ("```json\n[[1]]\n```", [[1]]),
-    ],
-)
-def test_arc_agi_verify_worker_extract_response_grid(response_str, expected_output):
-    worker = ArcAgiVerifyWorker.remote({})
-    extracted = ray.get(worker._extract_response_grid.remote(response_str))
-    assert extracted == expected_output, f"Expected {expected_output}, got {extracted}"
-    ray.kill(worker)
-
-
-def test_arc_agi_verify_worker_correct(arc_agi_env):
-    """Test ArcAgiVerifyWorker with a correct response."""
-    message_log_batch = [
-        [
-            {"role": "user", "content": "Solve the ARC puzzle."},
-            {
-                "role": "assistant",
-                "content": "Here is the solution:\n```json\n[[1, 2], [3, 4]]\n```",
-            },
-        ]
-    ]
-    metadata = [{"ground_truth": [[1, 2], [3, 4]]}]
-
-    result = ray.get(arc_agi_env.step.remote(message_log_batch, metadata))
-
-    assert result.rewards[0] == 1.0
-    assert result.observations[0]["content"] == "Environment: correct"
-
-
-def test_arc_agi_verify_worker_incorrect(arc_agi_env):
-    """Test ArcAgiVerifyWorker with an incorrect response."""
-    message_log_batch = [
-        [
-            {"role": "user", "content": "Solve the ARC puzzle."},
-            {
-                "role": "assistant",
-                "content": "Here is the solution:\n```json\n[[1, 2], [3, 5]]\n```",
-            },
-        ]
-    ]
-    metadata = [{"ground_truth": [[1, 2], [3, 4]]}]
-
-    result = ray.get(arc_agi_env.step.remote(message_log_batch, metadata))
-
-    assert result.rewards[0] == 0.0
-    assert result.observations[0]["content"] == "Environment: incorrect"
-
-
-def test_arc_agi_verify_worker_malformed(arc_agi_env):
-    """Test ArcAgiVerifyWorker with a malformed response."""
-    message_log_batch = [
-        [
-            {"role": "user", "content": "Solve the ARC puzzle."},
-            {
-                "role": "assistant",
-                "content": "Here is the solution:\n```json\n[[1, 2], [3, 4]\n```",
-            },
-        ]
-    ]
-    metadata = [{"ground_truth": [[1, 2], [3, 4]]}]
-
-    result = ray.get(arc_agi_env.step.remote(message_log_batch, metadata))
-
-    assert result.rewards[0] == 0.0
-    assert result.observations[0]["content"] == "Environment: incorrect"
-
-
-def test_arc_agi_verify_worker_no_json(arc_agi_env):
-    """Test ArcAgiVerifyWorker with a response that does not contain a JSON block."""
-    message_log_batch = [
-        [
-            {"role": "user", "content": "Solve the ARC puzzle."},
-            {"role": "assistant", "content": "I am not sure about the solution."},
-        ]
-    ]
-    metadata = [{"ground_truth": [[1, 2], [3, 4]]}]
-
-    result = ray.get(arc_agi_env.step.remote(message_log_batch, metadata))
-
-    assert result.rewards[0] == 0.0
-    assert result.observations[0]["content"] == "Environment: incorrect"
