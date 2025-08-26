@@ -13,6 +13,7 @@ generation:
 env:
   math:
     worker_type: "swebench_verified"
+    num_workers: 1
 
 cluster:
   gpus_per_node: 8

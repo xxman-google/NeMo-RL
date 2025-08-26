@@ -1060,14 +1060,14 @@ standard = [
 
 [[package]]
 name = "fastcore"
-version = "1.8.7"
+version = "1.8.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "packaging" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ce/d0/c49361f37e115a56eaff0bff640c63f4099a9976ab007f43cba02c771e4b/fastcore-1.8.7.tar.gz", hash = "sha256:ff4d976abaf2e298265e675cf8bf504f6ee2ab5fc159f9b4f153c6a5a03f6bf7", size = 76591, upload-time = "2025-07-25T15:57:50.42Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/bf/15/2303dcaea2d11a6997a47a6aa9b0e8dcae5b4c8941c7694e1f9e97990cae/fastcore-1.8.8.tar.gz", hash = "sha256:939f7b79c5510b059ba9fc512dfe8aab30f5a752130a640070f8a1b494493b56", size = 76675, upload-time = "2025-08-23T22:35:56.378Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bd/2f/e37fbde84c64468ec72093b0fc822c86ba6c8038a3ea66dddf82c758ae27/fastcore-1.8.7-py3-none-any.whl", hash = "sha256:3d71e9bae64d335dfad9bff58ff8985091e8fbc23651b0b1b8d16fa4895ff42d", size = 79342, upload-time = "2025-07-25T15:57:48.125Z" },
+    { url = "https://files.pythonhosted.org/packages/7b/ec/bedc0f8b644deb023fcbc8e2879a8f84935f9109ebc61c6614b0bb78f90c/fastcore-1.8.8-py3-none-any.whl", hash = "sha256:f38853245e5ae5abb16275daac92fca00edeced020871b1d2416fb22cde70df8", size = 79436, upload-time = "2025-08-23T22:35:54.433Z" },
 ]
 
 [[package]]
@@ -1696,6 +1696,19 @@ wheels = [
 ]
 
 [[package]]
+name = "grpclib"
+version = "0.4.8"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "h2" },
+    { name = "multidict" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/19/75/0f0d3524b38b35e5cd07334b754aa9bd0570140ad982131b04ebfa3b0374/grpclib-0.4.8.tar.gz", hash = "sha256:d8823763780ef94fed8b2c562f7485cf0bbee15fc7d065a640673667f7719c9a", size = 62793, upload-time = "2025-05-04T16:27:30.051Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/03/8b/ad381ec1b8195fa4a9a693cb8087e031b99530c0d6b8ad036dcb99e144c4/grpclib-0.4.8-py3-none-any.whl", hash = "sha256:a5047733a7acc1c1cee6abf3c841c7c6fab67d2844a45a853b113fa2e6cd2654", size = 76311, upload-time = "2025-05-04T16:27:22.818Z" },
+]
+
+[[package]]
 name = "gunicorn"
 version = "23.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1718,15 +1731,15 @@ wheels = [
 
 [[package]]
 name = "h2"
-version = "4.2.0"
+version = "4.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "hpack" },
     { name = "hyperframe" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1b/38/d7f80fd13e6582fb8e0df8c9a653dcc02b03ca34f4d72f34869298c5baf8/h2-4.2.0.tar.gz", hash = "sha256:c8a52129695e88b1a0578d8d2cc6842bbd79128ac685463b887ee278126ad01f", size = 2150682, upload-time = "2025-02-02T07:43:51.815Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1d/17/afa56379f94ad0fe8defd37d6eb3f89a25404ffc71d4d848893d270325fc/h2-4.3.0.tar.gz", hash = "sha256:6c59efe4323fa18b47a632221a1888bd7fde6249819beda254aeca909f221bf1", size = 2152026, upload-time = "2025-08-23T18:12:19.778Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d0/9e/984486f2d0a0bd2b024bf4bc1c62688fcafa9e61991f041fb0e2def4a982/h2-4.2.0-py3-none-any.whl", hash = "sha256:479a53ad425bb29af087f3458a61d30780bc818e4ebcf01f0b536ba916462ed0", size = 60957, upload-time = "2025-02-01T11:02:26.481Z" },
+    { url = "https://files.pythonhosted.org/packages/69/b2/119f6e6dcbd96f9069ce9a2665e0146588dc9f88f29549711853645e736a/h2-4.3.0-py3-none-any.whl", hash = "sha256:c438f029a25f7945c69e0ccf0fb951dc3f73a5f6412981daee861431b70e2bdd", size = 61779, upload-time = "2025-08-23T18:12:17.779Z" },
 ]
 
 [[package]]
@@ -2628,30 +2641,6 @@ wheels = [
 ]
 
 [[package]]
-name = "modal"
-version = "1.1.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "aiohttp" },
-    { name = "certifi" },
-    { name = "click" },
-    { name = "grpclib" },
-    { name = "protobuf" },
-    { name = "rich" },
-    { name = "synchronicity" },
-    { name = "toml" },
-    { name = "typer" },
-    { name = "types-certifi" },
-    { name = "types-toml" },
-    { name = "typing-extensions" },
-    { name = "watchfiles" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/35/68/88094cff7381e447012b8499da5cbd973ffd72afb8d78cced6a52a835ae3/modal-1.1.0.tar.gz", hash = "sha256:190ea96d45fbdfd6d6cb545a736bf1ef5599511d346ae94cfd773528a33b6097", size = 555957, upload-time = "2025-07-17T22:31:10.258Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/56/19/96c8cc6334225b7e880d1dd2aa4c96e236a7c914d90204ce8b51711912e9/modal-1.1.0-py3-none-any.whl", hash = "sha256:985f47427f214e098768995782fda3915141af5f84007815db0c10c45e4a6a16", size = 643413, upload-time = "2025-07-17T22:31:08.255Z" },
-]
-
-[[package]]
 name = "mlflow"
 version = "3.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2745,6 +2734,30 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/8b/77/89fa3327011f018638c9e943e1edc081ce9ca0ed296fe64d6daf93c6ff51/mlx_metal-0.27.1-py3-none-macosx_13_0_arm64.whl", hash = "sha256:c66d9b1adb3c0ea19492fba6493f672bc7542e65dd65f7e2995918815fbeb907", size = 33523035, upload-time = "2025-07-25T22:58:02.533Z" },
     { url = "https://files.pythonhosted.org/packages/d7/a8/ac706ad6ce834834762d5146d791f77710efc896c13ef47fd7d672099056/mlx_metal-0.27.1-py3-none-macosx_14_0_arm64.whl", hash = "sha256:fe4415ddd242974d91c7ca0699cd01507d17da8a5ba304122ef137cdb5e7fff4", size = 32926383, upload-time = "2025-07-25T22:57:54.194Z" },
     { url = "https://files.pythonhosted.org/packages/78/77/6963681fb54ecaa0ae5de4209c15504a803a0edd1a33fd074e6c558fd5e0/mlx_metal-0.27.1-py3-none-macosx_15_0_arm64.whl", hash = "sha256:d025dea30bda8baa32c928cfa333eac64a5adc8d07656f8fc55072d99403ebc9", size = 32897065, upload-time = "2025-07-25T22:58:26.362Z" },
+]
+
+[[package]]
+name = "modal"
+version = "1.1.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "certifi" },
+    { name = "click" },
+    { name = "grpclib" },
+    { name = "protobuf" },
+    { name = "rich" },
+    { name = "synchronicity" },
+    { name = "toml" },
+    { name = "typer" },
+    { name = "types-certifi" },
+    { name = "types-toml" },
+    { name = "typing-extensions" },
+    { name = "watchfiles" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f4/99/67bad0582adfdad88eee5918548b85fbb53c91af4ebb6d418ec01d7878ac/modal-1.1.3.tar.gz", hash = "sha256:6183117ceeb9d62696e9a6c181955669b241515c339c51f3d4c72d0688af44aa", size = 590327, upload-time = "2025-08-19T21:26:20.057Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b0/06/71c85be04d43e5e627aa4fd505d745e4e59b3e9a83a77fb1087797ec4d0c/modal-1.1.3-py3-none-any.whl", hash = "sha256:4444cd5e59025ab595934e805eb139dfa3758f87ef44b443ca88dc139adac11b", size = 681441, upload-time = "2025-08-19T21:26:18.215Z" },
 ]
 
 [[package]]
@@ -5896,6 +5909,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/95/32/1a225d6164441be760d75c2c42e2780dc0873fe382da3e98a2e1e48361e5/tzdata-2025.2.tar.gz", hash = "sha256:b60a638fcc0daffadf82fe0f57e53d06bdec2f36c4df66280ae79bce6bd6f2b9", size = 196380, upload-time = "2025-03-23T13:54:43.652Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5c/23/c7abc0ca0a1526a0774eca151daeb8de62ec457e77262b66b359c3c7679e/tzdata-2025.2-py2.py3-none-any.whl", hash = "sha256:1a403fada01ff9221ca8044d701868fa132215d84beb92242d9acd2147f667a8", size = 347839, upload-time = "2025-03-23T13:54:41.845Z" },
+]
+
+[[package]]
+name = "unidiff"
+version = "0.7.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a3/48/81be0ac96e423a877754153699731ef439fd7b80b4c8b5425c94ed079ebd/unidiff-0.7.5.tar.gz", hash = "sha256:2e5f0162052248946b9f0970a40e9e124236bf86c82b70821143a6fc1dea2574", size = 20931, upload-time = "2023-03-10T01:05:39.185Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8a/54/57c411a6e8f7bd7848c8b66e4dcaffa586bf4c02e63f2280db0327a4e6eb/unidiff-0.7.5-py2.py3-none-any.whl", hash = "sha256:c93bf2265cc1ba2a520e415ab05da587370bc2a3ae9e0414329f54f0c2fc09e8", size = 14386, upload-time = "2023-03-10T01:05:36.594Z" },
 ]
 
 [[package]]
