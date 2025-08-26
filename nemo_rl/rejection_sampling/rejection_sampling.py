@@ -343,16 +343,15 @@ async def _run_env_sampling_impl(
     data = []
 
 
-    # batch_count= 0
+    # batch_count = 0
     for batch in dataloader:
         # This is for debugging purposes
         # if batch_count > 1:
-        #     break;
+        #     break
         # print("Run Sampling Batch: ", batch_count)
         # batch_count += 1
 
         # get input prompt from message_log
-        
         prompts = []
         for message_log in batch["message_log"]:
             content = [message["content"] for message in message_log]

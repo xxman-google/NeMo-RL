@@ -12,13 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""SciQ dataset.
+"""Local science dataset."""
 
-Original dataset: https://huggingface.co/datasets/nvidia/Llama-Nemotron-Post-Training-Datase
-"""
-
-import random
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from datasets import load_dataset
 
@@ -26,34 +22,35 @@ from nemo_rl.data import processors
 from nemo_rl.data.interfaces import TaskDataSpec
 
 
-class NemotronDataset:
+class LocalScienceDataset:
     def __init__(
         self,
-        split: str = "science",
+        data_paths: str | list[str],
+        problem_key: str,
+        answer_key: str,
+        name: str,
+        split: Optional[str] = None,
+        file_format: Literal["csv", "json", "parquet"] = "parquet",
         prompt_file: Optional[str] = None,
         system_prompt_file: Optional[str] = None,
     ):
-        print("Loading NemotronDataset from huggingface...")
-        ds = load_dataset("nvidia/Llama-Nemotron-Post-Training-Dataset", split=split)
-        print("Loaded NemotronDataset from huggingface.")
-        self._rng = random.Random()
+        ds = load_dataset(file_format, data_files=data_paths)
+        if split is not None:
+            ds = ds[split]
+        else:
+            ds = ds["train"]
+        self._problem_key = problem_key
+        self._answer_key = answer_key
         self.rekeyed_ds = ds.map(self._rekey, remove_columns=ds.column_names)
         self.task_spec = TaskDataSpec(
-            task_name=f"Nemotron_{split}",
+            task_name=name,
             prompt_file=prompt_file,
             system_prompt_file=system_prompt_file,
         )
         self.processor = processors.math_rejection_sampling_processor
 
     def _rekey(self, data: dict[str, Any]):
-        """Rekey the data to match the expected format.       
-        """
-        problem = None
-        if isinstance(data["input"], list) and len(data["input"]) > 0 and "content" in data["input"][0]:
-            problem = data["input"][0]["content"]
-        else:
-            problem = str(data["input"])
         return {
-            "problem": problem,
-            "expected_answer": data["output"],
+            "problem": data[self._problem_key],
+            "expected_answer": data[self._answer_key],
         }

@@ -6,11 +6,17 @@ from nemo_rl.data import DataConfig
 from nemo_rl.data.datasets import AllTaskProcessedDataset, eval_collate_fn
 from nemo_rl.data.eval_datasets import load_eval_dataset
 from nemo_rl.data.interfaces import TaskDataSpec
-from nemo_rl.data.eval_datasets.nemotron import NemotronDataset
+from nemo_rl.data.eval_datasets.local_science_dataset import LocalScienceDataset
 
 
 def main():
-    dataset = NemotronDataset(split="science")
+    dataset = LocalScienceDataset(
+        data_paths="logs/nemotron/Qwen/consensus_examples.parquet",
+        problem_key="problems",
+        answer_key="expected_answers",
+        name="local_science",
+        file_format="parquet",
+    )
 
     # Show task metadata
     print("== Task Spec ==")
@@ -30,11 +36,15 @@ def main():
     print("\n== Testing data loading")
 
     data_config = DataConfig(
-        max_input_seq_length=512,
+        data_paths="logs/nemotron/Qwen/consensus_examples.parquet",
+        problem_key="problems",
+        answer_key="expected_answers",
+        dataset_name="local_science",
+        split=None,
+        file_format="parquet",
         prompt_file=None,
-        system_prompt_file="examples/prompts/nemotron_science.txt",
-        dataset_name="nemotron",
-        split="science",
+        system_prompt_file=None,
+        max_input_seq_length=2048,
     )
     tokenizer_config = {
         "name": "Qwen/Qwen3-8B",
@@ -69,15 +79,20 @@ def main():
             prompts.append(content)
         # problems are prompts without chat template
         problems = []
+        expected_answers = []
         for info in batch["extra_env_info"]:
             problem = info["problem"]
             problems.append(problem)
+            expected_answer = info["ground_truth"]
+            expected_answers.append(expected_answer)
         print("\n== Processed Sample 0==")
         print("Prompt: ", prompts[0])
         print("Problem: ", problems[0])
+        print("Expected Answer: ", expected_answers[0])
         print("\n== Processed Sample 1==")
         print("Prompt: ", prompts[1])
         print("Problem: ", problems[1])
+        print("Expected Answer: ", expected_answers[1])
         break
 
 if __name__ == "__main__":

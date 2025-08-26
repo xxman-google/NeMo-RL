@@ -24,6 +24,7 @@ from nemo_rl.data.eval_datasets.humaneval import HumanEvalDataset
 from nemo_rl.data.eval_datasets.ifeval import IFEvalDataset
 from nemo_rl.data.eval_datasets.livecodebench import LiveCodeBenchDataset
 from nemo_rl.data.eval_datasets.local_math_dataset import LocalMathDataset
+from nemo_rl.data.eval_datasets.local_science_dataset import LocalScienceDataset
 from nemo_rl.data.eval_datasets.math import MathDataset
 from nemo_rl.data.eval_datasets.math_train import MathTrainDataset
 from nemo_rl.data.eval_datasets.mbpp import MBPPDataset
@@ -179,6 +180,17 @@ def load_eval_dataset(data_config):
             solution_key=data_config["solution_key"],
             file_format=data_config["file_format"],
             split=data_config["split"],
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
+    elif dataset_name == "local_science":
+        base_dataset = LocalScienceDataset(
+            data_paths=data_config["data_paths"],
+            problem_key=data_config["problem_key"],
+            answer_key=data_config["answer_key"],
+            name=dataset_name,
+            split=data_config["split"],
+            file_format=data_config["file_format"],
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
