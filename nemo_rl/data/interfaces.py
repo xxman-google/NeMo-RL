@@ -59,6 +59,8 @@ class TaskDataSpec:
 
     enable_thinking: bool = False
 
+    append_think_token_to_user_msg: bool = False
+
     def __post_init__(self) -> None:
         def load_prompt_file(
             prompt_file: Optional[PathLike],
@@ -82,6 +84,7 @@ class TaskDataSpec:
             "system_prompt": from_spec.system_prompt,
             "prompt": from_spec.prompt,
             "enable_thinking": from_spec.enable_thinking,
+            "append_think_token_to_user_msg": from_spec.append_think_token_to_user_msg,
         }
 
         for attr_name, default_value in default_attrs.items():

@@ -34,6 +34,11 @@ _MAX_HTMLS_TO_DISPLAY = flags.DEFINE_integer(
     10,
     "Maximum HTMLs to display.",
 )
+_MAX_TOKENS_ALLOWED = flags.DEFINE_integer(
+    "max_tokens_allowed",
+    32500,
+    "Samples will be deleted if its sequence length exceeds this number.",
+)
 
 
 def has_repeated_ngrams(
@@ -64,6 +69,7 @@ def filter_messages(
     tokenizer: PreTrainedTokenizerBase,
     n_tokens: int,
     max_repetition_allowed: int,
+    max_tokens_allowed: int,
 ):
     prompt, response = get_prompt_and_response(messages)
     token_ids = tokenizer(response, return_tensors="np")["input_ids"][0]
@@ -72,7 +78,7 @@ def filter_messages(
         n=n_tokens,
         max_repetition_allowed=max_repetition_allowed,
     )
-    if skip:
+    if skip or len(token_ids) > max_tokens_allowed:
         html = vis_lib.MathRenderTemplate().render(
             prompt=prompt,
             response=response,
@@ -88,6 +94,7 @@ def main(_):
     logger_config = LoggerConfig(
         log_dir=_WANDB_LOG_DIR.value,
         wandb_enabled=True,
+        mlflow_enabled=False,
         tensorboard_enabled=False,
         wandb=WandbConfig(project="data_filtering", name=_DATASET_NAME.value),
         monitor_gpus=False,
@@ -104,6 +111,7 @@ def main(_):
             tokenizer,
             n_tokens=_N_TOKENS.value,
             max_repetition_allowed=_REPETITION_ALLOWED.value,
+            max_tokens_allowed=_MAX_TOKENS_ALLOWED.value,
         )
         if html is not None:
             htmls.append(html)

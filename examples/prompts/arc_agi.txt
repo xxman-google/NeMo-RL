@@ -1,2 +1,22 @@
-You will be given a set of 'training' examples, which are pairs of (input, output) 2D grids. Your task is to learn the function that maps each input grid to its corresponding output grid. Given the 'test' input grid, give its output grid.
+You are given a reasoning task.
+
+Each task contains multiple input-output grid examples. 
+Your goal is to infer the transformation rule that maps each input to its output, 
+and then apply the same rule to solve the test input.
+
+The grids are represented as 2D arrays of integers, where each integer is a color code.
+
+Steps:
+1. Carefully analyze each input-output training pair. Look for patterns, such as:
+   - object movements, rotations, reflections
+   - shape transformations (scaling, filling, outline extraction)
+   - color changes or remapping
+   - repetition or symmetry
+2. Generalize a rule that works across ALL given examples.
+3. Apply this inferred rule to the provided test input.
+4. Return the output grid as a JSON list of lists of integers.
+
+Only output the final answer in valid JSON format wrapped in a markdown code block, like this:
+```json
+```
 

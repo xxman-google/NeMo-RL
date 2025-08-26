@@ -13,9 +13,9 @@
 # limitations under the License.
 
 from nemo_rl.data.eval_datasets.arc_agi import ArcAgiDataset
+from nemo_rl.data.eval_datasets.ai2_arc import ArcDataset
 from nemo_rl.data.eval_datasets.aime2024 import AIME2024Dataset
 from nemo_rl.data.eval_datasets.aime2025 import AIME2025Dataset
-from nemo_rl.data.eval_datasets.arc_agi import ArcAgiDataset
 from nemo_rl.data.eval_datasets.beyond_aime import BeyondAIMEDataset
 from nemo_rl.data.eval_datasets.deepscaler import DeepScaleRDataset
 from nemo_rl.data.eval_datasets.gpqa import GPQADataset
@@ -32,11 +32,13 @@ from nemo_rl.data.eval_datasets.mmlu import MMLUDataset
 from nemo_rl.data.eval_datasets.mmlu_pro import MMLUProDataset
 from nemo_rl.data.eval_datasets.numina_math import NuminaMathDataset
 from nemo_rl.data.eval_datasets.openr1_math import OpenR1MathDataset
-from nemo_rl.data.eval_datasets.swe_bench_verified_oracle import (
-    SweBenchVerifiedOracleDataset,
-)
 from nemo_rl.data.eval_datasets.openr1_verifiable_code import (
     OpenR1VerifiableCodeDataset,
+)
+from nemo_rl.data.eval_datasets.sciq import SciQDataset
+from nemo_rl.data.eval_datasets.simpleqa import SimpleQADataset
+from nemo_rl.data.eval_datasets.swe_bench_verified_oracle import (
+    SweBenchVerifiedOracleDataset,
 )
 from nemo_rl.data.eval_datasets.tulu3_sft import Tulu3SftDataset
 
@@ -57,6 +59,13 @@ def load_eval_dataset(data_config):
                 prompt_file=data_config["prompt_file"],
                 system_prompt_file=data_config["system_prompt_file"],
             )
+    elif dataset_name == "ai2_arc":
+        base_dataset = ArcDataset(
+            subset=data_config["subset"],
+            split=data_config["split"],
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
     elif dataset_name == "deepscaler":
         base_dataset = DeepScaleRDataset(
             prompt_file=data_config["prompt_file"],
@@ -159,6 +168,11 @@ def load_eval_dataset(data_config):
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
+    elif dataset_name == "simpleqa":
+        base_dataset = SimpleQADataset(
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
     elif dataset_name == "local":
         base_dataset = LocalMathDataset(
             name=dataset_name,
@@ -199,7 +213,20 @@ def load_eval_dataset(data_config):
         )
     elif dataset_name == "openr1_verifiable_code":
         base_dataset = OpenR1VerifiableCodeDataset(
+            source=data_config["source"],
             code_exe_dir=data_config["code_exe_dir"],
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
+    elif dataset_name == "arc_agi":
+        base_dataset = ArcAgiDataset(
+            split=data_config.get("split", "evaluation"),
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
+    elif dataset_name == "sciq":
+        base_dataset = SciQDataset(
+            split=data_config["split"],
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
@@ -209,6 +236,7 @@ def load_eval_dataset(data_config):
 
 
 __all__ = [
+    "ArcDataset",
     "AIME2024Dataset",
     "AIME2025Dataset",
     "ArcAgiDataset",
@@ -230,5 +258,6 @@ __all__ = [
     "OpenR1MathDataset",
     "SweBenchVerifiedOracleDataset",
     "OpenR1VerifiableCodeDataset",
+    "SciQDataset",
     "Tulu3SftDataset",
 ]

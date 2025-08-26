@@ -21,13 +21,12 @@ import re
 import signal
 import sys
 import tempfile
-from collections.abc import Mapping, Sequence
 from contextlib import contextmanager, redirect_stdout
 from copy import copy
 from io import IOBase
 from pprint import pformat
 from types import ModuleType
-from typing import Any, Dict, List, Optional, Tuple, TypedDict
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, TypedDict
 
 import ray
 import torch
@@ -47,6 +46,7 @@ class CodeEnvConfig(TypedDict):
     terminate_on_evaluation: bool
     worker_type: str
     timeout: float
+    end_thinking_token: Optional[str]
 
 
 class CodeEnvMetadata(TypedDict):
@@ -81,16 +81,25 @@ def time_limit(seconds: float):
         signal.setitimer(signal.ITIMER_REAL, 0)
 
 
+def extract_response_after_thinking(response: str, end_thinking_token: str) -> str:
+    """Extracts response after the end of thinking."""
+    idx = response.find(end_thinking_token)
+    if idx < 0:
+        return response
+    return response[idx + len(end_thinking_token) :]
+
+
 class CodeExecutionWorker:
     """Helper class to process individual code execution steps."""
 
-    def __init__(self, timeout: float = 3.0):
+    def __init__(self, cfg: CodeEnvConfig, timeout: float = 3.0):
         # Create sandbox with safe builtins
         builtin_dict = {k: getattr(builtins, k) for k in dir(builtins)}
         builtin_dict["open"] = self.safe_open
         builtin_dict["__import__"] = self.safe_import
         self.sandbox = {"__builtins__": builtin_dict}
         self.timeout = timeout
+        self.end_thinking_token = cfg.get("end_thinking_token")
 
     def sanitize(self, obj: Any) -> Any:
         # TODO: better handling of unpicklable objects: custom __getstate__ and __setstate__
@@ -292,12 +301,16 @@ class PythonUnitTestVerifyRayWorker(CodeExecutionWorker):
         pattern = re.compile(r"```python\n(.*?)```", re.DOTALL)
 
         for message, metadata in zip(message_batch, metadata_batch):
+            if self.end_thinking_token is not None:
+                message = extract_response_after_thinking(
+                    message, self.end_thinking_token
+                )
             matches = pattern.findall(message)
             if not matches:
                 results.append("")
                 terminateds.append(False)
                 continue
-            code = matches[-1]
+            code = matches[0]
             if "base_imports" in metadata:
                 eval_code = "\n".join(
                     [metadata["base_imports"], code, metadata["tests"]]
@@ -374,13 +387,17 @@ class PythonStdoutVerifyRayWorker(CodeExecutionWorker):
         pattern = re.compile(r"```python\n(.*?)```", re.DOTALL)
 
         for message, metadata in zip(message_batch, metadata_batch):
+            if self.end_thinking_token is not None:
+                message = extract_response_after_thinking(
+                    message, self.end_thinking_token
+                )
             matches = pattern.findall(message)
             if not matches:
                 results.append("")
                 rewards.append(0.0)
                 terminateds.append(False)
                 continue
-            code = matches[-1]
+            code = matches[0]
             outputs = self._check_correctness(code, metadata)
             rewards.append(float(outputs["passed"]))
             results.append(outputs["result"])
@@ -411,7 +428,7 @@ class CodeEnvironment(EnvironmentInterface):
         self.workers = [
             worker_cls.options(
                 runtime_env={"py_executable": PY_EXECUTABLES.SYSTEM}
-            ).remote(timeout=cfg["timeout"])
+            ).remote(cfg=self.cfg, timeout=cfg["timeout"])
             for _ in range(self.num_workers)
         ]
 
@@ -419,6 +436,7 @@ class CodeEnvironment(EnvironmentInterface):
         self,
         message_log_batch: List[LLMMessageLogType],
         metadata_batch: List[CodeEnvMetadata],
+        return_extracted_answer: bool = False,
     ) -> EnvironmentReturn:
         """Process a batch of code execution steps."""
         message_batch = [ml[-1]["content"] for ml in message_log_batch]
@@ -454,12 +472,18 @@ class CodeEnvironment(EnvironmentInterface):
         rewards_tensor = torch.tensor(rewards, dtype=torch.float32)
         next_stop_strings = [["</code>"]] * len(message_log_batch)
 
+        # assert return_extracted_answer == False, (
+        #     "return_extracted_answer is not supported in CodeEnvironment. Please set it to False."
+        # )
+        extracted_answers = None
+
         return EnvironmentReturn(
             observations=observations,
             metadata=new_metadata_batch,
             next_stop_strings=next_stop_strings,
             rewards=rewards_tensor,
             terminateds=terminated_tensor,
+            answers=extracted_answers,
         )
 
     def shutdown(self):
