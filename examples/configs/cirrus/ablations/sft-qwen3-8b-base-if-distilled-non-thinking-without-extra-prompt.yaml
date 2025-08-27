@@ -1,0 +1,103 @@
+checkpointing:
+  checkpoint_dir: results/qwen3_8b_no_thinking_without_extra_prompt_1
+  enabled: true
+  higher_is_better: false
+  keep_top_k: 2
+  metric_name: null
+  save_period: 1000
+cluster:
+  gpus_per_node: 8
+  num_nodes: 1
+data:
+  add_bos: true
+  add_eos: true
+  add_generation_prompt: false
+  dataset_name: dataset_mixture
+  max_input_seq_length: 4096
+  mixture:
+  - additional_kwargs:
+      split: train
+    file_format: parquet
+    name_or_paths: data/ifeval_like/no_thinking_without_extra_prompt_large/train*
+    samples: 70000
+logger:
+  gpu_monitoring:
+    collection_interval: 10
+    flush_interval: 10
+  log_dir: logs/sft_qwen3_8b_no_thinking_without_extra_prompt_1
+  mlflow_enabled: false
+  monitor_gpus: false
+  tensorboard:
+    log_dir: tb_logs_qwen3_8b_no_thinking_without_extra_prompt_1
+  tensorboard_enabled: true
+  wandb:
+    name: sft_qwen3_8b_no_thinking_without_extra_prompt_1
+    project: qwen3-8b-base-if-sft
+  wandb_enabled: true
+policy:
+  dtensor_cfg:
+    activation_checkpointing: true
+    context_parallel_size: 1
+    cpu_offload: false
+    custom_parallel_plan: null
+    enabled: true
+    sequence_parallel: false
+    tensor_parallel_size: 2
+  dynamic_batching:
+    algorithm: modified_first_fit_decreasing
+    enabled: true
+    logprob_mb_tokens: 4096
+    sequence_length_round: 64
+    train_mb_tokens: 4096
+  logprob_batch_size: 1
+  make_sequence_length_divisible_by: 2
+  max_grad_norm: 1.0
+  max_total_sequence_length: 4096
+  megatron_cfg:
+    enabled: false
+  model_name: Qwen/Qwen3-8B-Base
+  optimizer:
+    kwargs:
+      betas:
+      - 0.9
+      - 0.98
+      eps: 1.0e-08
+      foreach: false
+      fused: false
+      lr: 5.0e-06
+      weight_decay: 0.1
+    name: torch.optim.AdamW
+  precision: bfloat16
+  scheduler:
+  - kwargs:
+      end_factor: 1.0
+      start_factor: 0.001
+      total_iters: 200
+    name: torch.optim.lr_scheduler.LinearLR
+  - kwargs:
+      T_max: 10000
+      eta_min: 5.0e-07
+    name: torch.optim.lr_scheduler.CosineAnnealingLR
+  - milestones:
+    - 200
+  sequence_packing:
+    algorithm: modified_first_fit_decreasing
+    enabled: false
+    logprob_mb_tokens: 4096
+    sequence_length_round: 64
+    train_mb_tokens: 4096
+  tokenizer:
+    chat_template: default
+    name: Qwen/Qwen3-8B-Base
+  train_global_batch_size: 128
+  train_micro_batch_size: 1
+sft:
+  max_num_epochs: 2
+  max_num_steps: 10000
+  seed: 42
+  val_at_start: true
+  val_batches: 8
+  val_global_batch_size: 128
+  val_micro_batch_size: 4
+  val_period: 100
+

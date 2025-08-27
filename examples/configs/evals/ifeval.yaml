@@ -2,9 +2,15 @@
 defaults: "gpqa.yaml"
 
 data:
-  prompt_file: "examples/prompts/cot.txt"
+  prompt_file: "examples/prompts/if_cot.txt"
   dataset_name: "ifeval"
 
 env:
   math:
     worker_type: "instruction_following"
+
+generation:
+  model_name: "/home/tangyoubao_google_com/LLaMA-Factory/saves/qwen3-14b/full/fa2_liger_fsdp_packing"
+  enable_thinking: false
+  vllm_cfg:
+    max_model_len: 4096

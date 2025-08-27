@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, Optional, TypedDict
 
 from datasets import concatenate_datasets, load_dataset
 
@@ -25,9 +25,18 @@ class WeightedDataset(TypedDict):
     name_or_paths: str | list[str] | dict[str, str]
     samples: int
     additional_kwargs: dict[str, Any]
+    user_msg_postfix: Optional[str]
+
+
+def _append_postfix_for_user_msg(example, postfix):
+    for msg in example["messages"]:
+        if msg["role"] == "user":
+            msg["content"] += f" {postfix}"
+    return example
 
 
 class DatasetMixture:
+    
     def __init__(
         self,
         mixture: list[WeightedDataset],
@@ -54,6 +63,8 @@ class DatasetMixture:
                 ds = load_dataset(
                     weighted_ds["name_or_paths"], **weighted_ds["additional_kwargs"]
                 )
+            if weighted_ds.get("user_msg_postfix", None):
+                ds = ds.map(lambda example: _append_postfix_for_user_msg(example, postfix=weighted_ds["user_msg_postfix"]))
             target_samples = weighted_ds["samples"]
             ds.shuffle(seed=seed)
             if isinstance(target_samples, (float)):
