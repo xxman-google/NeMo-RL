@@ -53,23 +53,23 @@ def main(_):
     print(type(_INPUT_PARQUET_FILES.value))
     
     # Print dataset info
-    print("\nDataset Info:")
-    print(ds)
+    print("\nDataset size:", len(ds))
     
     # Print first few examples
     print("\nFirst few examples:")
     for i, example in enumerate(ds):
+        if i >= 3:  # Print first 3 example
+            break
         print("-" * 20)
         print(f"\nExample {i + 1}:")
-        messages = example['messages']
-        print(messages)
-        print("*" * 10)
-        user_prompt, assistant_answer, extracted_answer = extract_prompt_and_answer(messages)
-        print("User: ", user_prompt)
-        print("Assistant: ", assistant_answer)
-        print("Extracted Answer: ", extracted_answer)
-        if i >= 20:  # Print first 20 examples
-            break
+        print(example)
+        # messages = example['messages']
+        # print(messages)
+        # print("*" * 10)
+        # user_prompt, assistant_answer, extracted_answer = extract_prompt_and_answer(messages)
+        # print("User: ", user_prompt)
+        # print("Assistant: ", assistant_answer)
+        # print("Extracted Answer: ", extracted_answer)
 
 if __name__ == "__main__":
     flags.mark_flags_as_required(["input_parquet_files"])

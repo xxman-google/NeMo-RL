@@ -8,3 +8,7 @@ generation:
   # top_k: 1
   model_name: "Qwen/Qwen3-32B"
   # enable_thinking: false
+  vllm_cfg:
+    max_model_len: 8912
+    enforce_eager: True
+    gpu_memory_utilization: 0.9

@@ -1,0 +1,4 @@
+defaults: "qwen3_14b_science_thinking.yaml"
+
+generation:
+  model_name: "Qwen/Qwen3-8B"

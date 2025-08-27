@@ -1,6 +1,0 @@
-# Rejection sampling configuration for Qwen3 32B model (thinking mode)
-
-defaults: "qwen3_32b_science_sampling.yaml"
-
-generation:
-  enable_thinking: true

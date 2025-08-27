@@ -1,0 +1,13 @@
+# Rejection sampling configuration for Qwen3 32B model (thinking mode)
+
+defaults: "qwen3_8b_science_thinking_sampling.yaml"
+
+generation:
+  model_name: "Qwen/Qwen3-32B"
+  # enable_thinking: true
+  vllm_cfg:
+    # max_model_len: 15000
+    # max_model_len: 38912
+    enforce_eager: True
+    gpu_memory_utilization: 0.9
+    tensor_parallel_size: 2

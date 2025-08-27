@@ -1,0 +1,12 @@
+# Rejection sampling configuration for Qwen3 14B model (thinking mode)
+
+# defaults: "qwen3_14b_science_sampling.yaml"
+
+# generation:
+#   enable_thinking: true
+
+defaults: "qwen3_8b_science_thinking_sampling.yaml"
+
+generation:
+  model_name: "Qwen/Qwen3-14B"
+  # enable_thinking: true

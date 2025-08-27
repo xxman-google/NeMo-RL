@@ -37,7 +37,7 @@ from nemo_rl.environments.metrics import (
 )
 from nemo_rl.environments.utils import chunk_list_to_workers
 from nemo_rl.evals import answer_parsing
-from nemo_rl.evals.grader_model import GptGraderModel, GeminiGraderModel, OPENAI_SYSTEM_MESSAGE_CHATGPT, QA_GRADER_TEMPLATE
+# from nemo_rl.evals.grader_model import GptGraderModel, GeminiGraderModel, OPENAI_SYSTEM_MESSAGE_CHATGPT, QA_GRADER_TEMPLATE
 
 # from nemo_rl.evals.ifeval import instructions_registry
 
@@ -125,71 +125,71 @@ class MathVerifyWorker:
         return results
 
 
-@ray.remote  # pragma: no cover
-class GraderVerifyWorker:
-    def __init__(self, cfg: MathEnvConfig) -> None:
-        model=cfg.get("grader_model_name", "gemini-2.5-flash")
-        self.grader_model = None
-        logger = logging.getLogger("qa_verify_worker")
-        logger.setLevel(logging.INFO)
-        logger.info(f"Initialized Grader Mmodel: {model})")
-        if model.startswith("gpt"):
-            self.grader_model = GptGraderModel(
-                model=model,
-                api_key=cfg.get("grader_api_key", os.getenv("OPENAI_API_KEY")),
-                system_message=cfg.get("grader_system_message",OPENAI_SYSTEM_MESSAGE_CHATGPT),
-                temperature=cfg.get("grader_temperature", 0.5),
-                max_tokens=cfg.get("grader_max_tokens", 1024),
-            )
-        else:
-           self.grader_model = GeminiGraderModel(
-               model=model,
-               api_key=cfg.get("grader_api_key", os.getenv("GEMINI_API_KEY")),
-               system_message=cfg.get("grader_system_message", OPENAI_SYSTEM_MESSAGE_CHATGPT),
-               temperature=cfg.get("grader_temperature", 0.5),
-               max_tokens=cfg.get("grader_max_tokens", 1024),
-           )
+# @ray.remote  # pragma: no cover
+# class GraderVerifyWorker:
+#     def __init__(self, cfg: MathEnvConfig) -> None:
+#         model=cfg.get("grader_model_name", "gemini-2.5-flash")
+#         self.grader_model = None
+#         logger = logging.getLogger("qa_verify_worker")
+#         logger.setLevel(logging.INFO)
+#         logger.info(f"Initialized Grader Mmodel: {model})")
+#         if model.startswith("gpt"):
+#             self.grader_model = GptGraderModel(
+#                 model=model,
+#                 api_key=cfg.get("grader_api_key", os.getenv("OPENAI_API_KEY")),
+#                 system_message=cfg.get("grader_system_message",OPENAI_SYSTEM_MESSAGE_CHATGPT),
+#                 temperature=cfg.get("grader_temperature", 0.5),
+#                 max_tokens=cfg.get("grader_max_tokens", 1024),
+#             )
+#         else:
+#            self.grader_model = GeminiGraderModel(
+#                model=model,
+#                api_key=cfg.get("grader_api_key", os.getenv("GEMINI_API_KEY")),
+#                system_message=cfg.get("grader_system_message", OPENAI_SYSTEM_MESSAGE_CHATGPT),
+#                temperature=cfg.get("grader_temperature", 0.5),
+#                max_tokens=cfg.get("grader_max_tokens", 1024),
+#            )
         
     
-    def _grade_sample(self, question: str, ground_truth: str, predicted_answer: str) -> str:
-        grader_prompt = QA_GRADER_TEMPLATE.format(
-            question=question,
-            target=ground_truth,
-            predicted_answer=predicted_answer,
-        )
-        prompt_messages = [
-            self.grader_model.pack_message(content=grader_prompt, role="user")
-        ]
-        grader_response = self.grader_model(prompt_messages)
-        grading_response = grader_response.response_text
-        # Extract the grading letter (A, B, C) from the response
-        match = re.search(r"(A|B|C)", grading_response)
-        return match.group(0) if match else "C"  # Default to "NOT_ATTEMPTED" if no match
+#     def _grade_sample(self, question: str, ground_truth: str, predicted_answer: str) -> str:
+#         grader_prompt = QA_GRADER_TEMPLATE.format(
+#             question=question,
+#             target=ground_truth,
+#             predicted_answer=predicted_answer,
+#         )
+#         prompt_messages = [
+#             self.grader_model.pack_message(content=grader_prompt, role="user")
+#         ]
+#         grader_response = self.grader_model(prompt_messages)
+#         grading_response = grader_response.response_text
+#         # Extract the grading letter (A, B, C) from the response
+#         match = re.search(r"(A|B|C)", grading_response)
+#         return match.group(0) if match else "C"  # Default to "NOT_ATTEMPTED" if no match
         
-    def verify(
-        self, pred_data: list[dict[str, str]], metadata_list: list[MathEnvironmentMetadata]
-    ) -> list[tuple[float, str, str]]:
-        """Verify the correctness of the predicted responses against the ground truth.
+#     def verify(
+#         self, pred_data: list[dict[str, str]], metadata_list: list[MathEnvironmentMetadata]
+#     ) -> list[tuple[float, str, str]]:
+#         """Verify the correctness of the predicted responses against the ground truth.
 
-        Args:
-            pred_data: list[dict[str, str]]. The predicted data including prompt and response from the LLM.
-            ground_truths: list[str]. The ground truth responses.
+#         Args:
+#             pred_data: list[dict[str, str]]. The predicted data including prompt and response from the LLM.
+#             ground_truths: list[str]. The ground truth responses.
 
-        Returns:
-            list[tuple[float, str, str]]. The rewards, correct answer, and the extracted answer for each predicted response.
-        """
-        results = []
-        for data, metadata in zip(pred_data, metadata_list):
-            question = data["prompt"]
-            model_response = data["response"]
-            ground_truth = str(metadata["ground_truth"])
-            grade_letter = self._grade_sample(question, ground_truth, model_response)
-            is_correct = grade_letter == "A"
-            is_incorrect = grade_letter == "B"
-            is_not_attempted = grade_letter == "C"
-            score = is_correct
-            results.append((score, ground_truth, data["response"]))
-        return results
+#         Returns:
+#             list[tuple[float, str, str]]. The rewards, correct answer, and the extracted answer for each predicted response.
+#         """
+#         results = []
+#         for data, metadata in zip(pred_data, metadata_list):
+#             question = data["prompt"]
+#             model_response = data["response"]
+#             ground_truth = str(metadata["ground_truth"])
+#             grade_letter = self._grade_sample(question, ground_truth, model_response)
+#             is_correct = grade_letter == "A"
+#             is_incorrect = grade_letter == "B"
+#             is_not_attempted = grade_letter == "C"
+#             score = is_correct
+#             results.append((score, ground_truth, data["response"]))
+#         return results
         
 
 @ray.remote  # pragma: no cover
@@ -422,7 +422,7 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
             "math": MathVerifyWorker,
             "mgsm": MGSMVerifyWorker,
             "multilingual_multichoice": MultilingualMultichoiceVerifyWorker,
-            "simpleqa": GraderVerifyWorker,
+            # "simpleqa": GraderVerifyWorker,
         }[worker_type]
         self.workers = [
             worker_cls.options(  # type: ignore # (decorated with @ray.remote)
