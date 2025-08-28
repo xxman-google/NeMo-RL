@@ -1,0 +1,21 @@
+# Arena-Hard evaluation configuration.
+
+# Note that the grader model configs for Arena-Hard are specified here:
+#  https://github.com/lmarena/arena-hard-auto/blob/main/config/arena-hard-v2.0.yaml
+
+defaults: "eval.yaml"
+
+generation:
+  vllm_cfg:
+    max_model_len: 32768
+
+data:
+  dataset_name: "arena_hard"
+
+env:
+  math:
+    worker_type: "arena_hard"
+    grader_model_name: "gemini-2.5-pro"
+    grader_max_tokens: 32000
+    grader_temperature: 1
+    

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from nemo_rl.data.eval_datasets.ai2_arc import ArcDataset
+from nemo_rl.data.eval_datasets.arena_hard import ArenaHardDataset
 from nemo_rl.data.eval_datasets.aime2024 import AIME2024Dataset
 from nemo_rl.data.eval_datasets.aime2025 import AIME2025Dataset
 from nemo_rl.data.eval_datasets.arc_agi import ArcAgiDataset
@@ -63,6 +64,11 @@ def load_eval_dataset(data_config):
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
+    elif dataset_name == "arena_hard":
+        base_dataset = ArenaHardDataset(
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        ) 
     elif dataset_name == "deepscaler":
         base_dataset = DeepScaleRDataset(
             prompt_file=data_config["prompt_file"],

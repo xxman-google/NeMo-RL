@@ -38,6 +38,9 @@ from nemo_rl.environments.metrics import (
 from nemo_rl.environments.utils import chunk_list_to_workers
 from nemo_rl.evals import answer_parsing
 from nemo_rl.evals.grader_model import (
+    ARENA_HARD_CREATIVE_WRITING_SYSTEM_MESSAGE,
+    ARENA_HARD_SYSTEM_MESSAGE,
+    ARENA_HARD_TEMPLATE,
     OPENAI_SYSTEM_MESSAGE_CHATGPT,
     QA_GRADER_TEMPLATE,
     GeminiGraderModel,
@@ -461,6 +464,147 @@ class ArcAgiVerifyWorker:
         return results
 
 
+@ray.remote
+class ArenaHardVerifyWorker:
+    """Response verifier worker for Arena-Hard."""
+
+    def __init__(self, cfg: MathEnvConfig) -> None:
+        self.end_thinking_token = cfg.get("end_thinking_token")
+
+        model = cfg.get("grader_model_name", "gemini-2.5-pro")
+        logger = logging.getLogger("arena_hard_verify_worker")
+        logger.setLevel(logging.INFO)
+        self.hard_prompt_grader_model = GeminiGraderModel(
+            model=model,
+            system_message=ARENA_HARD_SYSTEM_MESSAGE,
+            api_key=cfg.get("grader_api_key", os.getenv("GEMINI_API_KEY")),
+            temperature=cfg.get("grader_temperature", 1.0),
+            max_tokens=cfg.get("grader_max_tokens", 32000),
+        )
+        self.creative_writing_grader_model = GeminiGraderModel(
+            model=model,
+            system_message=ARENA_HARD_CREATIVE_WRITING_SYSTEM_MESSAGE,
+            api_key=cfg.get("grader_api_key", os.getenv("GEMINI_API_KEY")),
+            temperature=cfg.get("grader_temperature", 1.0),
+            max_tokens=cfg.get("grader_max_tokens", 32000),
+        )
+
+    def _grade_sample(
+        self,
+        prompt: str,
+        baseline_model_response: str,
+        sample_response: str,
+        creative_writing: bool = False,
+    ) -> tuple[str, str]:
+        """Grade the sample response against the baseline model response using the grader model."""
+        if creative_writing:
+            grader_model = self.creative_writing_grader_model
+        else:
+            grader_model = self.hard_prompt_grader_model
+
+        # Round 1
+        grader_prompt_1 = ARENA_HARD_TEMPLATE.format(
+            QUESTION=prompt,
+            ANSWER_A=baseline_model_response,
+            ANSWER_B=sample_response,
+        )
+        prompt_messages_1 = [
+            grader_model.pack_message(content=grader_prompt_1, role="user")
+        ]
+        grader_response_1 = grader_model(prompt_messages_1)
+
+        # Round 2
+        grader_prompt_2 = ARENA_HARD_TEMPLATE.format(
+            QUESTION=prompt,
+            ANSWER_A=sample_response,
+            ANSWER_B=baseline_model_response,
+        )
+        prompt_messages_2 = [
+            grader_model.pack_message(content=grader_prompt_2, role="user")
+        ]
+        grader_response_2 = grader_model(prompt_messages_2)
+        return grader_response_1.response_text, grader_response_2.response_text
+
+    def _get_verdict_from_grader_response(self, judgment: str) -> Optional[str]:
+        patterns = [
+            r"\[\[([AB<>=]+)\]\]",
+            r"\[([AB<>=]+)\]"
+        ]
+        for pattern in patterns:
+            pattern = re.compile(pattern)
+
+            matches = pattern.findall(judgment.upper())
+            matches = [m for m in matches if m != ""]
+
+            if len(set(matches)) > 0:
+                return matches[-1].strip("\n")
+        return None
+
+    def _get_score_from_verdict(
+        self, verdict: str, weight: int = 3
+    ) -> list[float]:
+        label_to_score = {
+            "A>B": [1.0],
+            "A>>B": [1.0] * weight,
+            "A=B": [0.5],
+            "A<<B": [0.0] * weight,
+            "A<B": [0.0],
+            "B>A": [0.0],
+            "B>>A": [0.0] * weight,
+            "B=A": [0.5],
+            "B<<A": [1.0] * weight,
+            "B<A": [1.0],
+        }
+        return label_to_score.get(verdict, [])
+
+    def verify(
+        self,
+        pred_data: list[dict[str, str]],
+        metadata_list: list[MathEnvironmentMetadata],
+    ) -> list[tuple[float, str, str]]:
+        """Use the LLM-as-judge to grade the model answer compared with a baseline answer.
+
+        Args:
+            pred_data: list[dict[str, str]]. The predicted data including prompt and response from the LLM.
+            metadata_list: list[MathEnvironmentMetadata]. The metadata containing the baseline responses and other info..
+
+        Returns:
+            list[tuple[float, str, str]]. The rewards, baseline answer, and the extracted answer for each predicted response.
+        """
+        results = []
+        for data, metadata in zip(pred_data, metadata_list):
+            prompt = data["prompt"]
+            sample_response = data["response"]
+            baseline_model_response = str(metadata["baseline_model_response"])
+            is_creative_writing = metadata["category"] == "creative_writing"
+            judge_response_1, judge_response_2 = self._grade_sample(
+                prompt,
+                baseline_model_response,
+                sample_response,
+                creative_writing=is_creative_writing,
+            )
+            verdict1 = self._get_verdict_from_grader_response(judge_response_1)
+            verdict2 = self._get_verdict_from_grader_response(judge_response_2)
+
+            if not verdict1 or not verdict2:
+                results.append((0.5, baseline_model_response, sample_response))
+                continue
+
+            scores1 = self._get_score_from_verdict(verdict1)
+            scores2 = self._get_score_from_verdict(verdict2)
+
+            # score for sample model is 1 - score_for_baseline
+            scores = [1.0 - s for s in scores1] + scores2
+            
+            if not scores:
+                results.append((0.5, baseline_model_response, sample_response))
+                continue
+
+            score = sum(scores) / len(scores)
+            results.append((score, baseline_model_response, sample_response))
+        return results
+
+
 @ray.remote(max_restarts=-1, max_task_retries=-1)  # pragma: no cover
 class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
     def __init__(self, cfg: MathEnvConfig):
@@ -473,6 +617,7 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
         )
         worker_cls = {
             "arc_agi": ArcAgiVerifyWorker,
+            "arena_hard": ArenaHardVerifyWorker,
             "english_multichoice": EnglishMultichoiceVerifyWorker,
             "instruction_following": IFVerifyWorker,
             "math": MathVerifyWorker,
