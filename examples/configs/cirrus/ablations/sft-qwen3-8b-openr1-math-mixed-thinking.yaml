@@ -1,4 +1,4 @@
-# Reference run: https://wandb.ai/gmayanksharan-google/cirrus/runs/vm6wplqy
+# Reference run: https://wandb.ai/gmayanksharan-google/cirrus/runs/8m6sm873
 # In order to train with this config, please copy the data from /mnt to your log directory. For example,
 # cp -r /mnt/datasets/cirrus0.0/openr1_math_*qwen3_8b_thinking/ $JOB_ID/ray-logs/app_logs/
 #
