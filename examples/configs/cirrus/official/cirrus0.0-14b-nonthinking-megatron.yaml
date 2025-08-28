@@ -11,7 +11,7 @@
 # logger.wandb.name=cirrus0p0_14b_nonthinking_megatron
 sft:
   max_num_epochs: 1
-  max_num_steps: 1227
+  max_num_steps: 1248
   val_period: 100
   val_batches: 16
   val_global_batch_size: 128
@@ -88,7 +88,7 @@ policy:
       end_weight_decay: ${policy.megatron_cfg.optimizer.weight_decay}
       weight_decay_incr_style: "constant"
       lr_decay_style: "cosine"
-      lr_decay_iters: 1227
+      lr_decay_iters: 1248
       lr_warmup_iters: 100
       lr_warmup_init: 1.17e-7
 
@@ -120,37 +120,37 @@ data:
   mixture:
     - file_format: "parquet"
       name_or_paths: "/tmp/logs/openr1_math_amc_aime_qwen3_14b_no_thinking/train-unboxed*"
-      samples: 523
+      samples: 563
       additional_kwargs:
         split: "train"
     - file_format: "parquet"
       name_or_paths: "/tmp/logs/openr1_math_aops_forum_qwen3_14b_no_thinking/train-unboxed*"
-      samples: 5510
+      samples: 5700
       additional_kwargs:
         split: "train"
     - file_format: "parquet"
       name_or_paths: "/tmp/logs/openr1_math_cn_contest_qwen3_14b_no_thinking/train-unboxed*"
-      samples: 6227
+      samples: 6460
       additional_kwargs:
         split: "train"
     - file_format: "parquet"
       name_or_paths: "/tmp/logs/openr1_math_inequalities_qwen3_14b_no_thinking/train-unboxed*"
-      samples: 573
+      samples: 568
       additional_kwargs:
         split: "train"
     - file_format: "parquet"
       name_or_paths: "/tmp/logs/openr1_math_number_theory_qwen3_14b_no_thinking/train-unboxed*"
-      samples: 175
+      samples: 178
       additional_kwargs:
         split: "train"
     - file_format: "parquet"
       name_or_paths: "/tmp/logs/openr1_math_olympiads_qwen3_14b_no_thinking/train-unboxed*"
-      samples: 39280
+      samples: 40212
       additional_kwargs:
         split: "train"
     - file_format: "parquet"
       name_or_paths: "/tmp/logs/openr1_math_olympiads_ref_qwen3_14b_no_thinking/train-unboxed*"
-      samples: 422
+      samples: 423
       additional_kwargs:
         split: "train"
     - file_format: "huggingface"

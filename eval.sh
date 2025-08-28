@@ -7,6 +7,7 @@ if [ "$#" -ne 3 ]; then
 fi
 
 enable_thinking=true
+append_think_token_to_user_msg=false
 if [[ $enable_thinking == "true" ]]; then
   max_model_len=32768
   temperature=0.6
@@ -62,6 +63,8 @@ for ((i=0; i<$len; i++)); do
   wandb_name="$exp_name-$benchmark_name"
 
   uv run examples/run_eval.py --config $config_file \
+  data.append_think_token_to_user_msg=$append_think_token_to_user_msg \
+  env.math.end_thinking_token="</think>" \
   eval.num_tests_per_prompt=$repeats \
   data.dataset_name=$dataset_name \
   generation.stop_token_ids=\[151643,151645\] \
