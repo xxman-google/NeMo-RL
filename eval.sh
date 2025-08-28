@@ -6,7 +6,7 @@ if [ "$#" -ne 3 ]; then
     exit 1
 fi
 
-enable_thinking=true
+enable_thinking=false
 if [[ $enable_thinking == "true" ]]; then
   max_model_len=32768
   temperature=0.6
@@ -72,8 +72,9 @@ for ((i=0; i<$len; i++)); do
   generation.temperature=$temperature \
   generation.top_p=$top_p \
   generation.top_k=$top_k \
-  cluster.gpus_per_node=$GPUS_PER_NODE \
-  cluster.num_nodes=$NNODES \
+  cluster.gpus_per_node=8 \
+  cluster.num_nodes=1 \
   generation.model_name=$hf_ckpt_path \
+  logger.wandb.project="fei-eval" \
   logger.wandb.name=$wandb_name
 done

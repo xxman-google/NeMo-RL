@@ -85,6 +85,7 @@ class DatasetMixture:
             datasets.append(ds.select(range(min(target_samples, len(ds)))))
 
         combined_dataset = concatenate_datasets(datasets)
+        combined_dataset = combined_dataset.shuffle(seed=seed)
         # shuffle by default inside train_test_split()
         split_ds = combined_dataset.train_test_split(test_size=val_size, seed=seed)
         self.formatted_ds = {
