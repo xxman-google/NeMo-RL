@@ -20,6 +20,7 @@ from collections import Counter
 from itertools import combinations
 from typing import Optional, TypedDict
 
+from alpaca_eval.metrics.glm_winrate import get_length_controlled_winrate
 import ray
 import torch
 from torch.utils.data import DataLoader
@@ -105,7 +106,11 @@ def setup(
     top_k = generation_config["top_k"]
 
     # Validate metrics
-    assert metric in ["pass@k", "cons@k"], f"Invalid metric: {metric}"
+    assert metric in [
+        "pass@k",
+        "cons@k",
+        "length_controlled_winrate",
+    ], f"Invalid metric: {metric}"
     if num_tests_per_prompt > 1:
         assert temperature > 0 and top_k != 1, (
             "temperature > 0 and top_k != 1 are required for multiple samples"
@@ -344,6 +349,7 @@ async def _run_env_eval_impl(
     evaluation_data = []
     metric_group_key = env_config.get("metric_group_key", None)
     render_template = {
+        "alpaca2": vis_lib.BaseRenderTemplate,
         "arc_agi": vis_lib.BaseRenderTemplate,
         "math": vis_lib.MathRenderTemplate,
         "mgsm": vis_lib.MathRenderTemplate,
@@ -456,6 +462,24 @@ async def _run_env_eval_impl(
             score += eval_cons_k(
                 rewards, num_tests_per_prompt, k_value, extracted_answers
             )
+        elif metric == "length_controlled_winrate":
+            annotations = []
+            for response, verdict, observation in zip(
+                output_texts,
+                rewards,
+                env_return.observations,
+            ):
+                golden_response = observation.get("correct_answer", None)
+                annotation = {
+                    "preference": 2 if verdict else 1,
+                    "annotator": master_config["env"]["math"]["grader_model_name"],
+                    "generator_1": "gpt4_1106_preview",
+                    "generator_2": master_config["generation"]["model_name"],
+                    "output_1": golden_response,
+                    "output_2": response,
+                }
+                annotations.append(annotation)
+            score = get_length_controlled_winrate(annotations)
         else:
             raise ValueError(f"Invalid metric: {metric}")
 
@@ -646,13 +670,21 @@ def _print_results(
     temperature = generation_config["temperature"]
     top_p = generation_config["top_p"]
     top_k = generation_config["top_k"]
-    average_score = score / dataset_size
 
     print("\n" + "=" * 60)
     print(f"{model_name=} {dataset_name=}")
     print(f"{max_new_tokens=} {temperature=} {top_p=} {top_k=} {seed=}\n")
     print(f"metric={metric[:-1]}{k_value} {num_tests_per_prompt=}\n")
-    print(f"score={average_score:.4f} ({score}/{dataset_size})")
+    if metric == "length_controlled_winrate":
+        winrate = score["win_rate"]
+        average_score = score["length_controlled_winrate"]
+        print(f"winrate={winrate:.4f}")
+        print(f"length_controlled_winrate={average_score:.4f}")
+    elif metric in ["pass@k", "cons@k"]:
+        average_score = score / dataset_size
+        print(f"score={average_score:.4f} ({score}/{dataset_size})")
+    else:
+        raise ValueError(f"Invalid metric: {metric}")
     print("=" * 60 + "\n")
     logger.log_histogram("generation length", generation_lengths, num_bins=10)
     max_samples_to_html = master_config["logger"].get("max_samples_to_html", 30)

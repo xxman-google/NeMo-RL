@@ -15,6 +15,7 @@
 from nemo_rl.data.eval_datasets.ai2_arc import ArcDataset
 from nemo_rl.data.eval_datasets.aime2024 import AIME2024Dataset
 from nemo_rl.data.eval_datasets.aime2025 import AIME2025Dataset
+from nemo_rl.data.eval_datasets.alpaca2 import Alpaca2Dataset
 from nemo_rl.data.eval_datasets.arc_agi import ArcAgiDataset
 from nemo_rl.data.eval_datasets.beyond_aime import BeyondAIMEDataset
 from nemo_rl.data.eval_datasets.deepscaler import DeepScaleRDataset
@@ -217,6 +218,11 @@ def load_eval_dataset(data_config):
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
+    elif dataset_name == "alpaca2":
+        base_dataset = Alpaca2Dataset(
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        ) 
     else:
         raise ValueError(f"Unknown dataset {dataset_name}.")
     return base_dataset
@@ -226,6 +232,7 @@ __all__ = [
     "ArcDataset",
     "AIME2024Dataset",
     "AIME2025Dataset",
+    "Alpaca2Dataset",
     "BeyondAIMEDataset",
     "DeepScaleRDataset",
     "GPQADataset",
