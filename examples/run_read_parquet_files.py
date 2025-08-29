@@ -51,10 +51,7 @@ def main(_):
     print("Load dataset")
     ds = load_dataset("parquet", data_files=_INPUT_PARQUET_FILES.value, split="train")
     print(type(_INPUT_PARQUET_FILES.value))
-    
-    # Print dataset info
-    print("\nDataset size:", len(ds))
-    
+        
     # Print first few examples
     print("\nFirst few examples:")
     for i, example in enumerate(ds):
@@ -70,6 +67,10 @@ def main(_):
         # print("User: ", user_prompt)
         # print("Assistant: ", assistant_answer)
         # print("Extracted Answer: ", extracted_answer)
+    
+    # Print dataset info
+    print("\nDataset size:", len(ds))
+
 
 if __name__ == "__main__":
     flags.mark_flags_as_required(["input_parquet_files"])

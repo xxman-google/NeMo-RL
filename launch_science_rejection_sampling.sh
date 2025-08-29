@@ -1,8 +1,11 @@
 #!/bin/bash
 
 dataset_name="local_science"
-
+data_paths="logs/nemotron/science/thnking_consensus_examples.parquet"
 model_names=("qwen3_8b_science_no_thinking")
+
+echo $GPUS_PER_NODE
+echo $NNODES
 
 for model_name in "${model_names[@]}"; do
   config_path="examples/configs/rejection_sampling/${model_name}.yaml"
@@ -18,10 +21,11 @@ for model_name in "${model_names[@]}"; do
     tp=1
   fi
 
-  output_dir="${LOCAL_LOG_DIR_IN_CONTAINER}/${dataset_name}_${model_name}"
+  output_dir="${LOCAL_LOG_DIR_IN_CONTAINER}/${dataset_name}_8B_14B_consensus_${model_name}"
   echo "writing results to $output_dir"
   uv run examples/run_rejection_sampling.py \
   --config $config_path \
+  data.data_paths=$data_paths \
   generation.num_prompts_per_step=-1 \
   generation.vllm_cfg.max_model_len=$max_model_len \
   generation.vllm_cfg.tensor_parallel_size=$tp \

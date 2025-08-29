@@ -8,7 +8,7 @@ The script:
 4. Saves the consistent conversations to a new parquet file
 
 Usage:
-    uv run examples/run_consensus_check.py --input_parquet_files logs/nemotron/Qwen/ --output_file logs/nemotron/Qwen/consensus_examples.parquet
+    uv run examples/run_consensus_check.py --input_parquet_files logs/nemotron/Qwen/fullset --output_file logs/nemotron/Qwen/fullset/8B_14B_consensus_examples.parquet
 """
 
 
@@ -71,12 +71,14 @@ def process_parquet_files(input_path):
     content_map = defaultdict(set)
     
     # Load all parquet files as a dataset
+    print("Loading dataset...")
     ds = load_dataset("parquet", data_files=parquet_files, split="train")
     print(f"Loaded dataset with {len(ds)} entries.")
     # Process each row in the dataset
     problems = []
     expected_answers = []
-    
+
+    print("Extracting prompts and answers...")
     for row in ds:
         messages = row.get('messages', [])
         prompt, answer, extracted = extract_prompt_and_answer(messages)
@@ -88,7 +90,8 @@ def process_parquet_files(input_path):
             else:
                 # Add this answer to existing answers for this prompt
                 content_map[prompt].append(extracted)
-
+    print("Extracted prompts and answers...")
+    
     # Find prompts where there are all assistants gave the same answer
     for prompt, answers in content_map.items():
         # There are less answers than the number of model responses or the answer is not consistent
