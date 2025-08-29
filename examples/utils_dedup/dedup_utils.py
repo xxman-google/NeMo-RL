@@ -29,10 +29,6 @@ class DeduplicationPipeline:
             model_name (str): The name of the Sentence-BERT model to use.
             metric (str): The similarity metric to use. Currently supports 'cosine'.
             threshold (float): The similarity score threshold for redundancy.
-            visualize (bool): Whether to generate and save visualization plots.
-            showcase (bool): Whether to display the most and least similar sample pairs.
-            deduplicate_and_save (bool): If True, removes redundant samples and saves the
-                                         cleaned dataset to a new file.
         """
         self.model_name = model_name
         self.metric = metric
