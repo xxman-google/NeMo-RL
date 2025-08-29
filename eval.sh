@@ -27,20 +27,22 @@ exp_name=$2
 is_megatron=$3
 hf_ckpt_path=$ckpt_path/hf
 
-if [ $is_megatron = "false" ]; then
-  uv run python examples/converters/convert_dcp_to_hf.py \
-  --config $ckpt_path/config.yaml \
-  --dcp-ckpt-path $ckpt_path/policy/weights/ \
-  --hf-ckpt-path $hf_ckpt_path
-else
-  uv run --extra mcore python examples/converters/convert_megatron_to_hf.py \
-  --config $ckpt_path/config.yaml \
-  --megatron-ckpt-path $ckpt_path/policy/weights/iter_0000000 \
-  --hf-ckpt-path $hf_ckpt_path
+if [ ! -d "$hf_ckpt_path" ]; then
+  if [ $is_megatron = "false" ]; then
+    uv run python examples/converters/convert_dcp_to_hf.py \
+    --config $ckpt_path/config.yaml \
+    --dcp-ckpt-path $ckpt_path/policy/weights/ \
+    --hf-ckpt-path $hf_ckpt_path
+  else
+    uv run --extra mcore python examples/converters/convert_megatron_to_hf.py \
+    --config $ckpt_path/config.yaml \
+    --megatron-ckpt-path $ckpt_path/policy/weights/iter_0000000 \
+    --hf-ckpt-path $hf_ckpt_path
+  fi
 fi
 
-benchmarks=("aime2024" "aime2025" "beyond_aime" "math" "math500" "mgsm" "gpqa" "mmlu" "mmlu_pro" "humaneval" "livecodebench_functional" "livecodebench_stdin" "ifeval")
-num_tests_per_prompt=(5 5 5 1 1 1 5 1 1 5 5 5 1)
+benchmarks=("aime2024" "aime2025" "beyond_aime" "math500" "mgsm" "gpqa" "mmlu" "mmlu_pro" "humaneval" "livecodebench_functional" "livecodebench_stdin" "ifeval" "arc_agi")
+num_tests_per_prompt=(5 5 5 1 1 5 1 1 5 5 5 1 5)
 
 len=${#benchmarks[@]}
 
