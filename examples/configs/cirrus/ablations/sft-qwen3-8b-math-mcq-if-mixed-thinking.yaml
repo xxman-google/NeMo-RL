@@ -1,0 +1,248 @@
+# Reference run: https://wandb.ai/gmayanksharan-google/cirrus/runs/fmy1piku
+# In order to train with this config, please copy the data from /mnt to your log directory. For example,
+# cp -r /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_*qwen3_8b_thinking/ $JOB_ID/ray-logs/app_logs/
+# cp -r /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_*qwen3_8b_no_thinking/ $JOB_ID/ray-logs/app_logs/
+# cp -r /gcs/cloud-nas-hns-data/cirrus0.1/sciq_qwen3_8b_mcq_no_thinking/ $JOB_ID/ray-logs/app_logs/
+# cp -r /gcs/cloud-nas-hns-data/cirrus0.1/sciq_qwen3_8b_mcq_thinking/ $JOB_ID/ray-logs/app_logs/
+# cp -r /gcs/cloud-nas-hns-data/cirrus0.2/if_rejection_sampling/ $JOB_ID/ray-logs/app_logs/
+#
+# Example launch command:
+# uv run examples/run_sft.py --config examples/configs/cirrus/ablations/sft-qwen3-8b-math-mcq-if-mixed-thinking.yaml \
+# cluster.num_nodes=4 \
+# cluster.gpus_per_node=8 \
+# logger.log_dir=$LOCAL_LOG_DIR_IN_CONTAINER \
+# checkpointing.checkpoint_dir=${CKPT_LOCAL_DIR}/sft_qwen3_8b_math_mcq_if_mixed_thinking \
+# logger.wandb.name=sft_qwen3_8b_math_mcq_if_mixed_thinking
+sft:
+  max_num_epochs: 1
+  max_num_steps: 2170
+  val_period: 100
+  val_batches: 16
+  val_global_batch_size: 64
+  val_micro_batch_size: 2
+  val_at_start: true
+  seed: 42
+checkpointing:
+  enabled: true
+  checkpoint_dir: "results/sft_qwen3_8b_math_mcq_if_mixed_thinking"
+  metric_name: val_loss
+  higher_is_better: false
+  save_period: 1000
+  keep_top_k: null
+  checkpoint_must_save_by: null
+policy:
+  model_name: "Qwen/Qwen3-8B-Base"
+  tokenizer:
+    name: "Qwen/Qwen3-8B"
+    chat_template: "default"
+  train_global_batch_size: 64
+  train_micro_batch_size: 2
+  logprob_batch_size: 1
+  max_total_sequence_length: 32768
+  precision: bfloat16
+
+  dtensor_cfg:
+    enabled: false
+  
+  megatron_cfg:
+    enabled: true
+    empty_unused_memory_level: 1
+    activation_checkpointing: true
+    converter_type: "Qwen2ForCausalLM"
+    tensor_model_parallel_size: 8
+    expert_tensor_parallel_size: 1
+    expert_model_parallel_size: 1
+    pipeline_model_parallel_size: 1
+    num_layers_in_first_pipeline_stage: null
+    num_layers_in_last_pipeline_stage: null
+    context_parallel_size: 1
+    pipeline_dtype: ${policy.precision}
+    sequence_parallel: true
+    freeze_moe_router: true
+    moe_router_dtype: "fp64"
+    moe_router_load_balancing_type: "none" # "seq_aux_loss" causes logprob error divergence for grpo
+    moe_router_bias_update_rate: 0.0 # by default, disable bias updates for grpo
+    #gives ~20% training perf speedup with sequence packing 
+    apply_rope_fusion: True
+
+    optimizer:
+      optimizer: "adam"
+      lr: 2.34e-05
+      min_lr: 2.34e-6
+      weight_decay: 0.1
+      bf16: true
+      fp16: false
+      params_dtype: "float32"
+
+      #adam
+      adam_beta1: 0.9
+      adam_beta2: 0.95
+      adam_eps: 1e-6
+
+      #distributed optimizer
+      use_distributed_optimizer: true
+      use_precision_aware_optimizer: true
+
+      clip_grad: 1.0
+      optimizer_cpu_offload: false
+      optimizer_offload_fraction: 0.0
+
+    scheduler:
+      start_weight_decay: ${policy.megatron_cfg.optimizer.weight_decay}
+      end_weight_decay: ${policy.megatron_cfg.optimizer.weight_decay}
+      weight_decay_incr_style: "constant"
+      lr_decay_style: "cosine"
+      lr_decay_iters: 2170
+      lr_warmup_iters: 200
+      lr_warmup_init: 2.34e-7
+
+    distributed_data_parallel_config:
+      grad_reduce_in_fp32: false
+      overlap_grad_reduce: true
+      overlap_param_gather: true
+      average_in_collective: true
+      use_custom_fsdp: false
+      data_parallel_sharding_strategy: "optim_grads_params"
+
+  dynamic_batching:
+    enabled: False
+
+  sequence_packing:
+    enabled: True
+    train_mb_tokens: ${mul:${policy.max_total_sequence_length}, ${policy.train_micro_batch_size}}
+    algorithm: "modified_first_fit_decreasing"
+    sequence_length_round: 64
+
+  make_sequence_length_divisible_by: ${policy.megatron_cfg.tensor_model_parallel_size}
+  optimizer: null
+
+data:
+  max_input_seq_length: ${policy.max_total_sequence_length}
+  dataset_name: "dataset_mixture"
+  mixture:
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_amc_aime_qwen3_8b_no_thinking/train-unboxed*"
+      samples: 523
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/no_think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_aops_forum_qwen3_8b_no_thinking/train-unboxed*"
+      samples: 5510
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/no_think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_cn_contest_qwen3_8b_no_thinking/train-unboxed*"
+      samples: 6227
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/no_think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_inequalities_qwen3_8b_no_thinking/train-unboxed*"
+      samples: 573
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/no_think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_number_theory_qwen3_8b_no_thinking/train-unboxed*"
+      samples: 175
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/no_think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_olympiads_qwen3_8b_no_thinking/train-unboxed*"
+      samples: 39280
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/no_think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_olympiads_ref_qwen3_8b_no_thinking/train-unboxed*"
+      samples: 422
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/no_think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/if_rejection_sampling/qwen3_8b_non_thinking/train-*"
+      samples: 15000
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/no_think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/sciq_qwen3_8b_mcq_no_thinking/train-augmented*"
+      samples: 2000
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/no_think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_amc_aime_qwen3_8b_thinking/train-unboxed*"
+      samples: 692
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_aops_forum_qwen3_8b_thinking/train-unboxed*"
+      samples: 6178
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_cn_contest_qwen3_8b_thinking/train-unboxed*"
+      samples: 7314
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_inequalities_qwen3_8b_thinking/train-unboxed*"
+      samples: 659
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_number_theory_qwen3_8b_thinking/train-unboxed*"
+      samples: 206
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_olympiads_qwen3_8b_thinking/train-unboxed*"
+      samples: 43996
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_math_olympiads_ref_qwen3_8b_thinking/train-unboxed*"
+      samples: 489
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/sciq_qwen3_8b_mcq_thinking/train-augmented*"
+      samples: 2000
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/if_rejection_sampling/qwen3_8b_thinking/train-*"
+      samples: 15000
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/think"
+  add_bos: true
+  add_eos: true
+  add_generation_prompt: false
+logger:
+  log_dir: "logs/sft_qwen3_8b_math_mcq_if_mixed_thinking"
+  wandb_enabled: true
+  tensorboard_enabled: false
+  mlflow_enabled: false
+  monitor_gpus: true
+  wandb:
+    project: cirrus
+    name: sft_qwen3_8b_math_mcq_if_mixed_thinking
+  gpu_monitoring:
+    collection_interval: 30
+    flush_interval: 30
+cluster:
+  gpus_per_node: 8
+  num_nodes: 4
