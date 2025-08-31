@@ -377,3 +377,12 @@ swe_bench_processor = functools.partial(
         ("instance", "instance"),
     ],
 )
+alpaca2_processor = functools.partial(
+    data_processor,
+    question_key="prompt",
+    extra_env_info_key_maps=[
+        ("baseline_model_response", "baseline_model_response"),
+        ("baseline_model", "baseline_model"),
+        ("dataset", "dataset"),
+    ],
+)

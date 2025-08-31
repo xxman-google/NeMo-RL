@@ -46,11 +46,13 @@ from nemo_rl.environments.metrics import (
 from nemo_rl.environments.utils import chunk_list_to_workers
 from nemo_rl.evals import answer_parsing
 from nemo_rl.evals.grader_model import (
-    OPENAI_SYSTEM_MESSAGE_CHATGPT,
-    QA_GRADER_TEMPLATE,
+    ALPACA2_GRADER_TEMPLATE,
+    ALPACA2_SYSTEM_MESSAGE,
     GeminiGraderModel,
     GptGraderModel,
     GraderModel,
+    OPENAI_SYSTEM_MESSAGE_CHATGPT,
+    QA_GRADER_TEMPLATE
 )
 from nemo_rl.evals.ifeval import instructions_registry
 
@@ -597,6 +599,7 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
             "multilingual_multichoice": MultilingualMultichoiceVerifyWorker,
             "swebench_verified": SweBenchVerifyWorker,
             "simpleqa": GraderVerifyWorker,
+            "alpaca2": Alpaca2VerifyWorker,
         }[worker_type]
         self.workers = [
             worker_cls.options(  # type: ignore # (decorated with @ray.remote)
