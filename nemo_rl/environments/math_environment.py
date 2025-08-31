@@ -538,6 +538,9 @@ class SweBenchVerifyWorker:
         self.end_thinking_token = cfg.get("end_thinking_token")
         self.run_id = cfg.get("run_id", "swebench_verified_oracle_eval")
         self.model_name = cfg.get("model_name")
+        self.swebench_namespace = cfg.get("swebench_namespace", "swebench")
+        if self.swebench_namespace is None:
+            raise ValueError("SWE-Bench namespace must be specified.")
 
     def verify(
         self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
@@ -575,7 +578,7 @@ class SweBenchVerifyWorker:
             max_workers=8,
             run_id=self.run_id,
             timeout=600,
-            namespace="us-central1-docker.pkg.dev/cloud-nas-260507/swebench",
+            namespace=self.swebench_namespace,
         )
 
         results = []
