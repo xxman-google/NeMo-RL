@@ -568,7 +568,6 @@ class SweBenchVerifyWorker:
             predictions[instance[KEY_INSTANCE_ID]] = prediction
             instances.append(instance)
 
-        eval_dir = f"logs/run_evaluation/{self.run_id}/{self.model_name}"
         run_instances(
             predictions=predictions,
             instances=instances,
@@ -581,6 +580,8 @@ class SweBenchVerifyWorker:
             namespace=self.swebench_namespace,
         )
 
+        model_name = self.model_name.replace("/", "__")
+        eval_dir = f"logs/run_evaluation/{self.run_id}/{model_name}"
         results = []
         # Read results from instance results files.
         if not os.path.exists(eval_dir):
