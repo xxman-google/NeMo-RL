@@ -557,12 +557,12 @@ class SweBenchVerifyWorker:
         predictions = {}
         instances = []
         for data, metadata in zip(pred_responses, metadata_list):
-            model_patch = data["response"]
+            model_patch = self._extract_patch(data["response"])
             instance = metadata["instance"]
             prediction = {
                 KEY_INSTANCE_ID: instance[KEY_INSTANCE_ID],
                 KEY_MODEL: self.model_name,
-                KEY_PREDICTION: self._extract_patch(model_patch),
+                KEY_PREDICTION: model_patch,
                 "golden_patch": instance["patch"],
             }
             predictions[instance[KEY_INSTANCE_ID]] = prediction
