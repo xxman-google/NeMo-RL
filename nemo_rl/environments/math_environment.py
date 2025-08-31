@@ -475,6 +475,8 @@ class SweBenchVerifyWorker:
 
     def __init__(self, cfg: MathEnvConfig) -> None:
         self.end_thinking_token = cfg.get("end_thinking_token")
+        self.run_id = cfg.get("run_id", "swebench_verified_oracle_eval")
+        self.model_name = cfg.get("model_name")
 
     def verify(
         self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
@@ -490,20 +492,19 @@ class SweBenchVerifyWorker:
         """
         predictions = {}
         instances = []
-        model_name = "model_name"  # TODO: Placeholder for the model name, should be set appropriately.
-        for response, metadata in zip(pred_responses, metadata_list):
+        for data, metadata in zip(pred_responses, metadata_list):
+            model_patch = data["response"]
             instance = metadata["instance"]
             prediction = {
                 KEY_INSTANCE_ID: instance[KEY_INSTANCE_ID],
-                KEY_MODEL: model_name,
-                KEY_PREDICTION: self._extract_patch(response),
+                KEY_MODEL: self.model_name,
+                KEY_PREDICTION: self._extract_patch(model_patch),
                 "golden_patch": instance["patch"],
             }
             predictions[instance[KEY_INSTANCE_ID]] = prediction
             instances.append(instance)
 
-        run_id = "swebench_verified_oracle_eval"
-        eval_dir = f"logs/run_evaluation/{run_id}/{model_name}"
+        eval_dir = f"logs/run_evaluation/{self.run_id}/{self.model_name}"
         run_instances(
             predictions=predictions,
             instances=instances,
@@ -511,7 +512,7 @@ class SweBenchVerifyWorker:
             clean=True,
             force_rebuild=False,
             max_workers=8,
-            run_id=run_id,
+            run_id=self.run_id,
             timeout=600,
             namespace="us-central1-docker.pkg.dev/cloud-nas-260507/swebench",
         )
@@ -553,9 +554,6 @@ class SweBenchVerifyWorker:
             }
             f.write(json.dumps(report, indent=4))
 
-        print("***************** SWE-Bench Verified Report *****************")
-        print(report)
-        print("*************************************************************")
         return results
 
     def _extract_patch(self, response: str) -> Optional[str]:

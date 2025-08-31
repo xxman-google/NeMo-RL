@@ -13,6 +13,8 @@ generation:
 env:
   math:
     worker_type: "swebench_verified"
+    run_id: "swebench_verified_oracle_eval"
+    model_name: ${generation.model_name}
     num_workers: 1
 
 cluster:
