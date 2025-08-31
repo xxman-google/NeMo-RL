@@ -13,4 +13,4 @@ data:
 env:
   math:
     worker_type: "instruction_following"
-    end_thinking_token: null
+    end_thinking_token: "</think>"

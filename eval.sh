@@ -7,6 +7,7 @@ if [ "$#" -ne 3 ]; then
 fi
 
 enable_thinking=true
+append_think_token_to_user_msg=false
 if [[ $enable_thinking == "true" ]]; then
   max_model_len=32768
   temperature=0.6
@@ -26,20 +27,22 @@ exp_name=$2
 is_megatron=$3
 hf_ckpt_path=$ckpt_path/hf
 
-if [ $is_megatron = "false" ]; then
-  uv run python examples/converters/convert_dcp_to_hf.py \
-  --config $ckpt_path/config.yaml \
-  --dcp-ckpt-path $ckpt_path/policy/weights/ \
-  --hf-ckpt-path $hf_ckpt_path
-else
-  uv run --extra mcore python examples/converters/convert_megatron_to_hf.py \
-  --config $ckpt_path/config.yaml \
-  --megatron-ckpt-path $ckpt_path/policy/weights/iter_0000000 \
-  --hf-ckpt-path $hf_ckpt_path
+if [ ! -d "$hf_ckpt_path" ]; then
+  if [ $is_megatron = "false" ]; then
+    uv run python examples/converters/convert_dcp_to_hf.py \
+    --config $ckpt_path/config.yaml \
+    --dcp-ckpt-path $ckpt_path/policy/weights/ \
+    --hf-ckpt-path $hf_ckpt_path
+  else
+    uv run --extra mcore python examples/converters/convert_megatron_to_hf.py \
+    --config $ckpt_path/config.yaml \
+    --megatron-ckpt-path $ckpt_path/policy/weights/iter_0000000 \
+    --hf-ckpt-path $hf_ckpt_path
+  fi
 fi
 
-benchmarks=("aime2024" "aime2025" "beyond_aime" "math" "math500" "mgsm" "gpqa" "mmlu" "mmlu_pro" "humaneval" "livecodebench_functional" "livecodebench_stdin" "ifeval")
-num_tests_per_prompt=(5 5 5 1 1 1 5 1 1 5 5 5 1)
+benchmarks=("aime2024" "aime2025" "beyond_aime" "math500" "mgsm" "gpqa" "mmlu" "mmlu_pro" "humaneval" "livecodebench_functional" "livecodebench_stdin" "ifeval" "arc_agi")
+num_tests_per_prompt=(5 5 5 1 1 5 1 1 5 5 5 1 5)
 
 len=${#benchmarks[@]}
 
@@ -62,6 +65,8 @@ for ((i=0; i<$len; i++)); do
   wandb_name="$exp_name-$benchmark_name"
 
   uv run examples/run_eval.py --config $config_file \
+  data.append_think_token_to_user_msg=$append_think_token_to_user_msg \
+  env.math.end_thinking_token="</think>" \
   eval.num_tests_per_prompt=$repeats \
   data.dataset_name=$dataset_name \
   generation.stop_token_ids=\[151643,151645\] \

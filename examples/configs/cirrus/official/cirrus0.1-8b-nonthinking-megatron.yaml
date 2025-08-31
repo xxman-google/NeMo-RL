@@ -1,7 +1,7 @@
 # Reference run: https://wandb.ai/gmayanksharan-google/cirrus/runs/w7ww1m7p
 # In order to train with this config, please copy the data from /mnt to your log directory. For example,
-# cp -r /mnt/datasets/cirrus0.0/openr1_math_*qwen3_8b_no_thinking/ $JOB_ID/ray-logs/app_logs/
-# cp -r /mnt/datasets/cirrus0.1/sciq_qwen3_8b_mcq_no_thinking/ $JOB_ID/ray-logs/app_logs/
+# cp -r /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_*qwen3_8b_no_thinking/ $JOB_ID/ray-logs/app_logs/
+# cp -r /gcs/cloud-nas-hns-data/cirrus0.1/sciq_qwen3_8b_mcq_no_thinking/ $JOB_ID/ray-logs/app_logs/
 #
 # Example launch command:
 # uv run examples/run_sft.py --config examples/configs/cirrus/official/cirrus0.1-8b-nonthinking-megatron.yaml \

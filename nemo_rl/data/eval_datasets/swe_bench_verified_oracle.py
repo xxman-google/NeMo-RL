@@ -33,8 +33,10 @@ class SweBenchVerifiedOracleDataset:
         prompt_file: Optional[str] = None,
         system_prompt_file: Optional[str] = None,
     ):
-        ds = load_dataset("jcpagadora/SWE-bench_Verified__style-3__fs-oracle", split="test",
-                          download_mode="force_redownload")
+        ds = load_dataset(
+            "jcpagadora/SWE-bench_Verified__style-3__fs-oracle",
+            split="test",
+        )
         self.rekeyed_ds = ds.map(self._rekey, remove_columns=ds.column_names)
         if _FILTER:
             print(f"Filtering out instances with prompt len > {_MAX_PROMPT_LENGTH} characters.")

@@ -81,6 +81,7 @@ def setup_data(tokenizer: AutoTokenizer, data_config, env_configs, enable_thinki
         raise ValueError(f"Unknown env_type: f{env_type}.")
 
     base_dataset.task_spec.enable_thinking = enable_thinking
+    base_dataset.task_spec.append_think_token_to_user_msg = data_config.get("append_think_token_to_user_msg", False)
     dataset = AllTaskProcessedDataset(
         dataset=rekeyed_ds,
         tokenizer=tokenizer,
