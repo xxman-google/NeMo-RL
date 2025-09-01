@@ -472,8 +472,8 @@ class ArenaHardVerifyWorker:
         self.end_thinking_token = cfg.get("end_thinking_token")
 
         model = cfg.get("grader_model_name", "gemini-2.5-pro")
-        logger = logging.getLogger("arena_hard_verify_worker")
-        logger.setLevel(logging.INFO)
+        self.logger = logging.getLogger("arena_hard_verify_worker")
+        self.logger.setLevel(logging.INFO)
         self.hard_prompt_grader_model = GeminiGraderModel(
             model=model,
             system_message=ARENA_HARD_SYSTEM_MESSAGE,
@@ -586,8 +586,9 @@ class ArenaHardVerifyWorker:
             verdict1 = self._get_verdict_from_grader_response(judge_response_1)
             verdict2 = self._get_verdict_from_grader_response(judge_response_2)
 
+            # Only count the results if both verdicts are valid.
             if not verdict1 or not verdict2:
-                results.append((0.5, baseline_model_response, sample_response))
+                self.logger.warning("Found invalid verdict. Skipping... ")
                 continue
 
             scores1 = self._get_score_from_verdict(verdict1)
@@ -595,7 +596,7 @@ class ArenaHardVerifyWorker:
 
             # score for sample model is 1 - score_for_baseline
             scores = [1.0 - s for s in scores1] + scores2
-            
+
             if not scores:
                 results.append((0.5, baseline_model_response, sample_response))
                 continue

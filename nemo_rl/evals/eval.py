@@ -345,6 +345,7 @@ async def _run_env_eval_impl(
     metric_group_key = env_config.get("metric_group_key", None)
     render_template = {
         "arc_agi": vis_lib.BaseRenderTemplate,
+        "arena_hard": vis_lib.BaseRenderTemplate,
         "math": vis_lib.MathRenderTemplate,
         "mgsm": vis_lib.MathRenderTemplate,
         "python_unit_test_verify": vis_lib.CodeRenderTemplate,
