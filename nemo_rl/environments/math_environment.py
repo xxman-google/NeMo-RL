@@ -14,6 +14,7 @@
 import ast
 import contextlib
 import io
+import json
 import logging
 import os
 import re
@@ -24,6 +25,13 @@ import torch
 from math_verify.errors import TimeoutException
 from math_verify.metric import math_metric
 from math_verify.parser import ExprExtractionConfig, LatexExtractionConfig
+from swebench.harness.run_evaluation import run_instances
+from swebench.harness.reporting import make_run_report
+from swebench.harness.constants import (
+    KEY_INSTANCE_ID,
+    KEY_MODEL,
+    KEY_PREDICTION,
+)
 
 from nemo_rl.data.interfaces import LLMMessageLogType
 from nemo_rl.distributed.batched_data_dict import BatchedDataDict
@@ -522,6 +530,119 @@ class Alpaca2VerifyWorker:
         return results
 
 
+@ray.remote
+class SweBenchVerifyWorker:
+    """Response verifier worker for SweBench problems."""
+
+    def __init__(self, cfg: MathEnvConfig) -> None:
+        self.end_thinking_token = cfg.get("end_thinking_token")
+        self.run_id = cfg.get("run_id", "swebench_verified_oracle_eval")
+        self.model_name = cfg.get("model_name")
+        self.swebench_namespace = cfg.get("swebench_namespace", "swebench")
+        if self.swebench_namespace is None:
+            raise ValueError("SWE-Bench namespace must be specified.")
+
+    def verify(
+        self, pred_responses: list[str], metadata_list: list[MathEnvironmentMetadata]
+    ) -> list[tuple[float, str, str]]:
+        """Run swebench evaluation on the model-generated patches.
+
+        Args:
+            pred_responses: list[str]. The predicted responses from the LLM.
+            metadata_list: list[MathEnvironmentMetadata]. The metadata containing ground truth and other info.
+
+        Returns:
+            list[tuple[float, str, str]]. The rewards, correct answer, and extracted answer for each predicted response.
+        """
+        predictions = {}
+        instances = []
+        for data, metadata in zip(pred_responses, metadata_list):
+            model_patch = self._extract_patch(data["response"])
+            instance = metadata["instance"]
+            prediction = {
+                KEY_INSTANCE_ID: instance[KEY_INSTANCE_ID],
+                KEY_MODEL: self.model_name,
+                KEY_PREDICTION: model_patch,
+                "golden_patch": instance["patch"],
+            }
+            predictions[instance[KEY_INSTANCE_ID]] = prediction
+            instances.append(instance)
+
+        run_instances(
+            predictions=predictions,
+            instances=instances,
+            cache_level="env",
+            clean=True,
+            force_rebuild=False,
+            max_workers=8,
+            run_id=self.run_id,
+            timeout=600,
+            namespace=self.swebench_namespace,
+        )
+
+        model_name = self.model_name.replace("/", "__")
+        eval_dir = f"logs/run_evaluation/{self.run_id}/{model_name}"
+        results = []
+        # Read results from instance results files.
+        if not os.path.exists(eval_dir):
+            raise FileNotFoundError(f"Evaluation directory {eval_dir} does not exist.")
+
+        submitted_instances = []
+        error_instances = []
+        verified_instances = []
+        for instance_id, prediction in predictions.items():
+            instance_result_file = os.path.join(
+                eval_dir, instance_id, "report.json"
+            )
+            if not os.path.exists(instance_result_file):
+                error_instances.append(instance_id)
+                continue
+            submitted_instances.append(instance_id)
+            with open(instance_result_file, "r") as f:
+                instance_report = f.read()
+            score = self._get_score_from_report(instance_id, instance_report)
+            golden_patch = prediction["golden_patch"]
+            model_patch = prediction[KEY_PREDICTION]
+            results.append((score, golden_patch, model_patch))
+            if score == 1.0:
+                verified_instances.append(instance_id)
+        with open(f"{eval_dir}/final_report.txt", "w") as f:
+            report = {
+                "total_instances": len(submitted_instances) + len(error_instances),
+                "submitted_instances": len(submitted_instances),
+                "verified_instances": len(verified_instances),
+                "error_instances": len(error_instances),
+                "submitted_instance_ids": submitted_instances,
+                "verified_instance_ids": verified_instances,
+                "unresolved_instance_ids": [id_ for id_ in submitted_instances if id_ not in verified_instances],
+                "error_instance_ids": error_instances
+            }
+            f.write(json.dumps(report, indent=4))
+
+        return results
+
+    def _extract_patch(self, response: str) -> Optional[str]:
+        if self.end_thinking_token is not None:
+            response = extract_response_after_thinking(
+                response, self.end_thinking_token
+            )
+        pattern = r"<patch>(.*?)</patch>"
+        match = re.search(pattern, response, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        # Check for another possible pattern.
+        pattern = r"```patch(.*?)```"
+        match = re.search(pattern, response, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        return None
+
+    def _get_score_from_report(self, instance_id: str, instance_report: str) -> float:
+        """Parses the instance report and returns whether the patch resolved the issue."""
+        instance_report = json.loads(instance_report)
+        return float(instance_report[instance_id]["resolved"])
+
+      
 @ray.remote(max_restarts=-1, max_task_retries=-1)  # pragma: no cover
 class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
     def __init__(self, cfg: MathEnvConfig):
@@ -539,6 +660,7 @@ class MathEnvironment(EnvironmentInterface[MathEnvironmentMetadata]):
             "math": MathVerifyWorker,
             "mgsm": MGSMVerifyWorker,
             "multilingual_multichoice": MultilingualMultichoiceVerifyWorker,
+            "swebench_verified": SweBenchVerifyWorker,
             "simpleqa": GraderVerifyWorker,
             "alpaca2": Alpaca2VerifyWorker,
         }[worker_type]

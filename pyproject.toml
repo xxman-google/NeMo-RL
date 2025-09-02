@@ -53,6 +53,7 @@ dependencies = [
     "evaluate",
     "absl-py",
     "tqdm",
+    "swebench",
     "openai>=1.0",
     "google-cloud-aiplatform",
     "google-generativeai",

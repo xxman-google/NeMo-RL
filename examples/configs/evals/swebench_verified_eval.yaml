@@ -1,0 +1,22 @@
+# SWE-Bench_Verified evaluation Configuration
+defaults: "eval.yaml"
+
+data:
+  dataset_name: "swebench_verified_oracle"
+
+generation:
+  vllm_cfg:
+    max_model_len: 262144
+    gpu_memory_utilization: 0.9
+    tensor_parallel_size: 2
+
+env:
+  math:
+    worker_type: "swebench_verified"
+    run_id: "swebench_verified_oracle_eval"
+    model_name: ${generation.model_name}
+    num_workers: 1
+
+cluster:
+  gpus_per_node: 8
+  num_nodes: 1
