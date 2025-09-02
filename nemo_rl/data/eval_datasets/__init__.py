@@ -33,6 +33,7 @@ from nemo_rl.data.eval_datasets.mmlu import MMLUDataset
 from nemo_rl.data.eval_datasets.mmlu_pro import MMLUProDataset
 from nemo_rl.data.eval_datasets.numina_math import NuminaMathDataset
 from nemo_rl.data.eval_datasets.openr1_math import OpenR1MathDataset
+from nemo_rl.data.eval_datasets.openr1_math_multilingual import OpenR1MathMultilingualDataset
 from nemo_rl.data.eval_datasets.simpleqa import SimpleQADataset
 from nemo_rl.data.eval_datasets.openr1_verifiable_code import (
     OpenR1VerifiableCodeDataset,
@@ -199,6 +200,10 @@ def load_eval_dataset(data_config):
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
+    elif dataset_name == "openr1_math_multilingual":
+        base_dataset = OpenR1MathMultilingualDataset(
+            system_prompt_file=data_config["system_prompt_file"],
+        )
     elif dataset_name == "openr1_verifiable_code":
         base_dataset = OpenR1VerifiableCodeDataset(
             source=data_config["source"],
@@ -249,6 +254,7 @@ __all__ = [
     "MMLUProDataset",
     "NuminaMathDataset",
     "OpenR1MathDataset",
+    "OpenR1MathMultilingualDataset",
     "OpenR1VerifiableCodeDataset",
     "SciQDataset",
     "Tulu3SftDataset",

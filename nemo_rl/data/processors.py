@@ -39,6 +39,7 @@ def data_processor(
     ],
 ) -> DatumSpec:
     """Process a datum dictionary (directly loaded from dataset) into a DatumSpec for the Math Environment."""
+
     problem = datum_dict[question_key]
     extra_env_info = {}
     for input_key, output_key in extra_env_info_key_maps:
