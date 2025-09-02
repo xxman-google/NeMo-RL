@@ -4,7 +4,7 @@ This dataset is created by translating the original English questions into other
 """
 
 import functools
-import io
+import json
 from typing import Any, Optional
 
 from datasets import Dataset, load_dataset
@@ -12,73 +12,108 @@ from datasets import Dataset, load_dataset
 from nemo_rl.data import processors
 from nemo_rl.data.interfaces import TaskDataSpec
 
-_ALL_LANGUAGES = ["en", "bn", "de", "es", "pt", "it", "fr", "ja", "ko", "ru", "sw", "te", "th", "zh"]
+_LANG_TO_CODE = {
+    'English': 'en',
+    'Bengali': 'bn',
+    'German': 'de',
+    'Spanish': 'es',
+    'Portuguese': 'pt',
+    'Italian': 'it',
+    'French': 'fr',
+    'Japanese': 'ja',
+    'Korean': 'ko',
+    'Russian': 'ru',
+    'Swahili': 'sw',
+    'Telugu': 'te',
+    'Thai': 'th',
+    'Chinese': 'zh',
+}
 
 _LANG_TO_INSTRUCTIONS = {
-    "en": """Solve this math problem. Give the reasoning steps before giving the final answer on the last line by itself in the format of "Answer:". Do not add anything other than the answer after "Answer:".
+    "English": """Solve this math problem. Give the reasoning steps before wrapping the final answer on the last line by \\boxed{{}} tag.
 
 {input}""",
-    "bn": """এই গণিত সমস্যাটি সমাধান করুন। শেষ লাইনে "উত্তর:" বিন্যাসে চূড়ান্ত উত্তর দেওয়ার আগে যুক্তিযুক্ত ধাপগুলো দিন। "উত্তর:" এর পরে উত্তর ছাড়া আর কিছু যোগ করবেন না।
+    "Bengali": """এই গণিত সমস্যাটি সমাধান করুন। চূড়ান্ত উত্তরটি \\boxed{{}} ট্যাগের ভিতরে শেষ লাইনে মোড়ানোর আগে যুক্তিসঙ্গত পদক্ষেপগুলি দিন।
 
 {input}""",
-    "de": """Löse dieses mathematische Problem. Gib die Begründungsschritte an, bevor du die endgültige Antwort auf der letzten Zeile für sich allein im Format "Antwort:" gibst. Füge nichts anderes als die Antwort nach "Antwort:" hinzu.
+    "German": """Lösen Sie diese Matheaufgabe. Geben Sie die logischen Schritte an, bevor Sie die endgültige Antwort in der letzten Zeile in einem \\boxed{{}}-Tag einschließen.
 
 {input}""",
-    "es": """Resuelve este problema matemático. Da los pasos de razonamiento antes de dar la respuesta final en la última línea por sí misma en el formato de "Respuesta:". No añadas nada más que la respuesta después de "Respuesta:".
+    "Spanish": """Resuelva este problema matemático. Dé los pasos de razonamiento antes de encerrar la respuesta final en la última línea dentro de una etiqueta \\boxed{{}}.
 
 {input}""",
-    "pt": """Resolva este problema de matemática. Dê os passos de raciocínio antes de dar a resposta final na última linha, por si só, no formato de "Resposta:". Não adicione nada além da resposta depois de "Resposta:".
+    "Portuguese": """Resolva este problema de matemática. Apresente os passos de raciocínio antes de envolver a resposta final na última linha dentro de uma tag \\boxed{{}}.
 
 {input}""",
-    "it": """Risolvi questo problema di matematica. Fornisci i passaggi del ragionamento prima di dare la risposta finale sull'ultima riga da sola nel formato "Risposta:". Non aggiungere nient'altro oltre alla risposta dopo "Risposta:".
+    "Italian": """Risolvi questo problema di matematica. Fornisci i passaggi del ragionamento prima di racchiudere la risposta finale nell'ultima riga all'interno di un tag \\boxed{{}}.
 
 {input}""",
-    "fr": """Résous ce problème de maths. Donne les étapes de raisonnement avant de donner la réponse finale sur la dernière ligne toute seule au format "Réponse :". N'ajoute rien d'autre que la réponse après "Réponse :".
+    "French": """Résolvez ce problème de mathématiques. Donnez les étapes de raisonnement avant d'encapsuler la réponse finale sur la dernière ligne à l'intérieur d'une balise \\boxed{{}}.
 
 {input}""",
-    "ja": """この数学の問題を解いてください。最終的な答えを「答え：」の形式で最後の行に単独で記載する前に、推論のステップを提示してください。「答え：」の後には答え以外は何も追加しないでください。
+    "Japanese": """この数学の問題を解いてください。最終的な答えを最後の行で \\boxed{{}} タグで囲む前に、論理的な手順を述べてください。
 
 {input}""",
-    "ko": """이 수학 문제를 풀어주세요. 마지막 줄에 "정답:" 형식으로 최종 정답만 표기하기 전에, 추론 과정을 제시해 주세요. "정답:" 뒤에는 정답 외에 아무것도 추가하지 마세요.
+    "Korean": """이 수학 문제를 풀어주세요. 최종 답을 마지막 줄에 \\boxed{{}} 태그 안에 넣기 전에 추론 과정을 제시하세요.
 
 {input}""",
-    "ru": """Решите эту математическую задачу. Представьте шаги рассуждения, прежде чем дать окончательный ответ на последней строке в формате «Ответ:». Не добавляйте ничего, кроме ответа после «Ответ:».
+    "Russian": """Решите эту математическую задачу. Изложите шаги рассуждений, прежде чем заключать окончательный ответ в последней строке внутри тега \\boxed{{}}.
 
 {input}""",
-    "sw": """Tatua tatizo hili la hesabu. Toa hatua za hoja kabla ya kutoa jibu la mwisho kwenye mstari wa mwisho peke yake katika muundo wa "Jibu:". Usiongeze chochote isipokuwa jibu baada ya "Jibu:".
+    "Swahili": """Tatua shida hii ya hesabu. Toa hatua za hoja kabla ya kufunga jibu la mwisho kwenye mstari wa mwisho ndani ya lebo ya \\boxed{{}}.
 
 {input}""",
-    "te": """ఈ గణిత సమస్యను పరిష్కరించండి. చివరి పంక్తిలో "జవాబు:" ఆకృతిలో అంతిమ జవాబును ఇవ్వడానికి ముందు తార్కిక దశలను ఇవ్వండి. "జవాబు:" తర్వాత జవాబు తప్ప మరేమీ జోడించవద్దు.
+    "Telugu": """ఈ గణిత సమస్యను పరిష్కరించండి. చివరి సమాధానాన్ని చివరి పంక్తిలో \\boxed{{}} ట్యాగ్ లోపల పెట్టే ముందు తార్కిక దశలను ఇవ్వండి.
 
 {input}""",
-    "th": """แก้โจทย์คณิตศาสตร์นี้ แสดงขั้นตอนการให้เหตุผลก่อนที่จะให้คำตอบสุดท้ายในบรรทัดสุดท้ายเพียงบรรทัดเดียวในรูปแบบ "คำตอบ:" ห้ามเพิ่มสิ่งอื่นใดนอกจากคำตอบหลัง "คำตอบ:"
+    "Thai": """แก้โจทย์คณิตศาสตร์นี้ ให้ขั้นตอนการให้เหตุผลก่อนห่อคำตอบสุดท้ายไว้ในบรรทัดสุดท้ายภายในแท็ก \\boxed{{}}.
 
 {input}""",
-    "zh": """解决这个数学问题。在最后一行给出答案前，请提供推理步骤。最后一行应该以 "答案: " 的形式独立给出答案。在 "答案：" 后不要添加除答案之外的任何内容。
+    "Chinese": """解决这道数学题。在最后一行将最终答案放在 \\boxed{{}} 标签中之前，给出推理步骤。
 
 {input}""",
 }
 
 
+def get_prompt_and_response(messages: list[dict[str, str]]) -> tuple[str, str]:
+    prompts = []
+    responses = []
+    for msg in messages:
+        if msg["role"] == "user":
+            prompts.append(msg["parts"])
+        elif msg["role"] == "assistant":
+            responses.append(msg["parts"])
+    return prompts[0], responses[0]
+
+
 class OpenR1MathMultilingualDataset:
     def __init__(self, system_prompt_file: Optional[str] = None):
-        ds = load_dataset("json", data_files="", split="train")
-        self.rekeyed_ds = ds.map(self._rekey, remove_columns=ds.column_names)
+        rows = []
+        with open('/tmp/logs/translated_math_conversations.jsonl', 'r') as fid:
+            for line in fid:
+                data = json.loads(line.strip())
+                if data['question_type'] != 'math-word-problem':
+                    continue
+                row = dict()
+                problem, _ = get_prompt_and_response(data['translated_conversation'])
+                lang = data['language']
+                row['problem'] = _LANG_TO_INSTRUCTIONS[lang].format(input=problem)
+                row['expected_answer'] = data['final_answer']
+                row['lang'] = _LANG_TO_CODE[lang]
+                rows.append(row)
+        self.rekeyed_ds = Dataset.from_list(rows)
         self.task_spec = TaskDataSpec(
-            task_name="openr1_math_multilingual",
+            task_name="OpenR1MathMultilingual",
             prompt_file=None,
             system_prompt_file=system_prompt_file,
         )
-        self.processor = processors.math_rejection_sampling_processor
+        self.processor = functools.partial(
+            processors.data_processor,
+            question_key="problem",
+            extra_env_info_key_maps=[
+                ("expected_answer", "ground_truth"),
+                ("lang", "lang"),
+                ("problem", "problem"),
+            ],
+        )
 
-    def _get_problem(self, messages) -> str:
-        problems = [msg["parts"] for msg in messages if msg["role"] == "user"]
-        return problems[0]
-
-    def _rekey(self, data: dict[str, Any]):
-        lang = data["lang"]
-        return {
-            "problem": _LANG_TO_INSTRUCTIONS[lang].format(input=slf._get_problem(data["translated_conversation"])),
-            "expected_answer": data["final_answer"],
-            "lang": lang,
-        }

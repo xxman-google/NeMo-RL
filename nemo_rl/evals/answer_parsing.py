@@ -65,12 +65,15 @@ MULTILINGUAL_ANSWER_REGEXES = [
     r"Àṣàyàn\s*:",
 ]
 LANG_TO_ANSWER_PREFIX = {
-    "en": "Answer",
     "bn": "উত্তর",
+    "en": "Answer",
     "de": "Antwort",
     "es": "Respuesta",
     "fr": "Réponse",
+    "it": "Risposta",
     "ja": "答え",
+    "ko": "정답",
+    "pt": "Resposta",
     "ru": "Ответ",
     "sw": "Jibu",
     "te": "సమాధానం",
