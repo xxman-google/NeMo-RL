@@ -33,7 +33,6 @@ class DeepCoderPreviewDataset:
                 tests = json.loads(example["tests"])
                 return len(tests) > 0 and tests[0]["type"] == "stdin_stdout"
             ds = ds.filter(_filter_primeintellect)
-            ds = ds.select([0])  # only keep first 10 examples for now
 
         self.rekeyed_ds = ds.map(self._rekey, remove_columns=ds.column_names)
         self.task_spec = TaskDataSpec(
