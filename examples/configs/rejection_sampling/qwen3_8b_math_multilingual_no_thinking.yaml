@@ -1,0 +1,14 @@
+# Rejection sampling configuration for Qwen3 8B model (no-thinking mode)
+
+defaults: "qwen3_14b_math_no_thinking.yaml"
+
+rejection_sampling:
+  num_tests_per_prompt: 10
+  metric: "pass@1,5,10"
+
+generation:
+  temperature: 0.7
+  top_p: 0.8
+  model_name: "Qwen/Qwen3-8B"
+  vllm_cfg:
+    max_model_len: 38912

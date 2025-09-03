@@ -252,6 +252,7 @@ async def _run_env_rejection_sampling_impl(
 
         # problems are prompts without chat template
         problems = []
+        langs = []
         for info in batch["extra_env_info"]:
             problem = info["problem"]
             if "options" in info:
@@ -259,6 +260,10 @@ async def _run_env_rejection_sampling_impl(
                     prompt="", question=problem, options=info["options"]
                 )
             problems.append(problem)
+            if "lang" in info:
+                langs.append(info["lang"])
+            else:
+                langs.append("en")
 
         # generate by vllm
         inputs = BatchedDataDict({"prompts": prompts})
@@ -285,18 +290,21 @@ async def _run_env_rejection_sampling_impl(
         rewards = itertools.batched(env_return.rewards.tolist(), num_tests_per_prompt)
         output_texts = itertools.batched(output_texts, num_tests_per_prompt)
         problems = itertools.batched(problems, num_tests_per_prompt)
+        langs = itertools.batched(langs, num_tests_per_prompt)
         prompt_lengths = itertools.batched(prompt_lengths, num_tests_per_prompt)
         generation_lengths = itertools.batched(generation_lengths, num_tests_per_prompt)
         for (
             chunk_rewards,
             chunk_outputs,
             chunk_problems,
+            chunk_langs,
             chunk_prompt_lengths,
             chunk_generation_lengths,
         ) in zip(
             rewards,
             output_texts,
             problems,
+            langs,
             prompt_lengths,
             generation_lengths,
         ):
@@ -316,6 +324,7 @@ async def _run_env_rejection_sampling_impl(
                     "num_corrects": reward_sum,
                     "prompt_length": chunk_prompt_lengths[last_idx],
                     "generation_length": chunk_generation_lengths[last_idx],
+                    "lang": chunk_langs[last_idx],
                 }
             )
 
