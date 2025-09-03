@@ -118,7 +118,7 @@ def code_processor(
     problem = datum_dict["question"]
     extra_env_info = {
         "problem": problem,
-        # It seems there is no clean way to convert str to list[dict] in datasets, thus bypass the issue here.
+        # In case the previous code failed to convert str to list of dict, perform the conversion here.
         "tests": json.loads(datum_dict["tests"]) if isinstance(datum_dict["tests"], str) else datum_dict["tests"],
         "working_dir": datum_dict["code_exe_dir"],
     }
