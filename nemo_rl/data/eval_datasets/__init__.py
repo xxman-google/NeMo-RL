@@ -18,6 +18,7 @@ from nemo_rl.data.eval_datasets.aime2025 import AIME2025Dataset
 from nemo_rl.data.eval_datasets.alpaca2 import Alpaca2Dataset
 from nemo_rl.data.eval_datasets.arc_agi import ArcAgiDataset
 from nemo_rl.data.eval_datasets.beyond_aime import BeyondAIMEDataset
+from nemo_rl.data.eval_datasets.deepcoder_preview import DeepCoderPreviewDataset
 from nemo_rl.data.eval_datasets.deepscaler import DeepScaleRDataset
 from nemo_rl.data.eval_datasets.gpqa import GPQADataset
 from nemo_rl.data.eval_datasets.gsm8k import Gsm8kDataset
@@ -206,6 +207,13 @@ def load_eval_dataset(data_config):
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
+    elif dataset_name == "deepcoder_preview":
+        base_dataset = DeepCoderPreviewDataset(
+            subset=data_config["subset"],
+            code_exe_dir=data_config["code_exe_dir"],
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
     elif dataset_name == "arc_agi":
         base_dataset = ArcAgiDataset(
             split=data_config.get("split", "evaluation"),
@@ -234,6 +242,7 @@ __all__ = [
     "AIME2025Dataset",
     "Alpaca2Dataset",
     "BeyondAIMEDataset",
+    "DeepCoderPreviewDataset",
     "DeepScaleRDataset",
     "GPQADataset",
     "Gsm8kDataset",

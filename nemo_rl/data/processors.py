@@ -15,6 +15,7 @@
 """Contains data processors for evaluation."""
 
 import functools
+import json
 from typing import Any, cast
 
 import torch
@@ -117,7 +118,8 @@ def code_processor(
     problem = datum_dict["question"]
     extra_env_info = {
         "problem": problem,
-        "tests": datum_dict["tests"],
+        # It seems there is no clean way to convert str to list[dict] in datasets, thus bypass the issue here.
+        "tests": json.loads(datum_dict["tests"]) if isinstance(datum_dict["tests"], str) else datum_dict["tests"],
         "working_dir": datum_dict["code_exe_dir"],
     }
     if datum_dict.get("base_imports"):

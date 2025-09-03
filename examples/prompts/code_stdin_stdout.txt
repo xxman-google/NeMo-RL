@@ -1,0 +1,5 @@
+{}
+You should use `sys.stdin` to get input line by line from stdin. Implement a function called `main()` which orchastrates the solution by reading inputs from stdin and writing the answer to stdout. Feel free to use additional functions as necessary. Next do NOT forget to call `main` function at the end of the program otherwise you will not be awarded any points. Please wrap the code in a markdown code block, like this:
+```python
+# your code here
+```
