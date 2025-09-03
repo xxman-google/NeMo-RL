@@ -1,0 +1,31 @@
+#!/bin/bash
+
+dataset_name="openr1_math_multilingual"
+
+model_names=("qwen3_8b_math_multilingual_thinking" "qwen3_14b_math_multilingual_thinking")
+
+for model_name in "${model_names[@]}"; do
+  config_path="examples/configs/rejection_sampling/${model_name}.yaml"
+  echo "Reading from ${config_path}"
+  if [[ "$model_name" == *"no_thinking" ]]; then
+    max_model_len=8192
+  else
+    max_model_len=32768
+  fi
+
+  output_dir="${LOCAL_LOG_DIR_IN_CONTAINER}/${dataset_name}_${model_name}"
+  echo "writing results to $output_dir"
+  uv run examples/run_rejection_sampling.py \
+  --config $config_path \
+  generation.num_prompts_per_step=-1 \
+  generation.vllm_cfg.max_model_len=$max_model_len \
+  generation.vllm_cfg.tensor_parallel_size=1 \
+  cluster.gpus_per_node=$GPUS_PER_NODE \
+  cluster.num_nodes=$NNODES \
+  logger.log_dir=$LOCAL_LOG_DIR_IN_CONTAINER/ \
+  logger.output_dir=$output_dir \
+  logger.wandb.name="${model_name}-${dataset_name}" \
+  data.dataset_name=$dataset_name \
+  sleep 20
+
+done
