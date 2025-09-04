@@ -39,7 +39,7 @@ policy:
   train_micro_batch_size: 2
   logprob_batch_size: 1
   max_total_sequence_length: 32768
-  precision: bfloat16
+  precision: "bfloat16"
 
   dtensor_cfg:
     enabled: false
@@ -110,6 +110,7 @@ policy:
   sequence_packing:
     enabled: True
     train_mb_tokens: ${mul:${policy.max_total_sequence_length}, ${policy.train_micro_batch_size}}
+    logprob_mb_tokens: ${mul:${policy.max_total_sequence_length}, ${policy.train_micro_batch_size}}
     algorithm: "modified_first_fit_decreasing"
     sequence_length_round: 64
 

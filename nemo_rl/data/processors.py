@@ -59,7 +59,9 @@ def data_processor(
             add_generation_prompt=False,
             add_special_tokens=False,
         )
-        sys_prompt["token_ids"] = tokenizer(sys, return_tensors="pt")["input_ids"][0]
+        sys_prompt["token_ids"] = tokenizer(
+            sys, return_tensors="pt", add_special_tokens=False
+        )["input_ids"][0]
         message_log.append(sys_prompt)
 
     # user prompt
@@ -254,7 +256,9 @@ def multichoice_qa_processor(
             add_generation_prompt=False,
             add_special_tokens=False,
         )
-        sys_prompt["token_ids"] = tokenizer(sys, return_tensors="pt")["input_ids"][0]
+        sys_prompt["token_ids"] = tokenizer(
+            sys, return_tensors="pt", add_special_tokens=False
+        )["input_ids"][0]
         message_log.append(sys_prompt)
 
     # user prompt
@@ -275,7 +279,9 @@ def multichoice_qa_processor(
         add_special_tokens=False,
         enable_thinking=task_data_spec.enable_thinking,
     )
-    user_message["token_ids"] = tokenizer(message, return_tensors="pt")["input_ids"][0]
+    user_message["token_ids"] = tokenizer(
+        message, return_tensors="pt", add_special_tokens=False
+    )["input_ids"][0]
     user_message["content"] = message
     message_log.append(user_message)
 

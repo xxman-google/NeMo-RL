@@ -36,7 +36,7 @@ uv run examples/run_grpo_math.py \
     2>&1 | tee $RUN_LOG
 
 # Convert tensorboard logs to json
-uv run tests/json_dump_tb_logs.py $LOG_DIR --output_path $JSON_METRICS --allow-conflicts
+uv run tests/json_dump_tb_logs.py $LOG_DIR --output_path $JSON_METRICS
 
 # Only run metrics if the target step is reached
 if [[ $(jq 'to_entries | .[] | select(.key == "train/loss") | .value | keys | map(tonumber) | max' $JSON_METRICS) -ge $MAX_STEPS ]]; then
@@ -65,4 +65,3 @@ cat ${RUN_LOG}.aime-24k       | grep "score=" | sed 's/.*score=\([^ ]*\).*/{"sco
  
 uv run tests/check_metrics.py ${RUN_LOG}-24k-metric.json \
   'data["score"] >= 0.2396'
-
