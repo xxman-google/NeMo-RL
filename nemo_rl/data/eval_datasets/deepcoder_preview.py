@@ -10,7 +10,7 @@ from nemo_rl.data import processors
 from nemo_rl.data.interfaces import TaskDataSpec
 from typing import Any, Literal, Optional
 
-_TEST_LENGTH_LIMIT = 50000000
+_TEST_LENGTH_LIMIT = 10000000
 
 class DeepCoderPreviewDataset:
     def __init__(
