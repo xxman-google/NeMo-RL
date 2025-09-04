@@ -39,7 +39,6 @@ def data_processor(
     ],
 ) -> DatumSpec:
     """Process a datum dictionary (directly loaded from dataset) into a DatumSpec for the Math Environment."""
-
     problem = datum_dict[question_key]
     extra_env_info = {}
     for input_key, output_key in extra_env_info_key_maps:
@@ -139,7 +138,7 @@ def code_processor(
             add_generation_prompt=False,
             add_special_tokens=False,
         )
-        sys_prompt["token_ids"] = tokenizer(sys, return_tensors="pt")["input_ids"][0]
+        sys_prompt["token_ids"] = tokenizer(sys, return_tensors="pt", add_special_tokens=False)["input_ids"][0]
         message_log.append(sys_prompt)
 
     # user prompt
@@ -158,7 +157,7 @@ def code_processor(
         add_special_tokens=False,
         enable_thinking=task_data_spec.enable_thinking,
     )
-    user_message["token_ids"] = tokenizer(message, return_tensors="pt")["input_ids"][0]
+    user_message["token_ids"] = tokenizer(message, return_tensors="pt", add_special_tokens=False)["input_ids"][0]
     user_message["content"] = message
     message_log.append(user_message)
 
@@ -202,7 +201,7 @@ def construct_multichoice_prompt(
 
 
 def _stringfy_list(matrix: list[list[int]]) -> str:
-    return '[' + ',\n'.join([str(row) for row in matrix]) + ']'
+    return "[" + ",\n".join([str(row) for row in matrix]) + "]"
 
 
 def _construct_arc_agi_prompt(
@@ -325,7 +324,9 @@ def arc_agi_processor(
             add_generation_prompt=False,
             add_special_tokens=False,
         )
-        sys_prompt["token_ids"] = tokenizer(sys, return_tensors="pt")["input_ids"][0]
+        sys_prompt["token_ids"] = tokenizer(
+            sys, return_tensors="pt", add_special_tokens=False
+        )["input_ids"][0]
         message_log.append(sys_prompt)
 
     # user prompt
@@ -347,7 +348,9 @@ def arc_agi_processor(
         add_special_tokens=False,
         enable_thinking=task_data_spec.enable_thinking,
     )
-    user_message["token_ids"] = tokenizer(message, return_tensors="pt")["input_ids"][0]
+    user_message["token_ids"] = tokenizer(
+        message, return_tensors="pt", add_special_tokens=False
+    )["input_ids"][0]
     user_message["content"] = message
     message_log.append(user_message)  # pyrefly: ignore
 
