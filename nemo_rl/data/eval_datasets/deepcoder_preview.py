@@ -26,8 +26,8 @@ class DeepCoderPreviewDataset:
                           name=subset,
                           split="train")
         ds = ds.filter(lambda x: len(x["tests"]) < _TEST_LENGTH_LIMIT)
-        ds = ds.map(self._transform_tests)
         ds = ds.filter(self._filter_keep_stdio)
+        ds = ds.map(self._transform_tests)
         self.rekeyed_ds = ds.map(self._rekey, remove_columns=ds.column_names)
         self.task_spec = TaskDataSpec(
             task_name="DeepCoderPreview",
@@ -36,15 +36,8 @@ class DeepCoderPreviewDataset:
         )
         self.processor = processors.code_processor
 
-    def _transform_tests(self, example: dict[str, Any]):
-        tests = json.loads(example["tests"])
-        if self.subset == "taco":
-            # tests now is a dict
-            tests = [{"input": i, "output": o} for i, o in zip(tests["inputs"], tests["outputs"])]
-        return {"tests": tests}
-
     def _filter_keep_stdio(self, example: dict[str, Any]):
-        tests = example["tests"]
+        tests = json.loads(example["tests"])
         if self.subset == "lcbv5":
             # tests is a list of dict
             return len(tests) > 0 and tests[0]["testtype"] == "stdin"
@@ -54,6 +47,13 @@ class DeepCoderPreviewDataset:
         elif self.subset == "taco":
             # tests is a dict
             return len(tests) > 0 and "fn_name" not in tests
+        
+    def _transform_tests(self, example: dict[str, Any]):
+        tests = json.loads(example["tests"])
+        if self.subset == "taco":
+            # tests now is a dict
+            tests = [{"input": i, "output": o} for i, o in zip(tests["inputs"], tests["outputs"])]
+        return {"tests": tests}
     
     def _rekey(self, example: dict[str, Any]):
         return {
