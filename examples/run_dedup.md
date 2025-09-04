@@ -16,7 +16,7 @@ Enabled a Python pipeline for analyzing and deduplicating a dataset based on sem
 
 If running with docker in interative mode, see an example command in dedup.sh
 ```
-uv run /examples/dedup_run_pip.py \
+uv run /examples/run_dedup.py \
 --data_path /data/cirrus0.0/openr1_math_amc_aime_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet \
 --output_dir ./dedup \
 --model_name all-MiniLM-L6-v2 \
@@ -29,7 +29,7 @@ If not running with docker, to run the pipeline, execute the run_dedup.py script
 
 Example Command
 ```
-python run_dedup.py
+python /examples/run_dedup.py
 ```
 This will perform the following actions:
 - Load the default dataset.
