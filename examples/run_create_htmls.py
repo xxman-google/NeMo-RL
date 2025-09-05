@@ -43,17 +43,18 @@ def main(_):
     logger = Logger(logger_config)
     tokenizer = AutoTokenizer.from_pretrained(_TOKENIZER.value)
     ds = load_dataset("parquet", data_files=_INPUT_PARQUET_FILES.value, split="train")
-    location, num_samples = _WHICH_SAMPLES.value.split("_")
-    num_samples = int(num_samples)
-    if location == "first":
-        messages = ds["messages"][:num_samples]
-    elif location == "last":
-        messages = ds["messages"][-num_samples:]
-    elif location == "random":
-        ds.shuffle()
-        messages = ds["messages"][:num_samples]
-    else:
-        raise ValueError(f"Invalid arg for `which_samples` {_WHICH_SAMPLES.value}.")
+    messages = ds["messages"]
+    # location, num_samples = _WHICH_SAMPLES.value.split("_")
+    # num_samples = int(num_samples)
+    # if location == "first":
+    #     messages = ds["messages"][:num_samples]
+    # elif location == "last":
+    #     messages = ds["messages"][-num_samples:]
+    # elif location == "random":
+    #     ds.shuffle()
+    #     messages = ds["messages"][:num_samples]
+    # else:
+    #     raise ValueError(f"Invalid arg for `which_samples` {_WHICH_SAMPLES.value}.")
     htmls = []
     generation_lengths = []
     for msg in messages:

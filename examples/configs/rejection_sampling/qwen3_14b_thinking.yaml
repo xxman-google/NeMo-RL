@@ -3,13 +3,14 @@
 defaults: "qwen3_14b_no_thinking.yaml"
 
 rejection_sampling:
-  num_tests_per_prompt: 3
-  metric: "pass@1,3"
+  num_tests_per_prompt: 5
+  metric: "pass@5,5"
 
 generation:
   temperature: 0.6
   top_p: 0.95
-  enable_thinking: true
+  enable_thinking: false
+  # model_name: "Qwen/Qwen3-8B"
   vllm_cfg:
     max_model_len: 38912
 
@@ -26,4 +27,4 @@ env:
 
 logger:
   log_dir: "logs"  # Base directory for all logs
-  output_dir: "${logger.log_dir}/${data.dataset_name}/thinking_without_extra_prompt_large"
+  output_dir: "${logger.log_dir}/${data.dataset_name}/qwen3-14b-non-thinking-easy"

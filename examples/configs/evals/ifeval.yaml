@@ -10,7 +10,7 @@ env:
     worker_type: "instruction_following"
 
 generation:
-  model_name: "/home/tangyoubao_google_com/LLaMA-Factory/saves/qwen3-14b/full/fa2_liger_fsdp_packing"
-  enable_thinking: false
+  model_name: "/home/tangyoubao_google_com/nemo-rl/results/qwen3_8b_both_8192_postfix/step_8562/hf"
+  enable_thinking: true
   vllm_cfg:
-    max_model_len: 4096
+    max_model_len: 8192
