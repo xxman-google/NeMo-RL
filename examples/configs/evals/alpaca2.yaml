@@ -20,7 +20,7 @@ env:
     num_workers: 1
     worker_type: "alpaca2"
     grader_model_name: "gpt-4-1106-preview"
-    grader_batch_size: 25
+    grader_batch_size: 805
     grader_max_tokens: 1
     grader_temperature: 1
     grader_logprobs: true

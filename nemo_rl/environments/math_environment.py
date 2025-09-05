@@ -478,7 +478,7 @@ class Alpaca2VerifyWorker:
             self.grader_model = GptGraderModel(
                 model=model,
                 api_key=cfg.get("grader_api_key", os.getenv("OPENAI_API_KEY")),
-                system_message=cfg.get("grader_system_message",ALPACA2_SYSTEM_MESSAGE),
+                system_message=cfg.get("grader_system_message", ALPACA2_SYSTEM_MESSAGE),
                 temperature=cfg.get("grader_temperature", 1.0),
                 max_tokens=cfg.get("grader_max_tokens", 1),
                 logprobs=cfg.get("grader_logprobs", 1),
@@ -488,7 +488,7 @@ class Alpaca2VerifyWorker:
             self.grader_model = GeminiGraderModel(
                 model=model,
                 api_key=cfg.get("grader_api_key", os.getenv("GEMINI_API_KEY")),
-                system_message=cfg.get("grader_system_message",ALPACA2_SYSTEM_MESSAGE),
+                system_message=cfg.get("grader_system_message", ALPACA2_SYSTEM_MESSAGE),
                 temperature=cfg.get("grader_temperature", 1.0),
                 max_tokens=cfg.get("grader_max_tokens", 1),
             )
