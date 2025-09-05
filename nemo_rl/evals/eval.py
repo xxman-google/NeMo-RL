@@ -464,14 +464,14 @@ async def _run_env_eval_impl(
             )
         elif metric == "length_controlled_winrate":
             annotations = []
-            for response, verdict, observation in zip(
+            for response, judge_prefers_sample, observation in zip(
                 output_texts,
                 rewards,
                 env_return.observations,
             ):
                 golden_response = observation.get("correct_answer", None)
                 annotation = {
-                    "preference": 2 if verdict else 1,
+                    "preference": 2 if judge_prefers_sample else 1,
                     "annotator": master_config["env"]["math"]["grader_model_name"],
                     "generator_1": "gpt4_1106_preview",
                     "generator_2": master_config["generation"]["model_name"],

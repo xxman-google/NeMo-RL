@@ -1,10 +1,11 @@
-import time
+import asyncio
 from dataclasses import dataclass
+import time
 from typing import Any
 
 import os
 import openai
-from openai import OpenAI
+from openai import AsyncOpenAI, OpenAI
 import google.generativeai as genai
 from google.api_core import exceptions as google_api_exceptions
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
@@ -168,6 +169,7 @@ class GptGraderModel(GraderModel):
         top_logprobs: int = 5
     ):
         self.client = OpenAI(api_key=api_key)
+        self.async_client = AsyncOpenAI(api_key=api_key)
         self.model = model
         self.system_message = system_message
         self.temperature = temperature
@@ -193,6 +195,49 @@ class GptGraderModel(GraderModel):
 
     def _handle_text(self, text: str):
         return {"type": "text", "text": text}
+
+    async def acall(self, message_list: MessageList) -> GraderResponse:
+        if self.system_message:
+            message_list = [
+                self.pack_message("system", self.system_message)
+            ] + message_list
+        trial = 0
+        while True:
+            try:
+                response = await self.async_client.chat.completions.create(
+                    model=self.model,
+                    messages=message_list,
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens,
+                    logprobs=self.logprobs,
+                    top_logprobs=self.top_logprobs,
+                )
+                content = response.choices[0].message.content
+                if content is None:
+                    raise ValueError("OpenAI API returned empty response; retrying")
+                
+                return GraderResponse(
+                    response_text=content,
+                    response_metadata={"usage": response.usage},
+                    actual_queried_message_list=message_list,
+                )
+            # NOTE: BadRequestError is triggered once for MMMU, please uncomment if you are reruning MMMU
+            except openai.BadRequestError as e:
+                print("Bad Request Error", e)
+                return GraderResponse(
+                    response_text="No response (bad request).",
+                    response_metadata={"usage": None},
+                    actual_queried_message_list=message_list,
+                )
+            except Exception as e:
+                exception_backoff = 2**trial  # expontial back off
+                print(f"[Retry {trial}] Exception occurred: {type(e).__name__}: {e}")
+                print(
+                    f"Rate limit exception so wait and retry {trial} after {exception_backoff} sec",
+                    e,
+                )
+                await asyncio.sleep(exception_backoff)
+                trial += 1
 
     def __call__(self, message_list: MessageList) -> GraderResponse:
         if self.system_message:

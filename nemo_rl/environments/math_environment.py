@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import ast
+import asyncio
 import contextlib
 import io
 import logging
@@ -21,6 +22,7 @@ from typing import Any, NotRequired, Optional, TypedDict
 
 import ray
 import torch
+import tqdm
 from math_verify.errors import TimeoutException
 from math_verify.metric import math_metric
 from math_verify.parser import ExprExtractionConfig, LatexExtractionConfig
@@ -468,23 +470,30 @@ class Alpaca2VerifyWorker:
     def __init__(self, cfg: MathEnvConfig) -> None:
         model = cfg.get("grader_model_name", "gpt-4-1106-preview")
         self.grader_model = None
-        logger = logging.getLogger("alpaca2_verify_worker")
-        logger.setLevel(logging.INFO)
-        logger.info(f"Initialized Grader Model: {model})")
-        assert model.startswith("gpt"), (
-            "Alpaca Eval 2.0 requires 'gpt-4-1106-preview' to be the grader model."
-        )
-        self.grader_model = GptGraderModel(
-            model=model,
-            api_key=cfg.get("grader_api_key", os.getenv("OPENAI_API_KEY")),
-            system_message=cfg.get("grader_system_message",ALPACA2_SYSTEM_MESSAGE),
-            temperature=cfg.get("grader_temperature", 1.0),
-            max_tokens=cfg.get("grader_max_tokens", 1),
-            logprobs=cfg.get("grader_logprobs", 1),
-            top_logprobs=cfg.get("grader_top_logprobs", 5),
-        )
+        self.logger = logging.getLogger("alpaca2_verify_worker")
+        self.logger.setLevel(logging.INFO)
+        self.logger.info(f"Initialized Grader Model: {model})")
+        self.batch_size = cfg.get("grader_batch_size", 25)
+        if model.startswith("gpt"):
+            self.grader_model = GptGraderModel(
+                model=model,
+                api_key=cfg.get("grader_api_key", os.getenv("OPENAI_API_KEY")),
+                system_message=cfg.get("grader_system_message",ALPACA2_SYSTEM_MESSAGE),
+                temperature=cfg.get("grader_temperature", 1.0),
+                max_tokens=cfg.get("grader_max_tokens", 1),
+                logprobs=cfg.get("grader_logprobs", 1),
+                top_logprobs=cfg.get("grader_top_logprobs", 5),
+            )
+        elif model.startswith("gemini"):
+            self.grader_model = GeminiGraderModel(
+                model=model,
+                api_key=cfg.get("grader_api_key", os.getenv("GEMINI_API_KEY")),
+                system_message=cfg.get("grader_system_message",ALPACA2_SYSTEM_MESSAGE),
+                temperature=cfg.get("grader_temperature", 1.0),
+                max_tokens=cfg.get("grader_max_tokens", 1),
+            )
 
-    def _grade_sample(self, prompt: str, baseline_model_response: str, sample_response: str) -> str:
+    async def _grade_sample(self, prompt: str, baseline_model_response: str, sample_response: str) -> str:
         grader_prompt = ALPACA2_GRADER_TEMPLATE.format(
             instruction=prompt,
             output_1=baseline_model_response,
@@ -493,10 +502,21 @@ class Alpaca2VerifyWorker:
         prompt_messages = [
             self.grader_model.pack_message(content=grader_prompt, role="user")
         ]
-        grader_response = self.grader_model(prompt_messages)
+        grader_response = await self.grader_model.acall(prompt_messages)
         return grader_response.response_text
 
-    def verify(
+    async def _grade_batch(self, batch_data):
+        tasks = [
+            self._grade_sample(
+                data["prompt"],
+                str(metadata["baseline_model_response"]),
+                data["response"],
+            )
+            for data, metadata in batch_data
+        ]
+        return await asyncio.gather(*tasks)
+
+    async def verify(
         self, pred_data: list[dict[str, str]], metadata_list: list[MathEnvironmentMetadata]
     ) -> list[tuple[float, str, str]]:
         """Verify the correctness of the predicted responses against the ground truth.
@@ -507,18 +527,31 @@ class Alpaca2VerifyWorker:
             list[tuple[float, str, str]]. The rewards, baseline response, and model sample response for each instance.
         """
         results = []
-        for data, metadata in zip(pred_data, metadata_list):
-            prompt = data["prompt"]
-            sample_response = data["response"]
-            baseline_model_response = str(metadata["baseline_model_response"])
-            verdict = self._grade_sample(prompt, baseline_model_response, sample_response)
-            if verdict not in ["m", "M"]:
-                logging.warning(
-                    f"Unexpected verdict from grader model: {verdict}. Expected 'm' or 'M'."
+        combined_data = list(zip(pred_data, metadata_list))
+        self.logger.info(
+            f"Grading {len(combined_data)} samples in batches of {self.batch_size}"
+        )
+        for i in tqdm.tqdm(
+            range(0, len(combined_data), self.batch_size), desc="Grading batches"
+        ):
+            batch = combined_data[i : i + self.batch_size]
+            verdicts = await self._grade_batch(batch)
+
+            for (data, metadata), verdict in zip(batch, verdicts):
+                if verdict not in ["m", "M"]:
+                    self.logger.warning(
+                        f"Unexpected verdict from grader model: {verdict}. Expected 'm' or 'M'."
+                    )
+                    continue
+                score = 1.0 if verdict == "M" else 0.0
+                results.append(
+                    (
+                        score,
+                        str(metadata["baseline_model_response"]),
+                        data["response"],
+                    )
                 )
-                continue
-            score = verdict == "M"
-            results.append((score, baseline_model_response, sample_response))
+            self.logger.info(f"Processed batch {i // self.batch_size + 1}")
         return results
 
 
