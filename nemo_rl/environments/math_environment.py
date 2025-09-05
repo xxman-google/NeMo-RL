@@ -594,15 +594,16 @@ class SweBenchVerifyWorker:
             instance_result_file = os.path.join(
                 eval_dir, instance_id, "report.json"
             )
+            golden_patch = prediction["golden_patch"]
+            model_patch = prediction[KEY_PREDICTION]
             if not os.path.exists(instance_result_file):
                 error_instances.append(instance_id)
+                results.append((0, golden_patch, model_patch))
                 continue
             submitted_instances.append(instance_id)
             with open(instance_result_file, "r") as f:
                 instance_report = f.read()
             score = self._get_score_from_report(instance_id, instance_report)
-            golden_patch = prediction["golden_patch"]
-            model_patch = prediction[KEY_PREDICTION]
             results.append((score, golden_patch, model_patch))
             if score == 1.0:
                 verified_instances.append(instance_id)
