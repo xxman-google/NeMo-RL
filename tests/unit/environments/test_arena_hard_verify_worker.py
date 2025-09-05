@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import ray
 import pytest
 from unittest.mock import patch
@@ -70,9 +71,9 @@ def test_verify_sample_better(mock_grade_sample, worker: ArenaHardVerifyWorker):
     mock_grade_sample.return_value = ("[[A>B]]", "[[B<A]]")
     pred_data = [{"prompt": "p1", "response": "r1"}]
     metadata_list: list[MathEnvironmentMetadata] = [{"baseline_model_response": "b1", "category": "coding"}]
-    
-    results = worker.verify(pred_data, metadata_list)
-    
+
+    results = asyncio.run(worker.verify(pred_data, metadata_list))
+
     assert len(results) == 1
     score, _, _ = results[0]
     # scores1 = [1 - 1.0] = [0.0], scores2 = [1.0]. avg = 0.5
@@ -84,9 +85,9 @@ def test_verify_baseline_better(mock_grade_sample, worker: ArenaHardVerifyWorker
     mock_grade_sample.return_value = ("[[A<B]]", "[[B>A]]")
     pred_data = [{"prompt": "p1", "response": "r1"}]
     metadata_list: list[MathEnvironmentMetadata] = [{"baseline_model_response": "b1", "category": "coding"}]
-    
-    results = worker.verify(pred_data, metadata_list)
-    
+
+    results = asyncio.run(worker.verify(pred_data, metadata_list))
+
     assert len(results) == 1
     score, _, _ = results[0]
     # scores1 = [1 - 0.0] = [1.0], scores2 = [0.0]. avg = 0.5
@@ -98,9 +99,9 @@ def test_verify_tie(mock_grade_sample, worker: ArenaHardVerifyWorker):
     mock_grade_sample.return_value = ("[[A=B]]", "[[B=A]]")
     pred_data = [{"prompt": "p1", "response": "r1"}]
     metadata_list: list[MathEnvironmentMetadata] = [{"baseline_model_response": "b1", "category": "coding"}]
-    
-    results = worker.verify(pred_data, metadata_list)
-    
+
+    results = asyncio.run(worker.verify(pred_data, metadata_list))
+
     assert len(results) == 1
     score, _, _ = results[0]
     # scores1 = [1 - 0.5] = [0.5], scores2 = [0.5]. avg = 0.5
@@ -112,9 +113,9 @@ def test_verify_baseline_much_better(mock_grade_sample, worker: ArenaHardVerifyW
     mock_grade_sample.return_value = ("[[A>>B]]", "[[B>>A]]")
     pred_data = [{"prompt": "p1", "response": "r1"}]
     metadata_list: list[MathEnvironmentMetadata] = [{"baseline_model_response": "b1", "category": "creative_writing"}]
-    
-    results = worker.verify(pred_data, metadata_list)
-    
+
+    results = asyncio.run(worker.verify(pred_data, metadata_list))
+
     assert len(results) == 1
     score, _, _ = results[0]
     # scores1 = [1-1, 1-1, 1-1] = [0,0,0]. scores2 = [0,0,0]. avg = 0
@@ -126,9 +127,9 @@ def test_verify_sample_much_better(mock_grade_sample, worker: ArenaHardVerifyWor
     mock_grade_sample.return_value = ("[[A<<B]]", "[[B<<A]]")
     pred_data = [{"prompt": "p1", "response": "r1"}]
     metadata_list: list[MathEnvironmentMetadata] = [{"baseline_model_response": "b1", "category": "coding"}]
-    
-    results = worker.verify(pred_data, metadata_list)
-    
+
+    results = asyncio.run(worker.verify(pred_data, metadata_list))
+
     assert len(results) == 1
     score, _, _ = results[0]
     # scores1 = [1-0, 1-0, 1-0] = [1,1,1]. scores2 = [1,1,1]. avg = 1
@@ -140,9 +141,9 @@ def test_verify_mixed_verdicts_baseline_better(mock_grade_sample, worker: ArenaH
     mock_grade_sample.return_value = ("[[B>A]]", "[[A<<B]]")
     pred_data = [{"prompt": "p1", "response": "r1"}]
     metadata_list: list[MathEnvironmentMetadata] = [{"baseline_model_response": "b1", "category": "coding"}]
-    
-    results = worker.verify(pred_data, metadata_list)
-    
+
+    results = asyncio.run(worker.verify(pred_data, metadata_list))
+
     assert len(results) == 1
     score, _, _ = results[0]
     # scores1 = [1-0] = [1]. scores2 = [0,0,0]. avg = 0.25
@@ -154,9 +155,9 @@ def test_verify_mixed_verdicts_sample_better(mock_grade_sample, worker: ArenaHar
     mock_grade_sample.return_value = ("[[A<<B]]", "[[B>A]]")
     pred_data = [{"prompt": "p1", "response": "r1"}]
     metadata_list: list[MathEnvironmentMetadata] = [{"baseline_model_response": "b1", "category": "coding"}]
-    
-    results = worker.verify(pred_data, metadata_list)
-    
+
+    results = asyncio.run(worker.verify(pred_data, metadata_list))
+
     assert len(results) == 1
     score, _, _ = results[0]
     # scores1 = [1-0, 1-0, 1-0] = [1,1,1]. scores2 = [0]. avg = 0.75
@@ -168,10 +169,12 @@ def test_verify_invalid_verdict1(mock_grade_sample, worker: ArenaHardVerifyWorke
     mock_grade_sample.return_value = ("No verdict", "[[B>A]]")
     pred_data = [{"prompt": "p1", "response": "r1"}]
     metadata_list: list[MathEnvironmentMetadata] = [{"baseline_model_response": "b1", "category": "coding"}]
-    
-    results = worker.verify(pred_data, metadata_list)
-    
-    assert len(results) == 0
+
+    results = asyncio.run(worker.verify(pred_data, metadata_list))
+
+    assert len(results) == 1
+    score, _, _ = results[0]
+    assert score == 0.0
 
 
 @patch.object(ArenaHardVerifyWorker.__ray_actor_class__, '_grade_sample')
@@ -179,7 +182,9 @@ def test_verify_no_scores(mock_grade_sample, worker: ArenaHardVerifyWorker):
     mock_grade_sample.return_value = ("[[invalid]]", "[[invalid]]")
     pred_data = [{"prompt": "p1", "response": "r1"}]
     metadata_list: list[MathEnvironmentMetadata] = [{"baseline_model_response": "b1", "category": "coding"}]
-    
-    results = worker.verify(pred_data, metadata_list)
-    
-    assert len(results) == 0
+
+    results = asyncio.run(worker.verify(pred_data, metadata_list))
+
+    assert len(results) == 1
+    score, _, _ = results[0]
+    assert score == 0.0

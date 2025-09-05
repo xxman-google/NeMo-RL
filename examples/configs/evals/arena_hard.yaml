@@ -14,8 +14,9 @@ data:
 
 env:
   math:
+    num_workers: 1
     worker_type: "arena_hard"
     grader_model_name: "gemini-2.5-pro"
+    grader_batch_size: 25
     grader_max_tokens: 32000
-    grader_temperature: 1
-    
+    grader_temperature: 1.0

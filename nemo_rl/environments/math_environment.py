@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import ast
+import asyncio
 import contextlib
 import io
 import logging
@@ -21,6 +22,7 @@ from typing import Any, NotRequired, Optional, TypedDict
 
 import ray
 import torch
+import tqdm
 from math_verify.errors import TimeoutException
 from math_verify.metric import math_metric
 from math_verify.parser import ExprExtractionConfig, LatexExtractionConfig
@@ -473,6 +475,7 @@ class ArenaHardVerifyWorker:
 
         model = cfg.get("grader_model_name", "gemini-2.5-pro")
         self.logger = logging.getLogger("arena_hard_verify_worker")
+        self.batch_size = cfg.get("grader_batch_size", 25)
         self.logger.setLevel(logging.INFO)
         self.hard_prompt_grader_model = GeminiGraderModel(
             model=model,
@@ -489,7 +492,7 @@ class ArenaHardVerifyWorker:
             max_tokens=cfg.get("grader_max_tokens", 32000),
         )
 
-    def _grade_sample(
+    async def _grade_sample(
         self,
         prompt: str,
         baseline_model_response: str,
@@ -511,7 +514,6 @@ class ArenaHardVerifyWorker:
         prompt_messages_1 = [
             grader_model.pack_message(content=grader_prompt_1, role="user")
         ]
-        grader_response_1 = grader_model(prompt_messages_1)
 
         # Round 2
         grader_prompt_2 = ARENA_HARD_TEMPLATE.format(
@@ -522,7 +524,12 @@ class ArenaHardVerifyWorker:
         prompt_messages_2 = [
             grader_model.pack_message(content=grader_prompt_2, role="user")
         ]
-        grader_response_2 = grader_model(prompt_messages_2)
+
+        grader_response_1, grader_response_2 = await asyncio.gather(
+            grader_model.acall(prompt_messages_1),
+            grader_model.acall(prompt_messages_2),
+        )
+
         return grader_response_1.response_text, grader_response_2.response_text
 
     def _get_verdict_from_grader_response(self, judgment: str) -> Optional[str]:
@@ -557,7 +564,7 @@ class ArenaHardVerifyWorker:
         }
         return label_to_score.get(verdict, [])
 
-    def verify(
+    async def verify(
         self,
         pred_data: list[dict[str, str]],
         metadata_list: list[MathEnvironmentMetadata],
@@ -571,39 +578,65 @@ class ArenaHardVerifyWorker:
         Returns:
             list[tuple[float, str, str]]. The rewards, baseline answer, and the extracted answer for each predicted response.
         """
-        results = []
-        for data, metadata in zip(pred_data, metadata_list):
-            prompt = data["prompt"]
-            sample_response = data["response"]
-            baseline_model_response = str(metadata["baseline_model_response"])
-            is_creative_writing = metadata["category"] == "creative_writing"
-            judge_response_1, judge_response_2 = self._grade_sample(
-                prompt,
-                baseline_model_response,
-                sample_response,
-                creative_writing=is_creative_writing,
-            )
-            verdict1 = self._get_verdict_from_grader_response(judge_response_1)
-            verdict2 = self._get_verdict_from_grader_response(judge_response_2)
+        num_samples = len(pred_data)
+        all_results = []
+        num_invalid_verdicts = 0
 
-            # Only count the results if both verdicts are valid.
-            if not verdict1 or not verdict2:
-                self.logger.warning("Found invalid verdict. Skipping... ")
-                continue
+        for i in tqdm.tqdm(range(0, num_samples, self.batch_size), desc="Grading batches"):
+            batch_pred_data = pred_data[i : i + self.batch_size]
+            batch_metadata_list = metadata_list[i : i + self.batch_size]
 
-            scores1 = self._get_score_from_verdict(verdict1)
-            scores2 = self._get_score_from_verdict(verdict2)
+            tasks = []
+            for data, metadata in zip(batch_pred_data, batch_metadata_list):
+                prompt = data["prompt"]
+                sample_response = data["response"]
+                baseline_model_response = str(metadata["baseline_model_response"])
+                is_creative_writing = metadata["category"] == "creative_writing"
+                tasks.append(
+                    self._grade_sample(
+                        prompt,
+                        baseline_model_response,
+                        sample_response,
+                        creative_writing=is_creative_writing,
+                    )
+                )
 
-            # score for sample model is 1 - score_for_baseline
-            scores = [1.0 - s for s in scores1] + scores2
+            judge_responses = await asyncio.gather(*tasks)
+            self.logger.info(f"LLM grader for batch {i // self.batch_size + 1} completed.")
 
-            if not scores:
-                results.append((0.5, baseline_model_response, sample_response))
-                continue
+            batch_results = []
+            for j, (judge_response_1, judge_response_2) in enumerate(judge_responses):
+                data = batch_pred_data[j]
+                metadata = batch_metadata_list[j]
+                sample_response = data["response"]
+                baseline_model_response = str(metadata["baseline_model_response"])
 
-            score = sum(scores) / len(scores)
-            results.append((score, baseline_model_response, sample_response))
-        return results
+                verdict1 = self._get_verdict_from_grader_response(judge_response_1)
+                verdict2 = self._get_verdict_from_grader_response(judge_response_2)
+
+                # Only count the results if both verdicts are valid.
+                if not verdict1 or not verdict2:
+                    self.logger.warning(f"Found invalid verdict for sample {i+j}. Skipping...")
+                    num_invalid_verdicts += 1
+                    batch_results.append((0, baseline_model_response, sample_response))
+                    continue
+
+                scores1 = self._get_score_from_verdict(verdict1)
+                scores2 = self._get_score_from_verdict(verdict2)
+
+                # score for sample model is 1 - score_for_baseline
+                scores = [1.0 - s for s in scores1] + scores2
+
+                if not scores:
+                    batch_results.append((0.5, baseline_model_response, sample_response))
+                    continue
+
+                score = sum(scores) / len(scores)
+                batch_results.append((score, baseline_model_response, sample_response))
+            all_results.extend(batch_results)
+
+        self.logger.info(f"Num. invalid verdicts: {num_invalid_verdicts}")
+        return all_results
 
 
 @ray.remote(max_restarts=-1, max_task_retries=-1)  # pragma: no cover
