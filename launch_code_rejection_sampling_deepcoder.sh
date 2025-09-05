@@ -34,7 +34,7 @@ for model_name in "${model_names[@]}"; do
     logger.log_dir=$LOCAL_LOG_DIR_IN_CONTAINER/ \
     logger.output_dir=$output_dir \
     logger.wandb.name="${model_name}-${dataset_name}-${subset}" \
-    data.prompt_file="examples/prompts/code_stdin_stdout.txt" \
+    data.prompt_file="examples/prompts/code_stdio.txt" \
     data.dataset_name=$dataset_name \
     data.subset=$subset
     sleep 20

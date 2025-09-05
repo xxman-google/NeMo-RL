@@ -28,7 +28,8 @@ class DeepCoderPreviewDataset:
         ds = ds.filter(lambda x: len(x["tests"]) < _TEST_LENGTH_LIMIT)
         ds = ds.filter(self._filter_keep_stdio)
         ds = ds.map(self._transform_tests)
-        self.rekeyed_ds = ds.map(self._rekey, remove_columns=ds.column_names)
+        self.rekeyed_ds = ds.map(self._rekey)
+        self.rekeyed_ds = self.rekeyed_ds.select_columns(["question", "tests", "code_exe_dir"])
         self.task_spec = TaskDataSpec(
             task_name="DeepCoderPreview",
             prompt_file=prompt_file,
@@ -51,8 +52,10 @@ class DeepCoderPreviewDataset:
     def _transform_tests(self, example: dict[str, Any]):
         tests = json.loads(example["tests"])
         if self.subset == "taco":
-            # tests now is a dict
-            tests = [{"input": i, "output": o} for i, o in zip(tests["inputs"], tests["outputs"])]
+            # Convert tests from dict to list of dict.
+            converted_tests = [{"input": i, "output": o} for i, o in zip(tests["inputs"], tests["outputs"])]
+            tests = converted_tests
+
         return {"tests": tests}
     
     def _rekey(self, example: dict[str, Any]):
