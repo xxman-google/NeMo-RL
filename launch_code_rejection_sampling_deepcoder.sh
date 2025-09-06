@@ -5,6 +5,7 @@ dataset_name="deepcoder_preview"
 # model_names=("qwen3_14b_code_no_thinking" "qwen3_14b_code_thinking")
 model_names=("qwen3_8b_code_no_thinking")
 subsets=("lcbv5" "primeintellect" "taco")
+test_types=("stdio" "functional")
 
 for model_name in "${model_names[@]}"; do
   config_path="examples/configs/rejection_sampling/${model_name}.yaml"
@@ -36,7 +37,8 @@ for model_name in "${model_names[@]}"; do
     logger.wandb.name="${model_name}-${dataset_name}-${subset}" \
     data.prompt_file="examples/prompts/code_stdio.txt" \
     data.dataset_name=$dataset_name \
-    data.subset=$subset
+    data.subset=$subset \
+    data.test_type="stdio"
     sleep 20
   done
 

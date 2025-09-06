@@ -210,6 +210,7 @@ def load_eval_dataset(data_config):
     elif dataset_name == "deepcoder_preview":
         base_dataset = DeepCoderPreviewDataset(
             subset=data_config["subset"],
+            test_type=data_config["test_type"],
             code_exe_dir=data_config["code_exe_dir"],
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
