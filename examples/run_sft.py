@@ -95,7 +95,9 @@ def setup_data(tokenizer: AutoTokenizer, data_config: DataConfig):
     print("\n▶ Setting up data...")
     data_cls = data_config["dataset_name"]
     if data_cls == "open_assistant":
-        data = hf_datasets.OasstDataset(output_dir="/tmp/open_assistant")
+        data = hf_datasets.OasstDataset(
+            output_dir="/tmp/open_assistant", seed=data_config["seed"]
+        )
     elif data_cls == "squad":
         data = hf_datasets.SquadDataset()
     elif data_cls == "tulu3sft":
@@ -112,14 +114,17 @@ def setup_data(tokenizer: AutoTokenizer, data_config: DataConfig):
             split=data_config["split"],
             output_key=data_config["output_key"],
             prompt_file=data_config["prompt_file"],
+            seed=data_config["seed"],
         )
     elif data_cls == "openai_format":
         data = hf_datasets.OpenAIFormatDataset(
             data_config["train_data_path"],
-            data_config["val_data_path"],
-            data_config["chat_key"],
-            data_config["system_key"],
-            data_config["system_prompt"],
+            data_config.get("val_data_path"),
+            data_config.get("chat_key"),
+            data_config.get("system_key"),
+            data_config.get("system_prompt"),
+            data_config.get("file_format", "json"),
+            data_config.get("val_ratio", 0.05),
         )
     elif data_cls == "tulu3_sft_mixture":
         data = hf_datasets.Tulu3SftMixtureDataset(train_sample_ratio=0.8)

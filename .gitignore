@@ -34,6 +34,7 @@ hf_datasets_cache/
 datasets/
 docker/*
 !docker/Dockerfile
+!docker/Dockerfile.ngc_pytorch
 !docker/README.md
 wandb/
 checkpoints/
@@ -44,3 +45,19 @@ data/
 # Runtime env
 *runtime_env.yaml
 !default_runtime_env.yaml
+
+79/
+181/
+191/
+algorithms/
+cluster_env_vars/
+configs/
+dedup/
+examples/configs/
+nemo_rl/examples/
+eval.sh
+launch_eve_eval.sh
+launch_eve_sft.sh
+launch_xuehan.sh
+nemo_rl-h20250721.sqsh
+
