@@ -15,7 +15,7 @@
 # logger.wandb.name=cirrus0p2_8b_mixed_thinking
 sft:
   max_num_epochs: 1
-  max_num_steps: 2170 #TBD
+  max_num_steps: 5000
   val_period: 100
   val_batches: 16
   val_global_batch_size: 64
@@ -92,7 +92,7 @@ policy:
       end_weight_decay: ${policy.megatron_cfg.optimizer.weight_decay}
       weight_decay_incr_style: "constant"
       lr_decay_style: "cosine"
-      lr_decay_iters: 2170
+      lr_decay_iters: 2413
       lr_warmup_iters: 200
       lr_warmup_init: 2.34e-7
 
@@ -229,6 +229,42 @@ data:
       additional_kwargs:
         split: "train"
       user_msg_postfix: "/think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_verifiable_code_apps_qwen3_8b_code_no_thinking/train-augmented*"
+      samples: 1817
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/no_think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_verifiable_code_code_contests_qwen3_8b_code_no_thinking/train-augmented*"
+      samples: 1725
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/no_think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/openr1_verifiable_code_taco_qwen3_8b_code_no_thinking/train-augmented*"
+      samples: 4104
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/no_think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/deepcoder_preview_lcbv5_stdio_qwen3_8b_code_no_thinking/train-augmented*"
+      samples: 149
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/no_think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/deepcoder_preview_primeintellect_stdio_qwen3_8b_code_no_thinking/train-augmented*"
+      samples: 5844
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/no_think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/deepcoder_preview_taco_stdio_qwen3_8b_code_no_thinking/train-augmented*"
+      samples: 2723
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/no_think"
   add_bos: true
   add_eos: true
   add_generation_prompt: false
