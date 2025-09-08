@@ -24,7 +24,7 @@ sft:
   seed: 42
 checkpointing:
   enabled: true
-  checkpoint_dir: "results/cirrus0p2_8b_mixed_thinking-exp0"
+  checkpoint_dir: "results/cirrus0p2_8b_mixed_thinking"
   metric_name: val_loss
   higher_is_better: false
   save_period: 1000
@@ -269,14 +269,14 @@ data:
   add_eos: true
   add_generation_prompt: false
 logger:
-  log_dir: "logs/cirrus0p2_8b_mixed_thinking-exp0"
+  log_dir: "logs/cirrus0p2_8b_mixed_thinking"
   wandb_enabled: true
   tensorboard_enabled: false
   mlflow_enabled: false
   monitor_gpus: true
   wandb:
-    project: fei-cirrus
-    name: cirrus0p2_8b_mixed_thinking-exp0
+    project: cirrus
+    name: cirrus0p2_8b_mixed_thinking
   gpu_monitoring:
     collection_interval: 30
     flush_interval: 30
