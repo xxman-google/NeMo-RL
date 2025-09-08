@@ -5,7 +5,7 @@ dataset_name="deepcoder_preview"
 # model_names=("qwen3_14b_code_no_thinking" "qwen3_14b_code_thinking")
 model_names=("qwen3_8b_code_no_thinking")
 subsets=("lcbv5" "primeintellect" "taco")
-test_types=("stdio" "functional")
+test_types=("functional")
 
 for model_name in "${model_names[@]}"; do
   config_path="examples/configs/rejection_sampling/${model_name}.yaml"
@@ -22,24 +22,37 @@ for model_name in "${model_names[@]}"; do
   fi
 
   for subset in "${subsets[@]}"; do
-    echo "subset: $subset"
-    output_dir="${LOCAL_LOG_DIR_IN_CONTAINER}/${dataset_name}_${subset}_${model_name}"
-    echo "writing results to $output_dir"
-    uv run examples/run_rejection_sampling.py \
-    --config $config_path \
-    generation.num_prompts_per_step=-1 \
-    generation.vllm_cfg.max_model_len=$max_model_len \
-    generation.vllm_cfg.tensor_parallel_size=$tp \
-    cluster.gpus_per_node=$GPUS_PER_NODE \
-    cluster.num_nodes=$NNODES \
-    logger.log_dir=$LOCAL_LOG_DIR_IN_CONTAINER/ \
-    logger.output_dir=$output_dir \
-    logger.wandb.name="${model_name}-${dataset_name}-${subset}" \
-    data.prompt_file="examples/prompts/code_stdio.txt" \
-    data.dataset_name=$dataset_name \
-    data.subset=$subset \
-    data.test_type="stdio"
-    sleep 20
+    for test_type in "${test_types[@]}"; do
+      if [[ "$test_type" == "stdio" ]]; then
+        prompt_file="examples/prompts/code_stdio.txt"
+        worker_type="python_stdout_verify"
+      else
+        prompt_file=""
+        worker_type="python_unit_test_verify"
+      fi
+      echo "subset: $subset"
+      echo "test_type: $test_type"
+      echo "prompt_file: $prompt_file"
+      output_dir="${LOCAL_LOG_DIR_IN_CONTAINER}/${dataset_name}_${subset}_${test_type}_${model_name}"
+      echo "writing results to $output_dir"
+      
+      uv run examples/run_rejection_sampling.py \
+      --config $config_path \
+      generation.num_prompts_per_step=-1 \
+      generation.vllm_cfg.max_model_len=$max_model_len \
+      generation.vllm_cfg.tensor_parallel_size=$tp \
+      cluster.gpus_per_node=$GPUS_PER_NODE \
+      cluster.num_nodes=$NNODES \
+      logger.log_dir=$LOCAL_LOG_DIR_IN_CONTAINER/ \
+      logger.output_dir=$output_dir \
+      logger.wandb.name="${model_name}-${dataset_name}-${subset}-${test_type}" \
+      data.prompt_file=$prompt_file \
+      data.dataset_name=$dataset_name \
+      data.subset=$subset \
+      data.test_type=$test_type \
+      env.code.worker_type=$worker_type
+      sleep 20
+    done
   done
 
 done

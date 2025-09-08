@@ -142,7 +142,9 @@ def code_processor(
         message_log.append(sys_prompt)
 
     # user prompt
-    if task_data_spec.prompt:
+    if "prompt" in datum_dict:
+        problem = datum_dict["prompt"]
+    elif task_data_spec.prompt:
         problem = task_data_spec.prompt.format(problem)
     if task_data_spec.append_think_token_to_user_msg:
         if task_data_spec.enable_thinking:
