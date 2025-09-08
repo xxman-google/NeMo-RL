@@ -16,12 +16,7 @@ Enabled a Python pipeline for analyzing and deduplicating a dataset based on sem
 
 If running with docker in interative mode, see an example command in dedup.sh
 ```
-uv run /examples/run_dedup.py \
---data_path /data/cirrus0.0/openr1_math_amc_aime_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet \
---output_dir ./dedup \
---model_name all-MiniLM-L6-v2 \
---metric cosine \
---threshold 0.8 
+uv run examples/dedup_run_pip.py
 ```
 install missing packages by uv pip install MISSING_PACKAGE.
 
@@ -29,16 +24,49 @@ If not running with docker, to run the pipeline, execute the run_dedup.py script
 
 Example Command
 ```
-python /examples/run_dedup.py
+python examples/run_dedup.py
 ```
-This will perform the following actions:
-- Load the default dataset.
-- Generate embeddings and a similarity matrix.
-- Save statistical analysis, visualization plots (histogram, box plot, t-SNE), and a showcase of redundant pairs to the ./output_dedup/ directory.
-- Save the deduplicated dataset as dedup.parquet inside the same output directory.
+
 
 You can customize the pipeline's behavior with the following options:
 
 ```
- --data_path YOUR_DATAPATH --output_dir YOUR_OUTPUT_DIR --model_name YOUR_ENCODER --metric YOUR_SIMILARITY_METRIC --threshold YOUR_THRESHOLD
+ --filelist_path_candidate YOUR_LIST_OF_FILES_TO_DEDUP --filelist_path_base YOUR_LIST_OF_FILES_TO_DEDUP_AGAINST --type YOUR_DEDUP_TYPE --output_dir YOUR_OUTPUT_DIR --model_name YOUR_ENCODER --metric YOUR_SIMILARITY_METRIC --threshold YOUR_THRESHOLD
 ```
+
+
+# Example usage:
+# usecase1: intra-set deduplication
+"""
+python3 examples/run_dedup.py --filelist_path_base /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_amc_aime_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet \
+  --filelist_path_candidate /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_amc_aime_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet \
+  --type intra_list --threshold 0.95 --output_dir ./output_dedup --output_suffix usecase1_test
+"""
+
+# usecase2: cross-set deduplication
+"""
+python3 examples/run_dedup.py --filelist_path_base /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_amc_aime_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet \
+  --filelist_path_candidate /gcs/cloud-nas-hns-data/cirrus0.2/openr1_math_amc_aime_qwen3_8b_thinking/train-unboxed-00000-of-00001.parquet \
+  --type cross_list --threshold 0.95 --output_dir ./output_dedup --output_suffix usecase2_test
+"""
+
+# usecase3: single file dedup against a list of files
+"""
+python3 examples/run_dedup.py --filelist_path_base /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_amc_aime_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_aops_forum_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet\
+  --filelist_path_candidate /gcs/cloud-nas-hns-data/cirrus0.2/openr1_math_amc_aime_qwen3_8b_thinking/train-unboxed-00000-of-00001.parquet \
+  --type cross_list --threshold 0.95 --output_dir ./output_dedup --output_suffix usecase3_test
+"""
+
+# usecase4: a list of files dedup against themselves
+"""
+python3 examples/run_dedup.py --filelist_path_base /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_amc_aime_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_aops_forum_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet\
+  --filelist_path_candidate /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_amc_aime_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_aops_forum_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet \
+  --type intra_list --threshold 0.95 --output_dir ./output_dedup --output_suffix usecase4_test
+"""
+
+# usecase5: a list of files dedup against another list of files
+"""
+python3 examples/run_dedup.py --filelist_path_base /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_amc_aime_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_aops_forum_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet\
+  --filelist_path_candidate /gcs/cloud-nas-hns-data/cirrus0.2/openr1_math_amc_aime_qwen3_8b_thinking/train-unboxed-00000-of-00001.parquet /gcs/cloud-nas-hns-data/cirrus0.2/openr1_math_aops_forum_qwen3_8b_thinking/train-unboxed-00000-of-00001.parquet \
+  --type cross_list --threshold 0.95 --output_dir ./output_dedup --output_suffix usecase5_test
+"""
