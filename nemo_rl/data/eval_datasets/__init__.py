@@ -214,6 +214,14 @@ def load_eval_dataset(data_config):
     elif dataset_name == "arc_agi":
         base_dataset = ArcAgiDataset(
             split=data_config.get("split", "evaluation"),
+            version="v1",
+            prompt_file=data_config["prompt_file"],
+            system_prompt_file=data_config["system_prompt_file"],
+        )
+    elif dataset_name == "arc_agi2":
+        base_dataset = ArcAgiDataset(
+            split=data_config.get("split", "evaluation"),
+            version="v2",
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
         )
@@ -227,7 +235,7 @@ def load_eval_dataset(data_config):
         base_dataset = Alpaca2Dataset(
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
-        ) 
+        )
     else:
         raise ValueError(f"Unknown dataset {dataset_name}.")
     return base_dataset

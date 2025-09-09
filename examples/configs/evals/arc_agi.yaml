@@ -3,7 +3,7 @@ defaults: "eval.yaml"
 
 data:
   prompt_file: "examples/prompts/arc_agi.txt"
-  dataset_name: "arc_agi"
+  dataset_name: "arc_agi"  # Use "arc_agi2" for ARC-AGI-2 dataset.
   split: "evaluation"
 
 generation:

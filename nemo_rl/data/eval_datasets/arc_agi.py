@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""ARC-AGI dataset."""
+"""ARC-AGI datasets."""
 
+from enum import Enum
 from typing import Any, Optional
 
 from datasets import load_dataset
@@ -22,17 +23,32 @@ from nemo_rl.data import processors
 from nemo_rl.data.interfaces import TaskDataSpec
 
 
+class ArcAgiVersion(str, Enum):
+    V1 = "v1"  # ARC-AGI-1 dataset.
+    V2 = "v2"  # ARC-AGI-2 dataset.
+
+
 class ArcAgiDataset:
     def __init__(
         self,
         split: str = "evaluation",
+        version: str = ArcAgiVersion.V1,
         prompt_file: Optional[str] = None,
         system_prompt_file: Optional[str] = None,
     ):
-        ds = load_dataset("dataartist/arc-agi", split=split)
+        if version == ArcAgiVersion.V1:
+            dataset_name = "jcpagadora/ARC-AGI"
+            task_name = "arc_agi"
+        elif version == ArcAgiVersion.V2:
+            dataset_name = "jcpagadora/ARC-AGI-2"
+            task_name = "arc_agi2"
+        else:
+            raise ValueError(f"Invalid version: {version}, must be one of {list(ArcAgiVersion)}")
+
+        ds = load_dataset(dataset_name, split=split)
         self.rekeyed_ds = ds.map(self._rekey, remove_columns=ds.column_names)
         self.task_spec = TaskDataSpec(
-            task_name="arg_agi",
+            task_name=task_name,
             prompt_file=prompt_file,
             system_prompt_file=system_prompt_file,
         )
