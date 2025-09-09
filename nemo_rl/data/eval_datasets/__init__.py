@@ -212,6 +212,9 @@ def load_eval_dataset(data_config):
         base_dataset = SweBenchVerifiedOracleDataset(
             prompt_file=data_config["prompt_file"],
             system_prompt_file=data_config["system_prompt_file"],
+            max_prompt_len=data_config.get("max_prompt_len", 131072),
+            filter=data_config.get("filter", False),
+            truncate=data_config.get("truncate", True),
         )
     elif dataset_name == "openr1_verifiable_code":
         base_dataset = OpenR1VerifiableCodeDataset(

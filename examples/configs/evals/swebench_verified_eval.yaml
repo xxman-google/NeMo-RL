@@ -3,10 +3,13 @@ defaults: "eval.yaml"
 
 data:
   dataset_name: "swebench_verified_oracle"
+  max_prompt_len: ${generation.vllm_cfg.max_model_len}
+  filter: false  # Whether to filter out instances that exceed the maximum length.
+  truncate: true  # Whether to truncate prompts that exceed the maximum length.
 
 generation:
   vllm_cfg:
-    max_model_len: 262144
+    max_model_len: 131072
     gpu_memory_utilization: 0.9
     tensor_parallel_size: 2
 

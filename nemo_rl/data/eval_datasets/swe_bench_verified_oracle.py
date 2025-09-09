@@ -22,27 +22,28 @@ from nemo_rl.data import processors
 from nemo_rl.data.interfaces import TaskDataSpec
 
 
-_MAX_PROMPT_LENGTH = 262144  # Maximum length of the prompt in characters
-_FILTER = False  # Whether to filter instances based on prompt length
-_TRUNCATE = True  # Whether to truncate prompts that exceed the maximum length
-
-
 class SweBenchVerifiedOracleDataset:
     def __init__(
         self,
         prompt_file: Optional[str] = None,
         system_prompt_file: Optional[str] = None,
+        max_prompt_len: int = 131072,
+        filter: bool = False,  # Whether to filter instances based on prompt length.
+        truncate: bool = True,  # Whether to truncate prompts that exceed the maximum length.
     ):
+        self.max_prompt_len = max_prompt_len
+        self.filter = filter
+        self.truncate = truncate
         ds = load_dataset(
             "jcpagadora/SWE-bench_Verified__style-3__fs-oracle",
             split="test",
         )
         self.rekeyed_ds = ds.map(self._rekey, remove_columns=ds.column_names)
-        if _FILTER:
-            print(f"Filtering out instances with prompt len > {_MAX_PROMPT_LENGTH} characters.")
+        if self.filter:
+            print(f"Filtering out instances with prompt len > {self.max_prompt_len} characters.")
             self.rekeyed_ds = self.rekeyed_ds.filter(self._filter)
-        if _TRUNCATE:
-            print(f"Truncating instances with prompt len > {_MAX_PROMPT_LENGTH} characters.")
+        if self.truncate:
+            print(f"Truncating instances with prompt len > {self.max_prompt_len} characters.")
             self.rekeyed_ds = self.rekeyed_ds.map(self._truncate)
         self.task_spec = TaskDataSpec(
             task_name="swebench_verified_oracle",
@@ -60,10 +61,10 @@ class SweBenchVerifiedOracleDataset:
 
     def _filter(self, data: dict[str, Any]) -> bool:
         """Filter function to remove instances with empty ground truth."""
-        return len(data["prompt"]) <= _MAX_PROMPT_LENGTH
+        return len(data["prompt"]) <= self.max_prompt_len
 
     def _truncate(self, data: dict[str, Any]) -> dict[str, Any]:
         """Truncate the prompt to a maximum length."""
-        if len(data["prompt"]) > _MAX_PROMPT_LENGTH:
-            data["prompt"] = data["prompt"][:_MAX_PROMPT_LENGTH]
+        if len(data["prompt"]) > self.max_prompt_len:
+            data["prompt"] = data["prompt"][:self.max_prompt_len]
         return data
