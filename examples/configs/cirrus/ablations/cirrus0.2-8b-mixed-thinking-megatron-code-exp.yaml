@@ -13,6 +13,9 @@
 # logger.log_dir=$LOCAL_LOG_DIR_IN_CONTAINER \
 # checkpointing.checkpoint_dir=${CKPT_LOCAL_DIR}/cirrus0p2_8b_mixed_thinking \
 # logger.wandb.name=cirrus0p2_8b_mixed_thinking
+
+# exp1: add stdio data from deepcoder_preview
+# exp2: add functional data, no additional prompt
 sft:
   max_num_epochs: 1
   max_num_steps: 5000
@@ -92,7 +95,7 @@ policy:
       end_weight_decay: ${policy.megatron_cfg.optimizer.weight_decay}
       weight_decay_incr_style: "constant"
       lr_decay_style: "cosine"
-      lr_decay_iters: 2413
+      lr_decay_iters: 2433
       lr_warmup_iters: 200
       lr_warmup_init: 2.34e-7
 
@@ -262,6 +265,24 @@ data:
     - file_format: "parquet"
       name_or_paths: "/tmp/logs/deepcoder_preview_taco_stdio_qwen3_8b_code_no_thinking/train-augmented*"
       samples: 2723
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/no_think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/deepcoder_preview_lcbv5_functional_qwen3_8b_code_no_thinking/train-00*"
+      samples: 225
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/no_think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/deepcoder_preview_primeintellect_functional_qwen3_8b_code_no_thinking/train-00*"
+      samples: 642
+      additional_kwargs:
+        split: "train"
+      user_msg_postfix: "/no_think"
+    - file_format: "parquet"
+      name_or_paths: "/tmp/logs/deepcoder_preview_taco_functional_qwen3_8b_code_no_thinking/train-00*"
+      samples: 500
       additional_kwargs:
         split: "train"
       user_msg_postfix: "/no_think"
