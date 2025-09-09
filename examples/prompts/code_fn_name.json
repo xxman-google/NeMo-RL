@@ -1,0 +1,17 @@
+[
+  "{}\n\nYou will use the function name `{}` as the code entry point for your solution. Remember to import any missing modules in the code, and enclose your code within delimiters like this:\n```python\n```\n",
+  "{}\n\nImplement the solution within a function named `{}`. Ensure all required libraries are imported. Surround your final Python code with \n```python\n```\n delimiters.",
+  "Please provide a Python solution for the following problem: {}\n\nYour main function must be named `{}`. Include all necessary import statements at the top. Wrap your entire code block in \n```python\n```\n.",
+  "Task: {}\n\nConstraints: The implementation must use the function signature `{}` as the primary entry point. All dependencies (imports) must be included. The solution must be formatted strictly within \n```python\n```\n code fences.",
+  "Hey! Can you help me solve this: {}\n\nI need the main function to be called `{}`. Make sure to import anything you use! Please put the code inside a \n```python\n```\n block. Thanks!",
+  "{}\n\nWrite a complete Python script to solve this. The starting point must be a function called `{}`. Don't forget to import any required modules. Output the code block using \n```python\n```\n formatting.",
+  "Problem definition: {}\n\nYour solution must define an entry point with the function name `{}`. Ensure all dependencies are imported. Delimit the finalized code block using \n```python\n```\n.",
+  "{}\n\nI just need the Python code for this. Use `{}` as the function name. Import necessary libraries. Please only provide the code, wrapped in \n```python\n```\n.",
+  "Solve the following challenge: {}\n\nMake sure all required modules are imported first. The core logic must be placed inside a function named `{}`. Format your response using \n```python\n```\n code delimiters.",
+  "Task: {}\n\nYour Python code should implement the function `{}`. Remember to include imports. Use Python markdown fences (\n```python\n```\n) to enclose your answer.",
+  "Here is the problem: {}\n\nDevelop a solution using the function definition `{}`. Import whatever modules are needed. Present the code inside \n```python\n```\n tags.",
+  "{}\n\nYour code solution must use `{}` as the entry point function name. Ensure all imports are present. Wrap the code in \n```python\n```\n blocks.",
+  "{}\n\nFunction: `{}`. Imports: Must be included. Format: \n```python\n```\n.",
+  "{}\n\nEnclose your solution in \n```python\n```\n. The primary function must be named `{}`. Don't forget to import all required libraries.",
+  "Assignment: {}\n\nYour submission must be executable Python code. The entry point must match the function name: `{}`. Include all necessary import statements. The output must be a single code block delimited by \n```python\n```\n."
+]

@@ -1,0 +1,17 @@
+[
+  "{}\n\nYou will use the following starter code to write the solution to the problem and enclose your code within delimiters. Also, remember to import any missing modules in the code.\n```python\n{}\n```\n",
+  "{}\n\nComplete the following Python code snippet. Ensure all necessary imports are included. Provide the final, complete solution wrapped in ```python delimiters.\n\nStarter Code:\n```python\n{}\n```\n",
+  "{}\n\nBuild your solution using this code skeleton. You must import all required libraries and present the final code inside a single \n```python\n```\n block.\n\nHere is the skeleton:\n```python\n{}\n```\n",
+  "{}\n\nPlease start with the code provided below. Remember to add any missing import statements. Your final answer should be the complete code, enclosed in \n```python\n```\n.\n\n```python\n{}\n```\n",
+  "{}\n\nSolve this using the starter code below. Crucially, ensure all dependencies are imported at the top of your solution. Wrap the entire finalized code in \n```python\n```\n.\n\n```python\n{}\n```\n",
+  "Help me solve this: {}\n\nYou need to use this code to start. Don't forget imports! Give me the final solution in a \n```python\n```\n block.\n\nCode to use:\n```python\n{}\n```\n",
+  "Task: {}\n\nConstraints: Solution must be built upon the provided partial code. All modules must be imported. Final output must be delimited by \n```python\n```\n.\n\nPartial Code:\n```python\n{}\n```\n",
+  "{}\n\nHere is the starting code:\n```python\n{}\n```\n\nPlease complete this solution. Include necessary imports and format the complete answer within \n```python\n```\n fences.",
+  "{}\n\nYour task is to complete the function(s) below. Import any modules you need. Return the full, working code solution inside \n```python\n```\n tags.\n\n```python\n{}\n```\n",
+  "{}\n\nUse this starter code. Add imports. Wrap final solution in \n```python\n```\n.\n\n```python\n{}\n```\n",
+  "Given the problem: {}\n\nAnd the following starter implementation:\n```python\n{}\n```\n\nProvide the complete, working solution. This includes all necessary import statements and wrapping the final code in \n```python\n```\n.",
+  "{}\n\nBegin with the code snippet below. Ensure your solution is complete, imports all required libraries, and is enclosed in \n```python\n```\n formatting.\n\n```python\n{}\n```\n",
+  "{}\n\nUse this template below to solve the problem. Remember: include all imports and wrap your final, complete code (including the starter parts) in \n```python\n```\n delimiters.\n\n```python\n{}\n```\n",
+  "{}\n\nCode Skeleton:\n```python\n{}\n```\n\nUsing the skeleton above, write the full solution. Your answer must import needed modules and be enclosed in \n```python\n```\n.",
+  "Assignment: {}\n\nMandatory starting point:\n```python\n{}\n```\n\nComplete the code. Your submission must include all imports and be formatted as a single \n```python\n```\n block."
+]

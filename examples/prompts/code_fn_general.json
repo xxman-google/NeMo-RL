@@ -1,0 +1,17 @@
+[
+  "{}\n\nRemember to import any missing modules in the code, and enclose your code within delimiters like this:\n```python\n```\n",
+  "Please provide a Python solution for the following problem: {}\n\nMake sure to include all necessary import statements. Wrap your final code in \n```python\n```\n delimiters.",
+  "Write Python code for this task: {}\n\nEnsure all required libraries are imported at the top. Your final answer must be enclosed within \n```python\n```\n code fences.",
+  "Hey, can you solve this for me? {}\n\nDon't forget to import anything it needs! Please put the full code in a \n```python\n```\n block.",
+  "Task: {}\n\nProvide a complete Python implementation. All dependencies must be imported. Enclose the solution in \n```python\n```\n formatting.",
+  "{}\n\nI just need the Python code for this. Include necessary imports. Please wrap the entire script in \n```python\n```\n.",
+  "{}\n\nPlease format your Python solution using \n```python\n```\n delimiters. Remember to also include any required import statements for your code to run.",
+  "Please write a complete Python script that solves the following: {}\n\nYour solution should include all necessary imports and be formatted inside a \n```python\n```\n block.",
+  "Provide a Python implementation for this problem: {}\n\nEnsure all modules are correctly imported. The code output must use Python markdown fences (\n```python\n```\n).",
+  "Problem: {}\n\nGenerate the Python code implementation. All library dependencies must be imported. Delimit the final code using \n```python\n```\n.",
+  "{}\n\nPython code solution requested. Include imports. Format with \n```python\n```\n.",
+  "Assignment: {}\n\nWrite an executable Python script. It must include all required imports. The final submission should be a single code block formatted with \n```python\n```\n.",
+  "{}\n\nSolve this challenge. Your Python solution must import all necessary modules and be enclosed in \n```python\n```\n tags.",
+  "Write a Python script for: {}\n\nRemember to import everything needed. Present the final script within \n```python\n```\n code delimiters.",
+  "Could you write the Python code for the following task? {}\n\nPlease include all imports and make sure the code is wrapped in \n```python\n```\n blocks. Thank you!"
+]
