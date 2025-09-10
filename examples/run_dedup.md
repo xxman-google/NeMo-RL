@@ -16,7 +16,7 @@ Enabled a Python pipeline for analyzing and deduplicating a dataset based on sem
 
 If running with docker in interative mode, see an example command in dedup.sh
 ```
-uv run examples/dedup_run_pip.py
+uv run examples/run_dedup.py
 ```
 install missing packages by uv pip install MISSING_PACKAGE.
 
