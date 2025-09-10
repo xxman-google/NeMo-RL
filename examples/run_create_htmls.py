@@ -17,7 +17,7 @@ _DATASET_NAME = flags.DEFINE_string("dataset_name", None, "Dataset name.")
 _WHICH_SAMPLES = flags.DEFINE_string(
     "which_samples", "first_30", "`first_n`, `last_n`, or `random_n`"
 )
-_TOKENIZER = flags.DEFINE_string("tokenizer", "Qwen/Qwen3-14B", "Tokenizer name.")
+_TOKENIZER = flags.DEFINE_string("tokenizer", "Qwen/Qwen3-8B", "Tokenizer name.")
 
 
 def get_prompt_and_response(messages: list[dict[str, str]]) -> tuple[str, str]:

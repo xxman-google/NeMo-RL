@@ -10,7 +10,7 @@ env:
     worker_type: "instruction_following"
 
 generation:
-  model_name: "/home/tangyoubao_google_com/LLaMA-Factory/saves/qwen3-14b/full/fa2_liger_fsdp_packing"
+  model_name: "/home/tangyoubao_google_com/LLaMA-Factory/saves/gemma3-27b/full/fa2_liger_fsdp/checkpoint-14500"
   enable_thinking: false
   vllm_cfg:
     max_model_len: 4096

@@ -15,6 +15,7 @@ class IFEvalDataset:
         system_prompt_file: Optional[str] = None,
     ):
         ds = load_dataset("google/IFEval", split="train")
+        ds = ds.map(self._append_postfix_for_prompt)
         self.rekeyed_ds = ds.map(
             self._rekey, remove_columns=["kwargs", "instruction_id_list"]
         )
@@ -32,3 +33,7 @@ class IFEvalDataset:
             "prompt": data["prompt"],
         }
         return data
+    
+    def _append_postfix_for_prompt(self, example, postfix="/no_think"): # /no_think /think
+        example["prompt"] += f" {postfix}"
+        return example

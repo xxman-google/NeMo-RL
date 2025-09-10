@@ -10,8 +10,9 @@ generation:
   temperature: 0.6
   top_p: 0.95
   enable_thinking: true
+  model_name: "Qwen/Qwen3-8B"
   vllm_cfg:
-    max_model_len: 38912
+    max_model_len: 10240
 
 data:
   dataset_name: "ifeval_like"
@@ -26,4 +27,7 @@ env:
 
 logger:
   log_dir: "logs"  # Base directory for all logs
-  output_dir: "${logger.log_dir}/${data.dataset_name}/thinking_without_extra_prompt_large"
+  output_dir: "${logger.log_dir}/${data.dataset_name}/qwen3-8b-thinking"
+  wandb:
+    project: "qwen3_8b_rejection_sampling"
+    name: "${generation.model_name}-${data.dataset_name}"
