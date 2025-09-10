@@ -10,7 +10,7 @@ env:
     worker_type: "instruction_following"
 
 generation:
-  model_name: "google/gemma-3-27b-pt"
+  model_name: "/home/tangyoubao_google_com/LLaMA-Factory/saves/gemma3-27b/full/fa2_liger_fsdp_packing_bs1_gemma_caht_template"
   # enable_thinking: true
   vllm_cfg:
     max_model_len: 4096
