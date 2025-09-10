@@ -7,7 +7,6 @@ from datasets import load_dataset
 from nemo_rl.data import processors
 from nemo_rl.data.interfaces import TaskDataSpec
 
-
 class IFEvalDataset:
     def __init__(
         self,
@@ -15,7 +14,7 @@ class IFEvalDataset:
         system_prompt_file: Optional[str] = None,
     ):
         ds = load_dataset("google/IFEval", split="train")
-        ds = ds.map(self._append_postfix_for_prompt)
+        # ds = ds.map(self._append_postfix_for_prompt)
         self.rekeyed_ds = ds.map(
             self._rekey, remove_columns=["kwargs", "instruction_id_list"]
         )
