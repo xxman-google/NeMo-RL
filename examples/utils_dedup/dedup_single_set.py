@@ -64,7 +64,7 @@ class Deduplication_Pipeline:
         return redundancy_score    
 
 
-    def _deduplicate_dataset(self, flag_intra_set: bool, df1: pd.DataFrame, df2:pd.DataFrame, similarity_matrix: torch.Tensor, output_path: str):
+    def _deduplicate_dataset(self, flag_intra_set: bool, df1: pd.DataFrame, df2:pd.DataFrame, similarity_matrix: torch.Tensor, output_path: str, flag_save_cleaned: bool):
         """
         Removes redundant samples from the DataFrame df2 and saves the cleaned dataset.
         This optimized version avoids the nested loop for faster execution.
@@ -109,11 +109,13 @@ class Deduplication_Pipeline:
         print(f"Number of samples removed: {len(indices_to_remove)}")
         print(f"Cleaned dataset size: {len(cleaned_df)}")
         
-        os.makedirs(os.path.dirname(f"{output_path}/dedup/"), exist_ok=True)
-        print(f"=====================dir made for {output_path}/dedup/=====================")
-        cleaned_df.to_parquet(f"{output_path}/dedup/{self.threshold}.parquet", engine='pyarrow')
-        print(f"Cleaned dataset saved to {output_path}/dedup/{self.threshold}.parquet")
-        return pairs_indice_score, cleaned_df
+        print("flag_save_cleaned should be set to false", flag_save_cleaned)
+        if flag_save_cleaned:
+            os.makedirs(os.path.dirname(f"{output_path}/dedup/"), exist_ok=True)
+            print(f"=====================dir made for {output_path}/dedup/=====================")
+            cleaned_df.to_parquet(f"{output_path}/dedup/{self.threshold}.parquet", engine='pyarrow')
+            print(f"Cleaned dataset saved to {output_path}/dedup/{self.threshold}.parquet")
+        return pairs_indice_score, indices_to_remove, cleaned_df
     
     
 
@@ -146,9 +148,6 @@ class Dedup_Visualize:
         print(similarity_matrix.shape)
         print(similarity_matrix)
         # Move the result to a small NumPy array for calculation if needed, but it's small.
-        
-        
-        
 
         stats = {
             "number_of_unique_pairs": len(upper_triangle_np),
@@ -400,12 +399,13 @@ class Gen_Embeddings_Similarity_Pipeline:
             if flag_save:
                 print("similarity matrix calculated")
                 print(f"{cosine_score.shape} cosine similarity matrix")
-                simple_matrix = cosine_score.cpu().numpy()
-                print("=====================similarity matrix=====================")
-                print(simple_matrix[0][0])
-                print(simple_matrix)
-                torch.save(simple_matrix, f'{output_dir}/similarity_matrix.pt')
-                print("similarity matrix saved")
+                # simple_matrix = cosine_score.cpu().numpy()
+                # print("=====================similarity matrix=====================")
+                # print(simple_matrix[0][0])
+                # print(simple_matrix)
+                # torch.save(simple_matrix, f'{output_dir}/similarity_matrix.pt')
+                # print("similarity matrix saved")
+                torch.save(cosine_score, f'{output_dir}/similarity_matrix.pt')
             return cosine_score
         else:
             raise ValueError(f"Unsupported metric: {self.metric}")

@@ -37,36 +37,36 @@ You can customize the pipeline's behavior with the following options:
 
 # Example usage:
 # usecase1: intra-set deduplication
-"""
+```
 python3 examples/run_dedup.py --filelist_path_base /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_amc_aime_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet \
   --filelist_path_candidate /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_amc_aime_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet \
   --type intra_list --threshold 0.95 --output_dir ./output_dedup --output_suffix usecase1_test
-"""
+```
 
 # usecase2: cross-set deduplication
-"""
+```
 python3 examples/run_dedup.py --filelist_path_base /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_amc_aime_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet \
   --filelist_path_candidate /gcs/cloud-nas-hns-data/cirrus0.2/openr1_math_amc_aime_qwen3_8b_thinking/train-unboxed-00000-of-00001.parquet \
   --type cross_list --threshold 0.95 --output_dir ./output_dedup --output_suffix usecase2_test
-"""
+```
 
 # usecase3: single file dedup against a list of files
-"""
+```
 python3 examples/run_dedup.py --filelist_path_base /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_amc_aime_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_aops_forum_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet\
   --filelist_path_candidate /gcs/cloud-nas-hns-data/cirrus0.2/openr1_math_amc_aime_qwen3_8b_thinking/train-unboxed-00000-of-00001.parquet \
   --type cross_list --threshold 0.95 --output_dir ./output_dedup --output_suffix usecase3_test
-"""
+```
 
 # usecase4: a list of files dedup against themselves
-"""
+```
 python3 examples/run_dedup.py --filelist_path_base /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_amc_aime_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_aops_forum_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet\
   --filelist_path_candidate /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_amc_aime_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_aops_forum_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet \
   --type intra_list --threshold 0.95 --output_dir ./output_dedup --output_suffix usecase4_test
-"""
+```
 
 # usecase5: a list of files dedup against another list of files
-"""
+```
 python3 examples/run_dedup.py --filelist_path_base /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_amc_aime_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet /gcs/cloud-nas-hns-data/cirrus0.0/openr1_math_aops_forum_qwen3_8b_no_thinking/train-unboxed-00000-of-00001.parquet\
   --filelist_path_candidate /gcs/cloud-nas-hns-data/cirrus0.2/openr1_math_amc_aime_qwen3_8b_thinking/train-unboxed-00000-of-00001.parquet /gcs/cloud-nas-hns-data/cirrus0.2/openr1_math_aops_forum_qwen3_8b_thinking/train-unboxed-00000-of-00001.parquet \
   --type cross_list --threshold 0.95 --output_dir ./output_dedup --output_suffix usecase5_test
-"""
+```

@@ -3,7 +3,7 @@ from utils_dedup.dedup_single_set import Deduplication_Pipeline, Gen_Embeddings_
 import os
 import pyarrow.parquet as pq
 import torch
-
+from tqdm import tqdm
 
 def load_data_to_df(path):
     """
@@ -87,9 +87,10 @@ def dedup_cross_set(args, df_base, df_candidate, base_suffix, candidate_suffix, 
         threshold=args.threshold,
     )
     flag_intra_set = True if type_dedup=='intra_set' else False
-    indices_scores, cleaned_df = dedup_single_set_pipeline._deduplicate_dataset(flag_intra_set=flag_intra_set, df1=df_base, df2=df_candidate, similarity_matrix=similarity_matrix, output_path=output_dir)
+    # set flag_save_cleaned to False for ablation study; to True for normal runs
+    indices_scores, indices_to_remove, cleaned_df = dedup_single_set_pipeline._deduplicate_dataset(flag_intra_set=flag_intra_set, df1=df_base, df2=df_candidate, similarity_matrix=similarity_matrix, output_path=output_dir, flag_save_cleaned=False)
     # always calculate redundancy score and showcase pairs for cross-set deduplication
-    dedup_single_set_pipeline._calculate_redundancy_score(indices_scores, len(questions_candidate), output_dir)
+    dedup_single_set_pipeline._calculate_redundancy_score(indices_to_remove, len(questions_candidate), output_dir)
     dedup_visualize._showcase_pairs(df1 = df_base, df2 = df_candidate, indices_scores = indices_scores, threshold = args.threshold, output_dir = output_dir)
     
     return indices_scores, cleaned_df
@@ -106,13 +107,13 @@ def dedup_cross_filelist(args):
     gen_embed_sim_pipeline = Gen_Embeddings_Similarity_Pipeline(args.model_name, args.metric)
     gen_embed_sim_pipeline._load_model()
     
-    for i in range(num_files_candidate):
+    for i in tqdm(range(num_files_candidate), desc="Processing candidate files"):
         if not os.path.exists(args.filelist_path_candidate[i]):
             raise FileNotFoundError(f"Candidate data file not found at: {args.filelist_path_candidate[i]}")
         df_candidate = load_data_to_df(args.filelist_path_candidate[i])
         indices_to_remove = set()
         
-        for j in range(num_files_base):
+        for j in tqdm(range(num_files_base), desc=f"Deduplicating against base files for candidate file {i+1}/{num_files_candidate}"):
             if args.type == 'intra_list' and j < i:
                 continue
             if not os.path.exists(args.filelist_path_base[j]):
@@ -132,7 +133,7 @@ def dedup_cross_filelist(args):
                 type_dedup = 'intra_set'
                 
             indices_scores, _ = dedup_cross_set(args=args, df_base=df_base, df_candidate=df_candidate, base_suffix=base_suffix, \
-                                                candidate_suffix=candidate_suffix, flag_save=False, flag_visualize= False, type_dedup=type_dedup)
+                                                candidate_suffix=candidate_suffix, flag_save=True, flag_visualize= False, type_dedup=type_dedup)
             indices_to_remove.update({idx_candidate for (idx_base, idx_candidate), score in indices_scores})
             
             print(f"Completed deduplication for candidate file: {file_path_candidate} against base file: {file_path_base}")
