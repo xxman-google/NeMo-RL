@@ -15,20 +15,20 @@ disable_caching()
 
 _TEST_LENGTH_LIMIT = 10000000
 
+_FORMATTED_PROMPT_GENERAL = """
+{}
+
+Remember to import any missing modules in the code, and enclose your code within delimiters like this:
+```python
+```
+"""
+
 _FORMATTED_PROMPT_WITH_STARTER_CODE = """
 {}
 
 You will use the following starter code to write the solution to the problem and enclose your code within delimiters. Also, remember to import any missing modules in the code.
 ```python
 {}
-```
-"""
-
-_FORMATTED_PROMPT_GENERAL = """
-{}
-
-Remember to import any missing modules in the code, and enclose your code within delimiters like this:
-```python
 ```
 """
 
@@ -108,6 +108,7 @@ class DeepCoderPreviewDataset:
             return {
                 "question": example["problem"],
                 "prompt": self._create_custom_user_prompt(example),
+                "meta_info": self._create_meta_info(example, tests),
                 "tests": self._create_functional_tests(example, tests),
                 "code_exe_dir": self.code_exe_dir,
             }
@@ -120,6 +121,14 @@ class DeepCoderPreviewDataset:
         elif self.subset == "taco":
             fn_name = json.loads(example["tests_str"])["fn_name"]
             return _FORMATTED_PROMPT_WITH_FN_NAME.format(example["problem"], fn_name).strip()
+        
+    def _create_meta_info(self, example: dict[str, Any], tests: list[dict]):
+        if self.subset == "lcbv5":
+            return {"starter_code": example["starter_code"]}
+        elif self.subset == "primeintellect":
+            return {"fn_name": tests[0]["fn_name"]}
+        elif self.subset == "taco":
+            return {"fn_name": json.loads(example["tests_str"])["fn_name"]}
 
     def _create_functional_tests(self, example: dict[str, Any], tests: list[dict]):
         if self.subset == "lcbv5":

@@ -3,9 +3,9 @@
 dataset_name="deepcoder_preview"
 
 # model_names=("qwen3_14b_code_no_thinking" "qwen3_14b_code_thinking")
-model_names=("qwen3_8b_code_no_thinking")
+model_names=("qwen3_14b_code_no_thinking")
 subsets=("lcbv5" "primeintellect" "taco")
-test_types=("functional")
+test_types=("stdio" "functional")
 
 for model_name in "${model_names[@]}"; do
   config_path="examples/configs/rejection_sampling/${model_name}.yaml"
@@ -50,6 +50,7 @@ for model_name in "${model_names[@]}"; do
       data.dataset_name=$dataset_name \
       data.subset=$subset \
       data.test_type=$test_type \
+      data.source="" \
       env.code.worker_type=$worker_type
       sleep 20
     done

@@ -118,10 +118,11 @@ def code_processor(
     problem = datum_dict["question"]
     extra_env_info = {
         "problem": problem,
-        # In case the previous code failed to convert str to list of dict, perform the conversion here.
         "tests": datum_dict["tests"],
         "working_dir": datum_dict["code_exe_dir"],
     }
+    if datum_dict.get("meta_info"):
+        extra_env_info["meta_info"] = datum_dict["meta_info"]
     if datum_dict.get("base_imports"):
         extra_env_info["base_imports"] = datum_dict["base_imports"]
     message_log: LLMMessageLogType = []
